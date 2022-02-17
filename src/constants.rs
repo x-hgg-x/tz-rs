@@ -1,0 +1,18 @@
+pub const SECONDS_PER_MINUTE: i64 = 60;
+pub const MINUTES_PER_HOUR: i64 = 60;
+pub const HOURS_PER_DAY: i64 = 24;
+pub const SECONDS_PER_HOUR: i64 = 3600;
+pub const SECONDS_PER_DAY: i64 = 86400;
+pub const DAYS_PER_WEEK: i64 = 7;
+pub const DAYS_PER_NORMAL_YEAR: i64 = 365;
+pub const DAYS_PER_4_YEARS: i64 = DAYS_PER_NORMAL_YEAR * 4 + 1;
+pub const DAYS_PER_100_YEARS: i64 = DAYS_PER_NORMAL_YEAR * 100 + 24;
+pub const DAYS_PER_400_YEARS: i64 = DAYS_PER_NORMAL_YEAR * 400 + 97;
+
+pub const DAY_IN_MONTHS_NORMAL_YEAR: [i64; 12] = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+pub const CUM_DAY_IN_MONTHS_NORMAL_YEAR: [i64; 12] = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
+
+// 2000-03-01 (Wed) at 00:00:00 UTC
+pub const UNIX_OFFSET_SECS: i64 = 951868800;
+pub const OFFSET_DAYS: i64 = 31 + 28;
+pub const OFFSET_YEARS: i64 = 100;
