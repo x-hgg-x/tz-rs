@@ -2,7 +2,13 @@
 name = "tz-rs"
 version = "0.1.0"
 edition = "2021"
+authors = ["x-hgg-x"]
+repository = "https://github.com/x-hgg-x/tz-rs"
+description = "A pure Rust reimplementation of libc functions localtime, gmtime and mktime."
 license = "MIT/Apache-2.0"
+keywords = ["date", "time", "timezone", "zone", "calendar"]
+categories = ["date-and-time", "parser-implementations"]
+readme = "README.md"
 
 [lib]
 name = "tz"
