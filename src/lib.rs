@@ -131,7 +131,7 @@ pub enum TzError {
     /// Unified error for parsing a TZ string
     TzStringError(TzStringError),
     /// Date time input error
-    DateTimeInputError,
+    DateTimeInputError(&'static str),
 }
 
 impl fmt::Display for TzError {
@@ -142,7 +142,7 @@ impl fmt::Display for TzError {
             Self::SystemTimeError(error) => error.fmt(f),
             Self::TzFileError(error) => error.fmt(f),
             Self::TzStringError(error) => error.fmt(f),
-            Self::DateTimeInputError => write!(f, "invalid date time input"),
+            Self::DateTimeInputError(error) => write!(f, "invalid date time input: {}", error),
         }
     }
 }
@@ -574,15 +574,20 @@ impl UtcDateTime {
 
         let year = full_year - 1900;
 
-        let mut check = true;
-        check = check && (0..=11).contains(&month);
-        check = check && (1..=31).contains(&month_day);
-        check = check && (0..=23).contains(&hour);
-        check = check && (0..=59).contains(&minute);
-        check = check && (0..=60).contains(&second);
-
-        if !check {
-            return Err(TzError::DateTimeInputError);
+        if !(0..=11).contains(&month) {
+            return Err(TzError::DateTimeInputError("invalid month"));
+        }
+        if !(1..=31).contains(&month_day) {
+            return Err(TzError::DateTimeInputError("invalid month day"));
+        }
+        if !(0..=23).contains(&hour) {
+            return Err(TzError::DateTimeInputError("invalid hour"));
+        }
+        if !(0..=59).contains(&minute) {
+            return Err(TzError::DateTimeInputError("invalid minute"));
+        }
+        if !(0..=60).contains(&second) {
+            return Err(TzError::DateTimeInputError("invalid second"));
         }
 
         let leap = is_leap_year(year) as i64;
@@ -593,7 +598,7 @@ impl UtcDateTime {
         }
 
         if month_day as i64 > day_in_month {
-            return Err(TzError::DateTimeInputError);
+            return Err(TzError::DateTimeInputError("invalid month day"));
         }
 
         let days_since_unix_epoch = days_since_unix_epoch(year, month.into(), month_day.into());

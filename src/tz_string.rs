@@ -20,9 +20,9 @@ pub enum TzStringError {
     /// I/O error
     IoError(io::Error),
     /// Invalid TZ string
-    InvalidTzString,
+    InvalidTzString(&'static str),
     /// Unsupported TZ string
-    UnsupportedTzString,
+    UnsupportedTzString(&'static str),
 }
 
 impl fmt::Display for TzStringError {
@@ -31,8 +31,8 @@ impl fmt::Display for TzStringError {
             Self::Utf8Error(error) => error.fmt(f),
             Self::ParseIntError(error) => error.fmt(f),
             Self::IoError(error) => error.fmt(f),
-            Self::InvalidTzString => write!(f, "invalid TZ string"),
-            Self::UnsupportedTzString => write!(f, "unsupported TZ string"),
+            Self::InvalidTzString(error) => write!(f, "invalid TZ string: {}", error),
+            Self::UnsupportedTzString(error) => write!(f, "unsupported TZ string: {}", error),
         }
     }
 }
@@ -70,7 +70,7 @@ fn parse_time_zone_designation<'a>(cursor: &mut Cursor<'a>) -> Result<&'a [u8], 
         cursor.read_exact(1)?;
 
         if !unquoted.iter().all(|&x| x.is_ascii_alphanumeric() || x == b'+' || x == b'-') {
-            return Err(TzStringError::InvalidTzString);
+            return Err(TzStringError::InvalidTzString("invalid characters in time zone designation"));
         }
 
         unquoted
@@ -79,7 +79,7 @@ fn parse_time_zone_designation<'a>(cursor: &mut Cursor<'a>) -> Result<&'a [u8], 
     };
 
     if unquoted.len() < 3 {
-        return Err(TzStringError::InvalidTzString);
+        return Err(TzStringError::InvalidTzString("invalid characters in time zone designation"));
     }
 
     Ok(unquoted)
@@ -121,8 +121,14 @@ fn parse_signed_hhmmss(cursor: &mut Cursor) -> Result<(i32, i32, i32, i32), TzSt
 fn parse_offset(cursor: &mut Cursor) -> Result<i32, TzStringError> {
     let (sign, hour, minute, second) = parse_signed_hhmmss(cursor)?;
 
-    if !((0..=24).contains(&hour) && (0..=59).contains(&minute) && (0..=59).contains(&second)) {
-        return Err(TzStringError::InvalidTzString);
+    if !(0..=24).contains(&hour) {
+        return Err(TzStringError::InvalidTzString("invalid offset hour"));
+    }
+    if !(0..=59).contains(&minute) {
+        return Err(TzStringError::InvalidTzString("invalid offset minute"));
+    }
+    if !(0..=59).contains(&second) {
+        return Err(TzStringError::InvalidTzString("invalid offset second"));
     }
 
     Ok(sign * (hour * 3600 + minute * 60 + second))
@@ -144,8 +150,14 @@ fn parse_rule_day(cursor: &mut Cursor) -> Result<RuleDay, TzStringError> {
             cursor.read_tag(b".")?;
             let week_day = parse_int(cursor.read_while(u8::is_ascii_digit)?)?;
 
-            if !((1..=12).contains(&month) && (1..=5).contains(&week) && (0..=6).contains(&week_day)) {
-                return Err(TzStringError::InvalidTzString);
+            if !(1..=12).contains(&month) {
+                return Err(TzStringError::InvalidTzString("invalid rule day month"));
+            }
+            if !(1..=5).contains(&week) {
+                return Err(TzStringError::InvalidTzString("invalid rule day week"));
+            }
+            if !(0..=6).contains(&week_day) {
+                return Err(TzStringError::InvalidTzString("invalid rule day week day"));
             }
 
             Ok(RuleDay::MonthWeekDay { month, week, week_day })
@@ -158,8 +170,14 @@ fn parse_rule_day(cursor: &mut Cursor) -> Result<RuleDay, TzStringError> {
 fn parse_rule_time(cursor: &mut Cursor) -> Result<i32, TzStringError> {
     let (hour, minute, second) = parse_hhmmss(cursor)?;
 
-    if !((0..=24).contains(&hour) && (0..=59).contains(&minute) && (0..=59).contains(&second)) {
-        return Err(TzStringError::InvalidTzString);
+    if !(0..=24).contains(&hour) {
+        return Err(TzStringError::InvalidTzString("invalid day time hour"));
+    }
+    if !(0..=59).contains(&minute) {
+        return Err(TzStringError::InvalidTzString("invalid day time minute"));
+    }
+    if !(0..=59).contains(&second) {
+        return Err(TzStringError::InvalidTzString("invalid day time second"));
     }
 
     Ok(hour * 3600 + minute * 60 + second)
@@ -169,8 +187,14 @@ fn parse_rule_time(cursor: &mut Cursor) -> Result<i32, TzStringError> {
 fn parse_rule_time_extended(cursor: &mut Cursor) -> Result<i32, TzStringError> {
     let (sign, hour, minute, second) = parse_signed_hhmmss(cursor)?;
 
-    if !((-167..=167).contains(&hour) && (0..=59).contains(&minute) && (0..=59).contains(&second)) {
-        return Err(TzStringError::InvalidTzString);
+    if !(-167..=167).contains(&hour) {
+        return Err(TzStringError::InvalidTzString("invalid day time hour"));
+    }
+    if !(0..=59).contains(&minute) {
+        return Err(TzStringError::InvalidTzString("invalid day time minute"));
+    }
+    if !(0..=59).contains(&second) {
+        return Err(TzStringError::InvalidTzString("invalid day time second"));
     }
 
     Ok(sign * (hour * 3600 + minute * 60 + second))
@@ -212,11 +236,11 @@ pub(crate) fn parse_posix_tz(tz_string: &[u8], use_string_extensions: bool) -> R
     let dst_offset = match cursor.remaining().get(0) {
         Some(&b',') => std_offset - 3600,
         Some(_) => parse_offset(&mut cursor)?,
-        None => return Err(TzStringError::UnsupportedTzString),
+        None => return Err(TzStringError::UnsupportedTzString("DST start and end rules must be provided")),
     };
 
     if cursor.is_empty() {
-        return Err(TzStringError::UnsupportedTzString);
+        return Err(TzStringError::UnsupportedTzString("DST start and end rules must be provided"));
     }
 
     cursor.read_tag(b",")?;
