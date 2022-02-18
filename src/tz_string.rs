@@ -1,5 +1,5 @@
 use crate::cursor::Cursor;
-use crate::{LocalTime, RuleDay, TransitionRule};
+use crate::{LocalTimeType, RuleDay, TransitionRule};
 
 use std::error;
 use std::fmt;
@@ -182,7 +182,7 @@ pub(crate) fn parse_posix_tz(tz_string: &[u8], use_string_extensions: bool) -> R
     let std_offset = parse_offset(&mut cursor)?;
 
     if cursor.is_empty() {
-        return Ok(TransitionRule::Fixed(LocalTime { ut_offset: -std_offset, is_dst: false, time_zone_designation: std_time_zone }));
+        return Ok(TransitionRule::Fixed(LocalTimeType { ut_offset: -std_offset, is_dst: false, time_zone_designation: std_time_zone }));
     }
 
     let dst_time_zone = str::from_utf8(parse_time_zone_designation(&mut cursor)?)?.to_owned();
@@ -204,8 +204,8 @@ pub(crate) fn parse_posix_tz(tz_string: &[u8], use_string_extensions: bool) -> R
     let (dst_end, dst_end_time) = parse_rule_block(&mut cursor, use_string_extensions)?;
 
     Ok(TransitionRule::Alternate {
-        std: LocalTime { ut_offset: -std_offset, is_dst: false, time_zone_designation: std_time_zone },
-        dst: LocalTime { ut_offset: -dst_offset, is_dst: true, time_zone_designation: dst_time_zone },
+        std: LocalTimeType { ut_offset: -std_offset, is_dst: false, time_zone_designation: std_time_zone },
+        dst: LocalTimeType { ut_offset: -dst_offset, is_dst: true, time_zone_designation: dst_time_zone },
         dst_start,
         dst_start_time,
         dst_end,

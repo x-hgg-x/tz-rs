@@ -1,6 +1,6 @@
 use crate::cursor::Cursor;
 use crate::tz_string::{self, TzStringError};
-use crate::{LeapSecond, LocalTime, TimeZone, Transition, TransitionRule, TzError};
+use crate::{LeapSecond, LocalTimeType, TimeZone, Transition, TransitionRule, TzError};
 
 use std::array::TryFromSliceError;
 use std::error;
@@ -118,7 +118,7 @@ struct DataBlock<'a> {
     time_size: usize,
     transition_times: &'a [u8],
     transition_types: &'a [u8],
-    local_times: &'a [u8],
+    local_time_types: &'a [u8],
     time_zone_designations: &'a [u8],
     leap_seconds: &'a [u8],
     std_walls: &'a [u8],
@@ -136,7 +136,7 @@ impl<'a> DataBlock<'a> {
             time_size,
             transition_times: cursor.read_exact(header.transition_count * time_size)?,
             transition_types: cursor.read_exact(header.transition_count)?,
-            local_times: cursor.read_exact(header.type_count * 6)?,
+            local_time_types: cursor.read_exact(header.type_count * 6)?,
             time_zone_designations: cursor.read_exact(header.char_count)?,
             leap_seconds: cursor.read_exact(header.leap_count * (time_size + 4))?,
             std_walls: cursor.read_exact(header.std_wall_count)?,
@@ -153,23 +153,23 @@ impl<'a> DataBlock<'a> {
 
     fn parse(&self, header: &Header) -> Result<TimeZone, TzFileError> {
         let mut transitions = Vec::with_capacity(header.transition_count);
-        for (arr_time, &local_time_index) in self.transition_times.chunks_exact(self.time_size).zip(self.transition_types) {
+        for (arr_time, &local_time_type_index) in self.transition_times.chunks_exact(self.time_size).zip(self.transition_types) {
             let unix_leap_time = self.parse_time(&arr_time[0..self.time_size], header.version)?;
 
-            let local_time_index = local_time_index as usize;
-            if local_time_index >= header.type_count {
+            let local_time_type_index = local_time_type_index as usize;
+            if local_time_type_index >= header.type_count {
                 return Err(TzFileError::InvalidTzFile);
             }
 
-            transitions.push(Transition { unix_leap_time, local_time_index });
+            transitions.push(Transition { unix_leap_time, local_time_type_index });
         }
 
         if !transitions.windows(2).all(|x| x[0].unix_leap_time < x[1].unix_leap_time) {
             return Err(TzFileError::InvalidTzFile);
         }
 
-        let mut local_times = Vec::with_capacity(header.type_count);
-        for arr in self.local_times.chunks_exact(6) {
+        let mut local_time_types = Vec::with_capacity(header.type_count);
+        for arr in self.local_time_types.chunks_exact(6) {
             let ut_offset = i32::from_be_bytes(arr[0..4].try_into()?);
             if ut_offset == i32::MIN {
                 return Err(TzFileError::InvalidTzFile);
@@ -191,7 +191,7 @@ impl<'a> DataBlock<'a> {
                 None => return Err(TzFileError::InvalidTzFile),
             };
 
-            local_times.push(LocalTime { ut_offset, is_dst, time_zone_designation });
+            local_time_types.push(LocalTimeType { ut_offset, is_dst, time_zone_designation });
         }
 
         let mut leap_seconds = Vec::with_capacity(header.leap_count);
@@ -220,7 +220,7 @@ impl<'a> DataBlock<'a> {
             }
         }
 
-        Ok(TimeZone { transitions, local_times, leap_seconds, extra_rule: None })
+        Ok(TimeZone { transitions, local_time_types, leap_seconds, extra_rule: None })
     }
 }
 
@@ -276,10 +276,10 @@ pub(crate) fn parse_tz_file(bytes: &[u8]) -> Result<TimeZone, TzError> {
 
             // Check extra rule
             if let (Some(extra_rule), Some(last_transition)) = (&time_zone.extra_rule, time_zone.transitions.last()) {
-                let last_local_time = &time_zone.local_times[last_transition.local_time_index];
-                let rule_local_time = extra_rule.find_local_time(time_zone.unix_leap_time_to_unix_time(last_transition.unix_leap_time))?;
+                let last_local_time_type = &time_zone.local_time_types[last_transition.local_time_type_index];
+                let rule_local_time_type = extra_rule.find_local_time_type(time_zone.unix_leap_time_to_unix_time(last_transition.unix_leap_time))?;
 
-                if last_local_time != rule_local_time {
+                if last_local_time_type != rule_local_time_type {
                     return Err(TzFileError::InvalidTzFile.into());
                 }
             }

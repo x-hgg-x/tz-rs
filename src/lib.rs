@@ -63,7 +63,7 @@ impl From<TzStringError> for TzError {
 #[derive(Debug, Copy, Clone)]
 struct Transition {
     unix_leap_time: i64,
-    local_time_index: usize,
+    local_time_type_index: usize,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -73,13 +73,13 @@ struct LeapSecond {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct LocalTime {
+pub struct LocalTimeType {
     ut_offset: i32,
     is_dst: bool,
     time_zone_designation: String,
 }
 
-impl LocalTime {
+impl LocalTimeType {
     pub fn ut_offset(&self) -> i32 {
         self.ut_offset
     }
@@ -165,14 +165,14 @@ impl RuleDay {
 
 #[derive(Debug, Clone)]
 enum TransitionRule {
-    Fixed(LocalTime),
-    Alternate { std: LocalTime, dst: LocalTime, dst_start: RuleDay, dst_start_time: i32, dst_end: RuleDay, dst_end_time: i32 },
+    Fixed(LocalTimeType),
+    Alternate { std: LocalTimeType, dst: LocalTimeType, dst_start: RuleDay, dst_start_time: i32, dst_end: RuleDay, dst_end_time: i32 },
 }
 
 impl TransitionRule {
-    fn find_local_time(&self, unix_time: i64) -> Result<&LocalTime, TzError> {
+    fn find_local_time_type(&self, unix_time: i64) -> Result<&LocalTimeType, TzError> {
         match self {
-            Self::Fixed(local_time) => Ok(local_time),
+            Self::Fixed(local_time_type) => Ok(local_time_type),
             Self::Alternate { std, dst, dst_start, dst_start_time, dst_end, dst_end_time } => {
                 let dst_start_time_in_utc = (dst_start_time - std.ut_offset).into();
                 let dst_end_time_in_utc = (dst_end_time - dst.ut_offset).into();
@@ -241,7 +241,7 @@ impl TransitionRule {
 #[derive(Debug, Clone)]
 pub struct TimeZone {
     transitions: Vec<Transition>,
-    local_times: Vec<LocalTime>,
+    local_time_types: Vec<LocalTimeType>,
     leap_seconds: Vec<LeapSecond>,
     extra_rule: Option<TransitionRule>,
 }
@@ -254,9 +254,9 @@ impl TimeZone {
     pub fn fixed(ut_offset: i32) -> Self {
         Self {
             transitions: Vec::new(),
-            local_times: vec![LocalTime::with_ut_offset(ut_offset)],
+            local_time_types: vec![LocalTimeType::with_ut_offset(ut_offset)],
             leap_seconds: Vec::new(),
-            extra_rule: Some(TransitionRule::Fixed(LocalTime::with_ut_offset(ut_offset))),
+            extra_rule: Some(TransitionRule::Fixed(LocalTimeType::with_ut_offset(ut_offset))),
         }
     }
 
@@ -286,33 +286,33 @@ impl TimeZone {
                 let tz_string = tz_string.trim_matches(|c: char| c.is_ascii_whitespace());
                 let rule = tz_string::parse_posix_tz(tz_string.as_bytes(), false)?;
 
-                let local_times = match &rule {
-                    TransitionRule::Fixed(local_time) => vec![local_time.clone()],
+                let local_time_types = match &rule {
+                    TransitionRule::Fixed(local_time_type) => vec![local_time_type.clone()],
                     TransitionRule::Alternate { std, dst, .. } => vec![std.clone(), dst.clone()],
                 };
-                Ok(TimeZone { transitions: Vec::new(), local_times, leap_seconds: Vec::new(), extra_rule: Some(rule) })
+                Ok(TimeZone { transitions: Vec::new(), local_time_types, leap_seconds: Vec::new(), extra_rule: Some(rule) })
             }
         }
     }
 
-    pub fn find_local_time(&self, unix_time: i64) -> Result<&LocalTime, TzError> {
+    pub fn find_local_time_type(&self, unix_time: i64) -> Result<&LocalTimeType, TzError> {
         match self.transitions.last() {
             None => match &self.extra_rule {
-                Some(extra_rule) => extra_rule.find_local_time(unix_time),
-                None => Ok(&self.local_times[0]),
+                Some(extra_rule) => extra_rule.find_local_time_type(unix_time),
+                None => Ok(&self.local_time_types[0]),
             },
             Some(last_transition) => {
                 let unix_leap_time = self.unix_time_to_unix_leap_time(unix_time);
 
                 if unix_leap_time >= last_transition.unix_leap_time {
                     match &self.extra_rule {
-                        Some(extra_rule) => extra_rule.find_local_time(unix_time),
-                        None => Ok(&self.local_times[last_transition.local_time_index]),
+                        Some(extra_rule) => extra_rule.find_local_time_type(unix_time),
+                        None => Ok(&self.local_time_types[last_transition.local_time_type_index]),
                     }
                 } else {
                     let index = self.transitions.partition_point(|x| x.unix_leap_time <= unix_leap_time);
-                    let local_time = if index > 0 { &self.local_times[self.transitions[index - 1].local_time_index] } else { &self.local_times[0] };
-                    Ok(local_time)
+                    let local_time_type_index = if index > 0 { self.transitions[index - 1].local_time_type_index } else { 0 };
+                    Ok(&self.local_time_types[local_time_type_index])
                 }
             }
         }
@@ -407,7 +407,7 @@ impl UtcDateTime {
             year: self.year,
             week_day: self.week_day,
             year_day: self.year_day,
-            local_time: LocalTime::with_ut_offset(0),
+            local_time_type: LocalTimeType::with_ut_offset(0),
         }
     }
 }
@@ -431,7 +431,7 @@ pub struct DateTime {
     /// Days since January 1 in `[0, 365]`
     year_day: u16,
     /// Local time parameters
-    local_time: LocalTime,
+    local_time_type: LocalTimeType,
 }
 
 impl DateTime {
@@ -471,8 +471,8 @@ impl DateTime {
         self.year_day
     }
 
-    pub fn local_time(&self) -> &LocalTime {
-        &self.local_time
+    pub fn local_time_type(&self) -> &LocalTimeType {
+        &self.local_time_type
     }
 
     pub fn from_utc_date_time(time_zone: &TimeZone, utc_date_time: UtcDateTime) -> Result<Self, TzError> {
@@ -482,9 +482,9 @@ impl DateTime {
     pub fn from_unix_time(time_zone: &TimeZone, unix_time: i64) -> Result<Self, TzError> {
         use constants::*;
 
-        let local_time = time_zone.find_local_time(unix_time)?;
+        let local_time_type = time_zone.find_local_time_type(unix_time)?;
 
-        let seconds = unix_time + local_time.ut_offset as i64 - UNIX_OFFSET_SECS;
+        let seconds = unix_time + local_time_type.ut_offset as i64 - UNIX_OFFSET_SECS;
         let mut remaining_days = seconds / SECONDS_PER_DAY;
         let mut remaining_seconds = seconds % SECONDS_PER_DAY;
         if remaining_seconds < 0 {
@@ -538,7 +538,7 @@ impl DateTime {
             year: year.try_into()?,
             week_day: week_day.try_into()?,
             year_day: year_day.try_into()?,
-            local_time: local_time.clone(),
+            local_time_type: local_time_type.clone(),
         })
     }
 
@@ -552,7 +552,7 @@ impl DateTime {
         result += self.minute as i64;
         result *= SECONDS_PER_MINUTE;
         result += self.second as i64;
-        result -= self.local_time.ut_offset as i64;
+        result -= self.local_time_type.ut_offset as i64;
 
         result
     }

@@ -7,15 +7,16 @@ A pure Rust reimplementation of libc functions `localtime`, `gmtime` and `mktime
 ### Construct a time zone object
 
 ```rust
-    let unix_time = 946684800; // 2000-01-01T00:00:00Z
+    // 2000-01-01T00:00:00Z
+    let unix_time = 946684800;
 
     // Get UTC time zone
     let time_zone_utc = TimeZone::utc();
-    assert_eq!(time_zone_utc.find_local_time(unix_time)?.ut_offset(), 0);
+    assert_eq!(time_zone_utc.find_local_time_type(unix_time)?.ut_offset(), 0);
 
     // Get fixed time zone at GMT-1
     let time_zone_fixed = TimeZone::fixed(-3600);
-    assert_eq!(time_zone_fixed.find_local_time(unix_time)?.ut_offset(), -3600);
+    assert_eq!(time_zone_fixed.find_local_time_type(unix_time)?.ut_offset(), -3600);
 
     // Get local time zone
     TimeZone::local()?;
@@ -35,7 +36,8 @@ A pure Rust reimplementation of libc functions `localtime`, `gmtime` and `mktime
 
 ```rust
     // Create a new UTC date time
-    let utc_date_time = UtcDateTime::new(2000, 0, 1, 0, 0, 0)?; // 2000-01-01T00:00:00Z
+    // 2000-01-01T00:00:00Z
+    let utc_date_time = UtcDateTime::new(2000, 0, 1, 0, 0, 0)?;
     let date_time = utc_date_time.to_date_time();
     assert_eq!(date_time.second(), 0);
     assert_eq!(date_time.minute(), 0);
@@ -46,12 +48,13 @@ A pure Rust reimplementation of libc functions `localtime`, `gmtime` and `mktime
     assert_eq!(date_time.full_year(), 2000);
     assert_eq!(date_time.week_day(), 6);
     assert_eq!(date_time.year_day(), 0);
-    assert_eq!(date_time.local_time().ut_offset(), 0);
+    assert_eq!(date_time.local_time_type().ut_offset(), 0);
 
     // Create a date time from a time zone and an UTC date time
     let time_zone_fixed = TimeZone::fixed(-3600);
 
-    let utc_date_time = UtcDateTime::new(2000, 0, 1, 0, 0, 0)?; // 2000-01-01T00:00:00Z
+    // 2000-01-01T00:00:00Z
+    let utc_date_time = UtcDateTime::new(2000, 0, 1, 0, 0, 0)?;
     let date_time = DateTime::from_utc_date_time(&time_zone_fixed, utc_date_time)?;
     assert_eq!(date_time.second(), 0);
     assert_eq!(date_time.minute(), 0);
@@ -62,10 +65,11 @@ A pure Rust reimplementation of libc functions `localtime`, `gmtime` and `mktime
     assert_eq!(date_time.full_year(), 1999);
     assert_eq!(date_time.week_day(), 5);
     assert_eq!(date_time.year_day(), 364);
-    assert_eq!(date_time.local_time().ut_offset(), -3600);
+    assert_eq!(date_time.local_time_type().ut_offset(), -3600);
 
     // Create a date time from a time zone and an unix time
-    let date_time = DateTime::from_unix_time(&time_zone_fixed, 946684800)?; // 2000-01-01T00:00:00Z
+    // 2000-01-01T00:00:00Z
+    let date_time = DateTime::from_unix_time(&time_zone_fixed, 946684800)?;
     assert_eq!(date_time.second(), 0);
     assert_eq!(date_time.minute(), 0);
     assert_eq!(date_time.hour(), 23);
@@ -75,7 +79,7 @@ A pure Rust reimplementation of libc functions `localtime`, `gmtime` and `mktime
     assert_eq!(date_time.full_year(), 1999);
     assert_eq!(date_time.week_day(), 5);
     assert_eq!(date_time.year_day(), 364);
-    assert_eq!(date_time.local_time().ut_offset(), -3600);
+    assert_eq!(date_time.local_time_type().ut_offset(), -3600);
 
     // Get the corresponding UTC unix time
     let unix_time = date_time.unix_time();
