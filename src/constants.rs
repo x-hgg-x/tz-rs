@@ -12,6 +12,8 @@ pub const SECONDS_PER_HOUR: i64 = 3600;
 pub const SECONDS_PER_DAY: i64 = 86400;
 /// Number of days in one week
 pub const DAYS_PER_WEEK: i64 = 7;
+/// Number of months in one year
+pub const MONTHS_PER_YEAR: i64 = 12;
 /// Number of days in a normal year
 pub const DAYS_PER_NORMAL_YEAR: i64 = 365;
 /// Number of days in 4 years (including 1 leap year)
@@ -32,3 +34,5 @@ pub const UNIX_OFFSET_SECS: i64 = 951868800;
 pub const OFFSET_DAYS: i64 = 31 + 28;
 /// Number of years between `2000` and `1900`
 pub const OFFSET_YEARS: i64 = 100;
+/// Month days in a leap year from March
+pub const DAY_IN_MONTHS_LEAP_YEAR_FROM_MARCH: [i64; 12] = [31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29];

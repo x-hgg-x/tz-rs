@@ -117,6 +117,9 @@ use std::time::{SystemTime, SystemTimeError};
 use tz_file::TzFileError;
 use tz_string::TzStringError;
 
+/// Alias for [`std::result::Result`] with the crate unified error
+pub type Result<T> = std::result::Result<T, TzError>;
+
 /// Unified error type for everything in the crate
 #[non_exhaustive]
 #[derive(Debug)]
@@ -137,7 +140,7 @@ pub enum TzError {
 }
 
 impl fmt::Display for TzError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::ConversionError(error) => error.fmt(f),
             Self::IoError(error) => error.fmt(f),
@@ -183,7 +186,7 @@ impl From<TzStringError> for TzError {
 }
 
 /// Transition of a TZif file
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 struct Transition {
     /// Unix leap time
     unix_leap_time: i64,
@@ -192,7 +195,7 @@ struct Transition {
 }
 
 /// Leap second of a TZif file
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 struct LeapSecond {
     /// Unix leap time
     unix_leap_time: i64,
@@ -239,7 +242,7 @@ impl LocalTimeType {
 }
 
 /// Transition rule day
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 enum RuleDay {
     /// Julian day in `[1, 365]`, without taking occasional Feb 29 into account, which is not referenceable
     Julian1WithoutLeap(u16),
@@ -330,7 +333,7 @@ impl RuleDay {
 }
 
 /// Transition rule
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 enum TransitionRule {
     /// Fixed local time type
     Fixed(LocalTimeType),
@@ -353,7 +356,7 @@ enum TransitionRule {
 
 impl TransitionRule {
     /// Find the local time type associated to the transition rule at the specified unix time in seconds
-    fn find_local_time_type(&self, unix_time: i64) -> Result<&LocalTimeType, TzError> {
+    fn find_local_time_type(&self, unix_time: i64) -> Result<&LocalTimeType> {
         match self {
             Self::Fixed(local_time_type) => Ok(local_time_type),
             Self::Alternate { std, dst, dst_start, dst_start_time, dst_end, dst_end_time } => {
@@ -422,7 +425,7 @@ impl TransitionRule {
 }
 
 /// Time zone
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct TimeZone {
     /// List of transitions
     transitions: Vec<Transition>,
@@ -442,21 +445,16 @@ impl TimeZone {
 
     /// Returns time zone with fixed UTC offset in seconds
     pub fn fixed(ut_offset: i32) -> Self {
-        Self {
-            transitions: Vec::new(),
-            local_time_types: vec![LocalTimeType::with_ut_offset(ut_offset)],
-            leap_seconds: Vec::new(),
-            extra_rule: Some(TransitionRule::Fixed(LocalTimeType::with_ut_offset(ut_offset))),
-        }
+        Self { transitions: Vec::new(), local_time_types: vec![LocalTimeType::with_ut_offset(ut_offset)], leap_seconds: Vec::new(), extra_rule: None }
     }
 
     /// Returns local time zone
-    pub fn local() -> Result<Self, TzError> {
+    pub fn local() -> Result<Self> {
         Self::from_posix_tz("localtime")
     }
 
     /// Construct a time zone from a POSIX TZ string, as described in [the POSIX documentation of the `TZ` environment variable](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap08.html).
-    pub fn from_posix_tz(tz_string: &str) -> Result<Self, TzError> {
+    pub fn from_posix_tz(tz_string: &str) -> Result<Self> {
         if tz_string == "localtime" {
             return tz_file::parse_tz_file(&fs::read("/etc/localtime")?);
         }
@@ -476,6 +474,8 @@ impl TimeZone {
             Ok(file) => tz_file::parse_tz_file(&read(file)?),
             Err(_) => {
                 let tz_string = tz_string.trim_matches(|c: char| c.is_ascii_whitespace());
+
+                // TZ string extensions are not allowed
                 let rule = tz_string::parse_posix_tz(tz_string.as_bytes(), false)?;
 
                 let local_time_types = match &rule {
@@ -488,7 +488,7 @@ impl TimeZone {
     }
 
     /// Find the local time type associated to the time zone at the specified unix time in seconds
-    pub fn find_local_time_type(&self, unix_time: i64) -> Result<&LocalTimeType, TzError> {
+    pub fn find_local_time_type(&self, unix_time: i64) -> Result<&LocalTimeType> {
         match self.transitions.last() {
             None => match &self.extra_rule {
                 Some(extra_rule) => extra_rule.find_local_time_type(unix_time),
@@ -512,7 +512,7 @@ impl TimeZone {
     }
 
     /// Find the current local time type associated to the time zone
-    pub fn find_current_local_time_type(&self) -> Result<&LocalTimeType, TzError> {
+    pub fn find_current_local_time_type(&self) -> Result<&LocalTimeType> {
         self.find_local_time_type(SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs().try_into()?)
     }
 
@@ -540,7 +540,7 @@ impl TimeZone {
 }
 
 /// UTC date time
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct UtcDateTime {
     /// Seconds in `[0, 60]`, with a possible leap second
     second: u8,
@@ -572,7 +572,7 @@ impl UtcDateTime {
     /// * `minute: `Minutes in `[0, 59]`
     /// * `second: `Seconds in `[0, 60]`, with a possible leap second
     ///
-    pub fn new(full_year: i32, month: u8, month_day: u8, hour: u8, minute: u8, second: u8) -> Result<Self, TzError> {
+    pub fn new(full_year: i32, month: u8, month_day: u8, hour: u8, minute: u8, second: u8) -> Result<Self> {
         use constants::*;
 
         let year = full_year - 1900;
@@ -631,7 +631,7 @@ impl UtcDateTime {
 }
 
 /// Date time associated to a local time type
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct DateTime {
     /// Seconds in `[0, 60]`, with a possible leap second
     second: u8,
@@ -705,17 +705,17 @@ impl DateTime {
     }
 
     /// Returns the current date time associated to the specified time zone
-    pub fn now(time_zone: &TimeZone) -> Result<Self, TzError> {
+    pub fn now(time_zone: &TimeZone) -> Result<Self> {
         Self::from_unix_time(time_zone, SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs().try_into()?)
     }
 
     /// Construct date time from a time zone and an UTC date time
-    pub fn from_utc_date_time(time_zone: &TimeZone, utc_date_time: UtcDateTime) -> Result<Self, TzError> {
+    pub fn from_utc_date_time(time_zone: &TimeZone, utc_date_time: UtcDateTime) -> Result<Self> {
         Self::from_unix_time(time_zone, utc_date_time.to_date_time().unix_time())
     }
 
     /// Construct date time from a time zone and an unix time in seconds
-    pub fn from_unix_time(time_zone: &TimeZone, unix_time: i64) -> Result<Self, TzError> {
+    pub fn from_unix_time(time_zone: &TimeZone, unix_time: i64) -> Result<Self> {
         use constants::*;
 
         let local_time_type = time_zone.find_local_time_type(unix_time)?;
@@ -747,19 +747,25 @@ impl DateTime {
         remaining_days -= remaining_years * DAYS_PER_NORMAL_YEAR;
 
         let leap = (remaining_years == 0 && (cycles_4_years != 0 || cycles_100_years == 0)) as i64;
-        let mut year_day = remaining_days + OFFSET_DAYS + leap;
+        let year_day = (remaining_days + OFFSET_DAYS + leap).rem_euclid(DAYS_PER_NORMAL_YEAR + leap);
+
         let mut year = OFFSET_YEARS + remaining_years + cycles_4_years * 4 + cycles_100_years * 100 + cycles_400_years * 400;
 
-        if year_day >= DAYS_PER_NORMAL_YEAR + leap {
-            year_day -= DAYS_PER_NORMAL_YEAR + leap;
+        let mut month = 2;
+        for days in DAY_IN_MONTHS_LEAP_YEAR_FROM_MARCH {
+            if remaining_days < days {
+                break;
+            }
+            remaining_days -= days;
+            month += 1;
+        }
+
+        if month >= MONTHS_PER_YEAR {
+            month -= MONTHS_PER_YEAR;
             year += 1;
         }
 
-        let cum_day_in_months =
-            [0, 31, 59 + leap, 90 + leap, 120 + leap, 151 + leap, 181 + leap, 212 + leap, 243 + leap, 273 + leap, 304 + leap, 334 + leap, 365 + leap];
-
-        let month = cum_day_in_months[1..].partition_point(|&x| x <= year_day);
-        let month_day = 1 + year_day - cum_day_in_months[month];
+        let month_day = 1 + remaining_days;
 
         let hour = remaining_seconds / SECONDS_PER_HOUR;
         let minute = (remaining_seconds / SECONDS_PER_MINUTE) % MINUTES_PER_HOUR;
@@ -844,4 +850,180 @@ fn days_since_unix_epoch(year: i32, month: usize, month_day: i64) -> i64 {
     result += CUM_DAY_IN_MONTHS_NORMAL_YEAR[month as usize] + month_day - 1;
 
     result
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_rule_day() -> Result<()> {
+        let rule_day_j1 = RuleDay::Julian1WithoutLeap(60);
+        assert_eq!(rule_day_j1.transition_date(100), (2, 1));
+        assert_eq!(rule_day_j1.transition_date(101), (2, 1));
+        assert_eq!(rule_day_j1.unix_time(100, 43200), 951912000);
+
+        let rule_day_j0 = RuleDay::Julian0WithLeap(59);
+        assert_eq!(rule_day_j0.transition_date(100), (1, 29));
+        assert_eq!(rule_day_j0.transition_date(101), (2, 1));
+        assert_eq!(rule_day_j0.unix_time(100, 43200), 951825600);
+
+        let rule_day_mwd = RuleDay::MonthWeekDay { month: 2, week: 5, week_day: 2 };
+        assert_eq!(rule_day_mwd.transition_date(100), (1, 29));
+        assert_eq!(rule_day_mwd.transition_date(101), (1, 27));
+        assert_eq!(rule_day_mwd.unix_time(100, 43200), 951825600);
+        assert_eq!(rule_day_mwd.unix_time(101, 43200), 983275200);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_transition_rule() -> Result<()> {
+        let transition_rule_fixed = TransitionRule::Fixed(LocalTimeType::with_ut_offset(0));
+        assert_eq!(*transition_rule_fixed.find_local_time_type(0)?, LocalTimeType::utc());
+
+        let transition_rule_neg = TransitionRule::Alternate {
+            std: LocalTimeType { ut_offset: 0, is_dst: false, time_zone_designation: "".to_owned() },
+            dst: LocalTimeType { ut_offset: 0, is_dst: true, time_zone_designation: "".to_owned() },
+            dst_start: RuleDay::Julian0WithLeap(100),
+            dst_start_time: 0,
+            dst_end: RuleDay::Julian0WithLeap(101),
+            dst_end_time: -86500,
+        };
+
+        assert!(transition_rule_neg.find_local_time_type(8639899)?.is_dst());
+        assert!(!transition_rule_neg.find_local_time_type(8639900)?.is_dst());
+        assert!(!transition_rule_neg.find_local_time_type(8639999)?.is_dst());
+        assert!(transition_rule_neg.find_local_time_type(8640000)?.is_dst());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_time_zone() -> Result<()> {
+        let time_zone_1 = TimeZone { transitions: Vec::new(), local_time_types: vec![LocalTimeType::utc()], leap_seconds: Vec::new(), extra_rule: None };
+        assert_eq!(*time_zone_1.find_local_time_type(0)?, LocalTimeType::utc());
+
+        let time_zone_2 = TimeZone {
+            transitions: Vec::new(),
+            local_time_types: vec![LocalTimeType::utc()],
+            leap_seconds: Vec::new(),
+            extra_rule: Some(TransitionRule::Fixed(LocalTimeType::with_ut_offset(3600))),
+        };
+
+        assert_eq!(*time_zone_2.find_local_time_type(0)?, LocalTimeType::with_ut_offset(3600));
+
+        let time_zone_3 = TimeZone {
+            transitions: vec![Transition { unix_leap_time: 0, local_time_type_index: 0 }],
+            local_time_types: vec![LocalTimeType::utc()],
+            leap_seconds: Vec::new(),
+            extra_rule: None,
+        };
+
+        assert_eq!(*time_zone_3.find_local_time_type(-1)?, LocalTimeType::utc());
+        assert!(matches!(time_zone_3.find_local_time_type(0), Err(TzError::NoLocalTimeType)));
+
+        let time_zone_4 = TimeZone {
+            transitions: vec![Transition { unix_leap_time: 0, local_time_type_index: 0 }],
+            local_time_types: vec![LocalTimeType::utc()],
+            leap_seconds: Vec::new(),
+            extra_rule: Some(TransitionRule::Fixed(LocalTimeType::with_ut_offset(3600))),
+        };
+
+        assert_eq!(*time_zone_4.find_local_time_type(-1)?, LocalTimeType::utc());
+        assert_eq!(*time_zone_4.find_local_time_type(0)?, LocalTimeType::with_ut_offset(3600));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_time_zone_from_posix_tz() -> Result<()> {
+        let time_zone_local_1 = TimeZone::local()?;
+        let time_zone_local_2 = TimeZone::from_posix_tz("localtime")?;
+        let time_zone_local_3 = TimeZone::from_posix_tz("/etc/localtime")?;
+        let time_zone_local_4 = TimeZone::from_posix_tz(":/etc/localtime")?;
+
+        assert_eq!(time_zone_local_1, time_zone_local_2);
+        assert_eq!(time_zone_local_1, time_zone_local_3);
+        assert_eq!(time_zone_local_1, time_zone_local_4);
+
+        let time_zone_utc = TimeZone::from_posix_tz("UTC")?;
+        assert_eq!(time_zone_utc.find_local_time_type(0)?.ut_offset(), 0);
+
+        assert!(TimeZone::from_posix_tz("EST5EDT,0/0,J365/25").is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_date_time() -> Result<()> {
+        let time_zone_utc = TimeZone::utc();
+        let utc = LocalTimeType::utc();
+
+        let time_zone_cet = TimeZone::fixed(3600);
+        let cet = LocalTimeType::with_ut_offset(3600);
+
+        let unix_times = [-93750523200, -11670955200, -8515195200, -8483659200, -8389051200, 951825600, 983448000, 1078056000, 4107585600, 32540356800];
+
+        let date_times_utc = [
+            DateTime { second: 0, minute: 0, hour: 12, month_day: 1, month: 2, year: -2901, week_day: 5, year_day: 59, local_time_type: utc.clone() },
+            DateTime { second: 0, minute: 0, hour: 12, month_day: 29, month: 1, year: -300, week_day: 2, year_day: 59, local_time_type: utc.clone() },
+            DateTime { second: 0, minute: 0, hour: 12, month_day: 1, month: 2, year: -200, week_day: 1, year_day: 59, local_time_type: utc.clone() },
+            DateTime { second: 0, minute: 0, hour: 12, month_day: 1, month: 2, year: -199, week_day: 2, year_day: 59, local_time_type: utc.clone() },
+            DateTime { second: 0, minute: 0, hour: 12, month_day: 29, month: 1, year: -196, week_day: 5, year_day: 59, local_time_type: utc.clone() },
+            DateTime { second: 0, minute: 0, hour: 12, month_day: 29, month: 1, year: 100, week_day: 2, year_day: 59, local_time_type: utc.clone() },
+            DateTime { second: 0, minute: 0, hour: 12, month_day: 1, month: 2, year: 101, week_day: 4, year_day: 59, local_time_type: utc.clone() },
+            DateTime { second: 0, minute: 0, hour: 12, month_day: 29, month: 1, year: 104, week_day: 0, year_day: 59, local_time_type: utc.clone() },
+            DateTime { second: 0, minute: 0, hour: 12, month_day: 1, month: 2, year: 200, week_day: 1, year_day: 59, local_time_type: utc.clone() },
+            DateTime { second: 0, minute: 0, hour: 12, month_day: 1, month: 2, year: 1101, week_day: 0, year_day: 59, local_time_type: utc },
+        ];
+
+        let date_times_cet = [
+            DateTime { second: 0, minute: 0, hour: 13, month_day: 1, month: 2, year: -2901, week_day: 5, year_day: 59, local_time_type: cet.clone() },
+            DateTime { second: 0, minute: 0, hour: 13, month_day: 29, month: 1, year: -300, week_day: 2, year_day: 59, local_time_type: cet.clone() },
+            DateTime { second: 0, minute: 0, hour: 13, month_day: 1, month: 2, year: -200, week_day: 1, year_day: 59, local_time_type: cet.clone() },
+            DateTime { second: 0, minute: 0, hour: 13, month_day: 1, month: 2, year: -199, week_day: 2, year_day: 59, local_time_type: cet.clone() },
+            DateTime { second: 0, minute: 0, hour: 13, month_day: 29, month: 1, year: -196, week_day: 5, year_day: 59, local_time_type: cet.clone() },
+            DateTime { second: 0, minute: 0, hour: 13, month_day: 29, month: 1, year: 100, week_day: 2, year_day: 59, local_time_type: cet.clone() },
+            DateTime { second: 0, minute: 0, hour: 13, month_day: 1, month: 2, year: 101, week_day: 4, year_day: 59, local_time_type: cet.clone() },
+            DateTime { second: 0, minute: 0, hour: 13, month_day: 29, month: 1, year: 104, week_day: 0, year_day: 59, local_time_type: cet.clone() },
+            DateTime { second: 0, minute: 0, hour: 13, month_day: 1, month: 2, year: 200, week_day: 1, year_day: 59, local_time_type: cet.clone() },
+            DateTime { second: 0, minute: 0, hour: 13, month_day: 1, month: 2, year: 1101, week_day: 0, year_day: 59, local_time_type: cet },
+        ];
+
+        for ((unix_time, date_time_utc), date_time_cet) in unix_times.into_iter().zip(date_times_utc).zip(date_times_cet) {
+            assert_eq!(DateTime::from_unix_time(&time_zone_utc, unix_time)?, date_time_utc);
+            assert_eq!(date_time_utc.unix_time(), unix_time);
+
+            assert_eq!(DateTime::from_unix_time(&time_zone_cet, unix_time)?, date_time_cet);
+            assert_eq!(date_time_cet.unix_time(), unix_time);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_is_leap_year() {
+        assert!(is_leap_year(100));
+        assert!(!is_leap_year(101));
+        assert!(is_leap_year(104));
+        assert!(!is_leap_year(200));
+        assert!(!is_leap_year(300));
+        assert!(!is_leap_year(400));
+        assert!(is_leap_year(500));
+    }
+
+    #[test]
+    fn test_days_since_unix_epoch() {
+        assert_eq!(days_since_unix_epoch(-2901, 2, 1), -1085076);
+        assert_eq!(days_since_unix_epoch(-300, 1, 29), -135081);
+        assert_eq!(days_since_unix_epoch(-200, 2, 1), -98556);
+        assert_eq!(days_since_unix_epoch(-199, 2, 1), -98191);
+        assert_eq!(days_since_unix_epoch(-196, 1, 29), -97096);
+        assert_eq!(days_since_unix_epoch(100, 1, 29), 11016);
+        assert_eq!(days_since_unix_epoch(101, 2, 1), 11382);
+        assert_eq!(days_since_unix_epoch(104, 1, 29), 12477);
+        assert_eq!(days_since_unix_epoch(200, 2, 1), 47541);
+        assert_eq!(days_since_unix_epoch(1101, 2, 1), 376624);
+    }
 }

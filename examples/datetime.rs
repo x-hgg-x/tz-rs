@@ -1,6 +1,6 @@
 use tz::*;
 
-fn main() -> Result<(), TzError> {
+fn main() -> Result<()> {
     //
     // TimeZone
     //

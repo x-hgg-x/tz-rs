@@ -258,3 +258,153 @@ pub(crate) fn parse_posix_tz(tz_string: &[u8], use_string_extensions: bool) -> R
         dst_end_time,
     })
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    use crate::TzError;
+
+    #[test]
+    fn test_no_dst() -> Result<(), TzError> {
+        let tz_string = b"HST10";
+
+        let transition_rule = parse_posix_tz(tz_string, false)?;
+        let transition_rule_result = TransitionRule::Fixed(LocalTimeType { ut_offset: -36000, is_dst: false, time_zone_designation: "HST".to_owned() });
+
+        assert_eq!(transition_rule, transition_rule_result);
+        assert_eq!(transition_rule.find_local_time_type(0)?.ut_offset(), -36000);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_quoted() -> Result<(), TzError> {
+        let tz_string = b"<-03>+3<+03>-3,J1,J365";
+
+        let transition_rule = parse_posix_tz(tz_string, false)?;
+
+        let transition_rule_result = TransitionRule::Alternate {
+            std: LocalTimeType { ut_offset: -10800, is_dst: false, time_zone_designation: "-03".to_owned() },
+            dst: LocalTimeType { ut_offset: 10800, is_dst: true, time_zone_designation: "+03".to_owned() },
+            dst_start: RuleDay::Julian1WithoutLeap(1),
+            dst_start_time: 7200,
+            dst_end: RuleDay::Julian1WithoutLeap(365),
+            dst_end_time: 7200,
+        };
+
+        assert_eq!(transition_rule, transition_rule_result);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_full() -> Result<(), TzError> {
+        let tz_string = b"NZST-12:00:00NZDT-13:00:00,M10.1.0/02:00:00,M3.3.0/02:00:00";
+
+        let transition_rule = parse_posix_tz(tz_string, false)?;
+
+        let transition_rule_result = TransitionRule::Alternate {
+            std: LocalTimeType { ut_offset: 43200, is_dst: false, time_zone_designation: "NZST".to_owned() },
+            dst: LocalTimeType { ut_offset: 46800, is_dst: true, time_zone_designation: "NZDT".to_owned() },
+            dst_start: RuleDay::MonthWeekDay { month: 10, week: 1, week_day: 0 },
+            dst_start_time: 7200,
+            dst_end: RuleDay::MonthWeekDay { month: 3, week: 3, week_day: 0 },
+            dst_end_time: 7200,
+        };
+
+        assert_eq!(transition_rule, transition_rule_result);
+
+        assert_eq!(transition_rule.find_local_time_type(953384399)?.ut_offset(), 46800);
+        assert_eq!(transition_rule.find_local_time_type(953384400)?.ut_offset(), 43200);
+        assert_eq!(transition_rule.find_local_time_type(970322399)?.ut_offset(), 43200);
+        assert_eq!(transition_rule.find_local_time_type(970322400)?.ut_offset(), 46800);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_negative_dst() -> Result<(), TzError> {
+        let tz_string = b"IST-1GMT0,M10.5.0,M3.5.0/1";
+
+        let transition_rule = parse_posix_tz(tz_string, false)?;
+
+        let transition_rule_result = TransitionRule::Alternate {
+            std: LocalTimeType { ut_offset: 3600, is_dst: false, time_zone_designation: "IST".to_owned() },
+            dst: LocalTimeType { ut_offset: 0, is_dst: true, time_zone_designation: "GMT".to_owned() },
+            dst_start: RuleDay::MonthWeekDay { month: 10, week: 5, week_day: 0 },
+            dst_start_time: 7200,
+            dst_end: RuleDay::MonthWeekDay { month: 3, week: 5, week_day: 0 },
+            dst_end_time: 3600,
+        };
+
+        assert_eq!(transition_rule, transition_rule_result);
+
+        assert_eq!(transition_rule.find_local_time_type(954032399)?.ut_offset(), 0);
+        assert_eq!(transition_rule.find_local_time_type(954032400)?.ut_offset(), 3600);
+        assert_eq!(transition_rule.find_local_time_type(972781199)?.ut_offset(), 3600);
+        assert_eq!(transition_rule.find_local_time_type(972781200)?.ut_offset(), 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_negative_hour() -> Result<(), TzError> {
+        let tz_string = b"<-03>3<-02>,M3.5.0/-2,M10.5.0/-1";
+
+        assert!(parse_posix_tz(tz_string, false).is_err());
+
+        let transition_rule = parse_posix_tz(tz_string, true)?;
+
+        let transition_rule_result = TransitionRule::Alternate {
+            std: LocalTimeType { ut_offset: -10800, is_dst: false, time_zone_designation: "-03".to_owned() },
+            dst: LocalTimeType { ut_offset: -7200, is_dst: true, time_zone_designation: "-02".to_owned() },
+            dst_start: RuleDay::MonthWeekDay { month: 3, week: 5, week_day: 0 },
+            dst_start_time: -7200,
+            dst_end: RuleDay::MonthWeekDay { month: 10, week: 5, week_day: 0 },
+            dst_end_time: -3600,
+        };
+
+        assert_eq!(transition_rule, transition_rule_result);
+
+        assert_eq!(transition_rule.find_local_time_type(954032399)?.ut_offset(), -10800);
+        assert_eq!(transition_rule.find_local_time_type(954032400)?.ut_offset(), -7200);
+        assert_eq!(transition_rule.find_local_time_type(972781199)?.ut_offset(), -7200);
+        assert_eq!(transition_rule.find_local_time_type(972781200)?.ut_offset(), -10800);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_all_year_dst() -> Result<(), TzError> {
+        let tz_string = b"EST5EDT,0/0,J365/25";
+
+        assert!(parse_posix_tz(tz_string, false).is_err());
+
+        let transition_rule = parse_posix_tz(tz_string, true)?;
+
+        let transition_rule_result = TransitionRule::Alternate {
+            std: LocalTimeType { ut_offset: -18000, is_dst: false, time_zone_designation: "EST".to_owned() },
+            dst: LocalTimeType { ut_offset: -14400, is_dst: true, time_zone_designation: "EDT".to_owned() },
+            dst_start: RuleDay::Julian0WithLeap(0),
+            dst_start_time: 0,
+            dst_end: RuleDay::Julian1WithoutLeap(365),
+            dst_end_time: 90000,
+        };
+
+        assert_eq!(transition_rule, transition_rule_result);
+
+        assert_eq!(transition_rule.find_local_time_type(946702799)?.ut_offset(), -14400);
+        assert_eq!(transition_rule.find_local_time_type(946702800)?.ut_offset(), -14400);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_error() -> Result<(), TzError> {
+        assert!(matches!(parse_posix_tz(b"IST-1GMT0", false), Err(TzStringError::UnsupportedTzString(_))));
+        assert!(matches!(parse_posix_tz(b"EET-2EEST", false), Err(TzStringError::UnsupportedTzString(_))));
+
+        Ok(())
+    }
+}
