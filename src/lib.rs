@@ -132,6 +132,8 @@ pub enum TzError {
     TzStringError(TzStringError),
     /// Date time input error
     DateTimeInputError(&'static str),
+    /// No available local type type
+    NoLocalTimeType,
 }
 
 impl fmt::Display for TzError {
@@ -143,6 +145,7 @@ impl fmt::Display for TzError {
             Self::TzFileError(error) => error.fmt(f),
             Self::TzStringError(error) => error.fmt(f),
             Self::DateTimeInputError(error) => write!(f, "invalid date time input: {}", error),
+            Self::NoLocalTimeType => write!(f, "no local time type is available for the specified timestamp"),
         }
     }
 }
@@ -497,7 +500,7 @@ impl TimeZone {
                 if unix_leap_time >= last_transition.unix_leap_time {
                     match &self.extra_rule {
                         Some(extra_rule) => extra_rule.find_local_time_type(unix_time),
-                        None => Ok(&self.local_time_types[last_transition.local_time_type_index]),
+                        None => Err(TzError::NoLocalTimeType),
                     }
                 } else {
                     let index = self.transitions.partition_point(|x| x.unix_leap_time <= unix_leap_time);
