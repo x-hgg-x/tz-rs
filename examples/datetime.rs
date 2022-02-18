@@ -17,7 +17,10 @@ fn main() -> Result<(), TzError> {
     assert_eq!(time_zone_fixed.find_local_time_type(unix_time)?.ut_offset(), -3600);
 
     // Get local time zone
-    TimeZone::local()?;
+    let time_zone_local = TimeZone::local()?;
+
+    // Get the current local time type
+    let _current_local_time_type = time_zone_local.find_current_local_time_type()?;
 
     // Get time zone from a TZ string:
     // From an absolute file
@@ -82,6 +85,10 @@ fn main() -> Result<(), TzError> {
     // Get the corresponding UTC unix time
     let unix_time = date_time.unix_time();
     assert_eq!(unix_time, 946684800);
+
+    // Get the current date time at the local time zone
+    let time_zone_local = TimeZone::local()?;
+    let _date_time = DateTime::now(&time_zone_local)?;
 
     Ok(())
 }

@@ -9,6 +9,7 @@ use std::fmt;
 use std::fs::{self, File};
 use std::io::{self, Read};
 use std::num::TryFromIntError;
+use std::time::{SystemTime, SystemTimeError};
 
 use tz_file::TzFileError;
 use tz_string::TzStringError;
@@ -17,6 +18,7 @@ use tz_string::TzStringError;
 pub enum TzError {
     ConversionError(TryFromIntError),
     IoError(io::Error),
+    SystemTimeError(SystemTimeError),
     TzFileError(TzFileError),
     TzStringError(TzStringError),
     DateTimeInputError,
@@ -27,6 +29,7 @@ impl fmt::Display for TzError {
         match self {
             Self::ConversionError(error) => error.fmt(f),
             Self::IoError(error) => error.fmt(f),
+            Self::SystemTimeError(error) => error.fmt(f),
             Self::TzFileError(error) => error.fmt(f),
             Self::TzStringError(error) => error.fmt(f),
             Self::DateTimeInputError => write!(f, "invalid DateTime input"),
@@ -45,6 +48,12 @@ impl From<TryFromIntError> for TzError {
 impl From<io::Error> for TzError {
     fn from(error: io::Error) -> Self {
         Self::IoError(error)
+    }
+}
+
+impl From<SystemTimeError> for TzError {
+    fn from(error: SystemTimeError) -> Self {
+        Self::SystemTimeError(error)
     }
 }
 
@@ -318,6 +327,10 @@ impl TimeZone {
         }
     }
 
+    pub fn find_current_local_time_type(&self) -> Result<&LocalTimeType, TzError> {
+        self.find_local_time_type(SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs().try_into()?)
+    }
+
     fn unix_time_to_unix_leap_time(&self, unix_time: i64) -> i64 {
         let mut unix_leap_time = unix_time;
 
@@ -473,6 +486,10 @@ impl DateTime {
 
     pub fn local_time_type(&self) -> &LocalTimeType {
         &self.local_time_type
+    }
+
+    pub fn now(time_zone: &TimeZone) -> Result<Self, TzError> {
+        Self::from_unix_time(time_zone, SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs().try_into()?)
     }
 
     pub fn from_utc_date_time(time_zone: &TimeZone, utc_date_time: UtcDateTime) -> Result<Self, TzError> {
