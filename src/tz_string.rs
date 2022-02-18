@@ -1,3 +1,5 @@
+//! Functions used for parsing a TZ string.
+
 use crate::cursor::Cursor;
 use crate::{LocalTimeType, RuleDay, TransitionRule};
 
@@ -7,12 +9,19 @@ use std::io;
 use std::num::ParseIntError;
 use std::str::{self, FromStr, Utf8Error};
 
+/// Unified error type for parsing a TZ string
+#[non_exhaustive]
 #[derive(Debug)]
 pub enum TzStringError {
+    /// Utf-8 error
     Utf8Error(Utf8Error),
+    // Integer parsing error
     ParseIntError(ParseIntError),
+    /// I/O error
     IoError(io::Error),
+    /// Invalid TZ string
     InvalidTzString,
+    /// Unsupported TZ string
     UnsupportedTzString,
 }
 
@@ -48,10 +57,12 @@ impl From<io::Error> for TzStringError {
     }
 }
 
+/// Parse integer from a slice of bytes
 fn parse_int<T: FromStr<Err = ParseIntError>>(bytes: &[u8]) -> Result<T, TzStringError> {
     Ok(str::from_utf8(bytes)?.parse()?)
 }
 
+/// Parse time zone designation
 fn parse_time_zone_designation<'a>(cursor: &mut Cursor<'a>) -> Result<&'a [u8], TzStringError> {
     let unquoted = if cursor.remaining().get(0) == Some(&b'<') {
         cursor.read_exact(1)?;
@@ -74,6 +85,7 @@ fn parse_time_zone_designation<'a>(cursor: &mut Cursor<'a>) -> Result<&'a [u8], 
     Ok(unquoted)
 }
 
+/// Parse hours, minutes and seconds
 fn parse_hhmmss(cursor: &mut Cursor) -> Result<(i32, i32, i32), TzStringError> {
     let hour = parse_int(cursor.read_while(u8::is_ascii_digit)?)?;
 
@@ -91,6 +103,7 @@ fn parse_hhmmss(cursor: &mut Cursor) -> Result<(i32, i32, i32), TzStringError> {
     Ok((hour, minute, second))
 }
 
+/// Parse signed hours, minutes and seconds
 fn parse_signed_hhmmss(cursor: &mut Cursor) -> Result<(i32, i32, i32, i32), TzStringError> {
     let mut sign = 1;
     if let Some(&c @ (b'+' | b'-')) = cursor.remaining().get(0) {
@@ -104,6 +117,7 @@ fn parse_signed_hhmmss(cursor: &mut Cursor) -> Result<(i32, i32, i32, i32), TzSt
     Ok((sign, hour, minute, second))
 }
 
+/// Parse time zone offset
 fn parse_offset(cursor: &mut Cursor) -> Result<i32, TzStringError> {
     let (sign, hour, minute, second) = parse_signed_hhmmss(cursor)?;
 
@@ -114,6 +128,7 @@ fn parse_offset(cursor: &mut Cursor) -> Result<i32, TzStringError> {
     Ok(sign * (hour * 3600 + minute * 60 + second))
 }
 
+/// Parse transition rule day
 fn parse_rule_day(cursor: &mut Cursor) -> Result<RuleDay, TzStringError> {
     match cursor.remaining().get(0) {
         Some(b'J') => {
@@ -139,6 +154,7 @@ fn parse_rule_day(cursor: &mut Cursor) -> Result<RuleDay, TzStringError> {
     }
 }
 
+/// Parse transition rule time
 fn parse_rule_time(cursor: &mut Cursor) -> Result<i32, TzStringError> {
     let (hour, minute, second) = parse_hhmmss(cursor)?;
 
@@ -149,6 +165,7 @@ fn parse_rule_time(cursor: &mut Cursor) -> Result<i32, TzStringError> {
     Ok(hour * 3600 + minute * 60 + second)
 }
 
+/// Parse transition rule time with TZ string extensions
 fn parse_rule_time_extended(cursor: &mut Cursor) -> Result<i32, TzStringError> {
     let (sign, hour, minute, second) = parse_signed_hhmmss(cursor)?;
 
@@ -159,6 +176,7 @@ fn parse_rule_time_extended(cursor: &mut Cursor) -> Result<i32, TzStringError> {
     Ok(sign * (hour * 3600 + minute * 60 + second))
 }
 
+/// Parse transition rule
 fn parse_rule_block(cursor: &mut Cursor, use_string_extensions: bool) -> Result<(RuleDay, i32), TzStringError> {
     let date = parse_rule_day(cursor)?;
 
@@ -175,6 +193,10 @@ fn parse_rule_block(cursor: &mut Cursor, use_string_extensions: bool) -> Result<
     Ok((date, time))
 }
 
+/// Parse a POSIX TZ string containing a time zone description, as described in [the POSIX documentation of the `TZ` environment variable](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap08.html).
+///
+/// TZ string extensions from [RFC 8536](https://datatracker.ietf.org/doc/html/rfc8536#section-3.3.1) may be used.
+///
 pub(crate) fn parse_posix_tz(tz_string: &[u8], use_string_extensions: bool) -> Result<TransitionRule, TzStringError> {
     let mut cursor = Cursor::new(tz_string);
 

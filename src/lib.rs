@@ -1,4 +1,4 @@
-//! This crate provides the struct `TimeZone` and `DateTime`, which can be used to determine local time on a given time zone.
+//! This crate provides the `TimeZone` and `DateTime` structs, which can be used to determine local time on a given time zone.
 //!
 //! # Usage
 //!
@@ -117,13 +117,20 @@ use std::time::{SystemTime, SystemTimeError};
 use tz_file::TzFileError;
 use tz_string::TzStringError;
 
+/// Unified error type for everything in the crate
+#[non_exhaustive]
 #[derive(Debug)]
 pub enum TzError {
     ConversionError(TryFromIntError),
+    /// I/O error
     IoError(io::Error),
+    /// System time error
     SystemTimeError(SystemTimeError),
+    /// Unified error for parsing a TZif file
     TzFileError(TzFileError),
+    /// Unified error for parsing a TZ string
     TzStringError(TzStringError),
+    /// Date time input error
     DateTimeInputError,
 }
 
@@ -135,7 +142,7 @@ impl fmt::Display for TzError {
             Self::SystemTimeError(error) => error.fmt(f),
             Self::TzFileError(error) => error.fmt(f),
             Self::TzStringError(error) => error.fmt(f),
-            Self::DateTimeInputError => write!(f, "invalid DateTime input"),
+            Self::DateTimeInputError => write!(f, "invalid date time input"),
         }
     }
 }
@@ -172,55 +179,92 @@ impl From<TzStringError> for TzError {
     }
 }
 
+/// Transition of a TZif file
 #[derive(Debug, Copy, Clone)]
 struct Transition {
+    /// Unix leap time
     unix_leap_time: i64,
+    /// Index specifying the local time type of the transition
     local_time_type_index: usize,
 }
 
+/// Leap second of a TZif file
 #[derive(Debug, Copy, Clone)]
 struct LeapSecond {
+    /// Unix leap time
     unix_leap_time: i64,
+    /// Leap second correction
     correction: i32,
 }
 
+/// Local time type associted to a time zone
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct LocalTimeType {
+    /// Offset from UTC in seconds
     ut_offset: i32,
+    /// Daylight Saving Time indicator
     is_dst: bool,
+    /// Time zone designation
     time_zone_designation: String,
 }
 
 impl LocalTimeType {
+    /// Returns offset from UTC in seconds
     pub fn ut_offset(&self) -> i32 {
         self.ut_offset
     }
 
+    /// Returns daylight saving time indicator
     pub fn is_dst(&self) -> bool {
         self.is_dst
     }
 
+    /// Returns time zone designation
     pub fn time_zone_designation(&self) -> &str {
         &self.time_zone_designation
     }
 
+    /// Construct the local time type associated to UTC
     pub fn utc() -> Self {
         Self::with_ut_offset(0)
     }
 
+    /// Construct a local time type with the specified offset in seconds
     pub fn with_ut_offset(ut_offset: i32) -> Self {
         Self { ut_offset, is_dst: false, time_zone_designation: "".to_owned() }
     }
 }
 
+/// Transition rule day
 #[derive(Debug, Copy, Clone)]
 enum RuleDay {
+    /// Julian day in `[1, 365]`, without taking occasional Feb 29 into account, which is not referenceable
     Julian1WithoutLeap(u16),
+    /// Zero-based Julian day in `[0, 365]`, taking occasional Feb 29 into account
     Julian0WithLeap(u16),
-    MonthWeekDay { month: u8, week: u8, week_day: u8 },
+    /// Day represented by a month, a month week and a week day
+    MonthWeekDay {
+        /// Month in `[1, 12]`
+        month: u8,
+        /// Week of the month in `[1, 5]`, with `5` representing the last week of the month
+        week: u8,
+        /// Day of the week in `[0, 6]` from Sunday
+        week_day: u8,
+    },
 }
 
 impl RuleDay {
+    /// Get the transition date for the provided year
+    ///
+    /// ## Inputs
+    ///
+    /// * `year`: Years since 1900
+    ///
+    /// ## Outputs
+    ///
+    /// * `month`: Month in `[0, 11]`
+    /// * `month_day`: Day of the month in `[1, 31]`
+    ///
     fn transition_date(&self, year: i32) -> (usize, i64) {
         use constants::*;
 
@@ -267,6 +311,13 @@ impl RuleDay {
         }
     }
 
+    /// Returns the UTC unix time in seconds associated to the transition date for the provided year
+    ///
+    /// ## Inputs
+    ///
+    /// * `year`: Years since 1900
+    /// * `day_time_in_utc`: UTC day time in seconds
+    ///
     fn unix_time(&self, year: i32, day_time_in_utc: i64) -> i64 {
         use constants::*;
 
@@ -275,13 +326,30 @@ impl RuleDay {
     }
 }
 
+/// Transition rule
 #[derive(Debug, Clone)]
 enum TransitionRule {
+    /// Fixed local time type
     Fixed(LocalTimeType),
-    Alternate { std: LocalTimeType, dst: LocalTimeType, dst_start: RuleDay, dst_start_time: i32, dst_end: RuleDay, dst_end_time: i32 },
+    /// Alternate local time type
+    Alternate {
+        /// Local time type for standard time
+        std: LocalTimeType,
+        /// Local time type for Daylight Saving Time
+        dst: LocalTimeType,
+        /// Start day of Daylight Saving Time
+        dst_start: RuleDay,
+        /// Local start day time of Daylight Saving Time, in seconds
+        dst_start_time: i32,
+        /// End day of Daylight Saving Time
+        dst_end: RuleDay,
+        /// Local end day time of Daylight Saving Time, in seconds
+        dst_end_time: i32,
+    },
 }
 
 impl TransitionRule {
+    /// Find the local time type associated to the transition rule at the specified unix time in seconds
     fn find_local_time_type(&self, unix_time: i64) -> Result<&LocalTimeType, TzError> {
         match self {
             Self::Fixed(local_time_type) => Ok(local_time_type),
@@ -350,19 +418,26 @@ impl TransitionRule {
     }
 }
 
+/// Time zone
 #[derive(Debug, Clone)]
 pub struct TimeZone {
+    /// List of transitions
     transitions: Vec<Transition>,
+    /// List of local time types
     local_time_types: Vec<LocalTimeType>,
+    /// List of leap seconds
     leap_seconds: Vec<LeapSecond>,
+    /// Extra transition rule applicable after the last transition
     extra_rule: Option<TransitionRule>,
 }
 
 impl TimeZone {
+    /// Returns UTC time zone
     pub fn utc() -> Self {
         Self::fixed(0)
     }
 
+    /// Returns time zone with fixed UTC offset in seconds
     pub fn fixed(ut_offset: i32) -> Self {
         Self {
             transitions: Vec::new(),
@@ -372,10 +447,12 @@ impl TimeZone {
         }
     }
 
+    /// Returns local time zone
     pub fn local() -> Result<Self, TzError> {
         Self::from_posix_tz("localtime")
     }
 
+    /// Construct a time zone from a POSIX TZ string, as described in [the POSIX documentation of the `TZ` environment variable](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap08.html).
     pub fn from_posix_tz(tz_string: &str) -> Result<Self, TzError> {
         if tz_string == "localtime" {
             return tz_file::parse_tz_file(&fs::read("/etc/localtime")?);
@@ -407,6 +484,7 @@ impl TimeZone {
         }
     }
 
+    /// Find the local time type associated to the time zone at the specified unix time in seconds
     pub fn find_local_time_type(&self, unix_time: i64) -> Result<&LocalTimeType, TzError> {
         match self.transitions.last() {
             None => match &self.extra_rule {
@@ -430,10 +508,12 @@ impl TimeZone {
         }
     }
 
+    /// Find the current local time type associated to the time zone
     pub fn find_current_local_time_type(&self) -> Result<&LocalTimeType, TzError> {
         self.find_local_time_type(SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs().try_into()?)
     }
 
+    /// Convert unix time to unix leap time, from the list of leap seconds in the time zone
     fn unix_time_to_unix_leap_time(&self, unix_time: i64) -> i64 {
         let mut unix_leap_time = unix_time;
 
@@ -447,6 +527,7 @@ impl TimeZone {
         unix_leap_time
     }
 
+    /// Convert unix leap time to unix time, from the list of leap seconds in the time zone
     fn unix_leap_time_to_unix_time(&self, unix_leap_time: i64) -> i64 {
         let index = self.leap_seconds.partition_point(|x| x.unix_leap_time < unix_leap_time);
         let correction = if index > 0 { self.leap_seconds[index - 1].correction } else { 0 };
@@ -455,6 +536,7 @@ impl TimeZone {
     }
 }
 
+/// UTC date time
 #[derive(Debug, Clone)]
 pub struct UtcDateTime {
     /// Seconds in `[0, 60]`, with a possible leap second
@@ -476,6 +558,17 @@ pub struct UtcDateTime {
 }
 
 impl UtcDateTime {
+    /// Construct an UTC date time
+    ///
+    /// ## Inputs
+    ///
+    /// * `full_year: `Year
+    /// * `month: `Month in `[0, 11]`
+    /// * `month_day: `Day of the month in `[1, 31]`
+    /// * `hour: `Hours since midnight in `[0, 23]`
+    /// * `minute: `Minutes in `[0, 59]`
+    /// * `second: `Seconds in `[0, 60]`, with a possible leap second
+    ///
     pub fn new(full_year: i32, month: u8, month_day: u8, hour: u8, minute: u8, second: u8) -> Result<Self, TzError> {
         use constants::*;
 
@@ -513,6 +606,7 @@ impl UtcDateTime {
         Ok(Self { second, minute, hour, month_day, month, year, week_day, year_day })
     }
 
+    /// Convert to a date time
     pub fn to_date_time(self) -> DateTime {
         DateTime {
             second: self.second,
@@ -528,6 +622,7 @@ impl UtcDateTime {
     }
 }
 
+/// Date time associated to a local time type
 #[derive(Debug, Clone)]
 pub struct DateTime {
     /// Seconds in `[0, 60]`, with a possible leap second
@@ -546,59 +641,72 @@ pub struct DateTime {
     week_day: u8,
     /// Days since January 1 in `[0, 365]`
     year_day: u16,
-    /// Local time parameters
+    /// Local time type
     local_time_type: LocalTimeType,
 }
 
 impl DateTime {
+    /// Returns seconds in `[0, 60]`, with a possible leap second
     pub fn second(&self) -> u8 {
         self.second
     }
 
+    /// Returns minutes in `[0, 59]`
     pub fn minute(&self) -> u8 {
         self.minute
     }
 
+    /// Returns hours since midnight in `[0, 23]`
     pub fn hour(&self) -> u8 {
         self.hour
     }
 
+    /// Returns day of the month in `[1, 31]`
     pub fn month_day(&self) -> u8 {
         self.month_day
     }
 
+    /// Returns month in `[0, 11]`
     pub fn month(&self) -> u8 {
         self.month
     }
 
+    /// Returns years since 1900
     pub fn year(&self) -> i32 {
         self.year
     }
 
+    /// Returns year
     pub fn full_year(&self) -> i32 {
         self.year + 1900
     }
 
+    /// Returns days since Sunday in `[0, 6]`
     pub fn week_day(&self) -> u8 {
         self.week_day
     }
 
+    /// Returns days since January 1 in `[0, 365]`
     pub fn year_day(&self) -> u16 {
         self.year_day
     }
 
+    /// Returns local time type
     pub fn local_time_type(&self) -> &LocalTimeType {
         &self.local_time_type
     }
 
+    /// Returns the current date time associated to the specified time zone
     pub fn now(time_zone: &TimeZone) -> Result<Self, TzError> {
         Self::from_unix_time(time_zone, SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs().try_into()?)
     }
 
+    /// Construct date time from a time zone and an UTC date time
     pub fn from_utc_date_time(time_zone: &TimeZone, utc_date_time: UtcDateTime) -> Result<Self, TzError> {
         Self::from_unix_time(time_zone, utc_date_time.to_date_time().unix_time())
     }
 
+    /// Construct date time from a time zone and an unix time in seconds
     pub fn from_unix_time(time_zone: &TimeZone, unix_time: i64) -> Result<Self, TzError> {
         use constants::*;
 
@@ -662,6 +770,7 @@ impl DateTime {
         })
     }
 
+    /// Returns the UTC unix time in seconds associated to the date time
     pub fn unix_time(&self) -> i64 {
         use constants::*;
 
@@ -678,11 +787,25 @@ impl DateTime {
     }
 }
 
+/// Check if a year is a leap year.
+///
+/// ## Inputs
+///
+/// * `year`: Years since 1900
+///
 fn is_leap_year(year: i32) -> bool {
     let full_year = 1900 + year;
     full_year % 400 == 0 || (full_year % 4 == 0 && full_year % 100 != 0)
 }
 
+/// Compute the number of days since Unix epoch (`1970-01-01T00:00:00Z`).
+///
+/// ## Inputs
+///
+/// * `year`: Years since 1900
+/// * `month`: Month in `[0, 11]`
+/// * `month_day`: Day of the month in `[1, 31]`
+///
 fn days_since_unix_epoch(year: i32, month: usize, month_day: i64) -> i64 {
     use constants::*;
 

@@ -1,3 +1,5 @@
+//! Functions used for parsing a TZif file.
+
 use crate::cursor::Cursor;
 use crate::tz_string::{self, TzStringError};
 use crate::{LeapSecond, LocalTimeType, TimeZone, Transition, TransitionRule, TzError};
@@ -10,13 +12,21 @@ use std::io;
 use std::iter;
 use std::str::{self, Utf8Error};
 
+/// Unified error type for parsing a TZif file
+#[non_exhaustive]
 #[derive(Debug)]
 pub enum TzFileError {
+    /// Utf-8 error
     Utf8Error(Utf8Error),
+    /// Conversion from slice to array error
     TryFromSliceError(TryFromSliceError),
+    /// I/O error
     IoError(io::Error),
+    /// Unified error for parsing a TZ string
     TzStringError(TzStringError),
+    /// Invalid TZif file
     InvalidTzFile,
+    /// Unsupported TZif file
     UnsupportedTzFile,
 }
 
@@ -59,24 +69,37 @@ impl From<TzStringError> for TzFileError {
     }
 }
 
+/// TZif version
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 enum Version {
+    /// Version 1
     V1,
+    /// Version 2
     V2,
+    /// Version 3
     V3,
 }
 
+/// TZif header
 #[derive(Debug)]
 struct Header {
+    /// TZif version
     version: Version,
+    /// Number of UT/local indicators
     ut_local_count: usize,
+    /// Number of standard/wall indicators
     std_wall_count: usize,
+    /// Number of leap-second records
     leap_count: usize,
+    /// Number of transition times
     transition_count: usize,
+    /// Number of local time type records
     type_count: usize,
+    /// Number of time zone designations bytes
     char_count: usize,
 }
 
+/// Parse TZif header
 fn parse_header(cursor: &mut Cursor) -> Result<Header, TzFileError> {
     let magic = cursor.read_exact(4)?;
     if magic != *b"TZif" {
@@ -114,18 +137,28 @@ fn parse_header(cursor: &mut Cursor) -> Result<Header, TzFileError> {
     })
 }
 
+/// TZif data blocks
 struct DataBlock<'a> {
+    /// Time size in bytes
     time_size: usize,
+    /// Transition times data block
     transition_times: &'a [u8],
+    /// Transition types data block
     transition_types: &'a [u8],
+    /// Local time types data block
     local_time_types: &'a [u8],
+    /// Time zone designations data block
     time_zone_designations: &'a [u8],
+    /// Leap seconds data block
     leap_seconds: &'a [u8],
+    /// UT/local indicators data block
     std_walls: &'a [u8],
+    /// Standard/wall indicators data block
     ut_locals: &'a [u8],
 }
 
 impl<'a> DataBlock<'a> {
+    /// Read TZif data blocks
     fn new(cursor: &mut Cursor<'a>, header: &Header, version: Version) -> Result<Self, TzFileError> {
         let time_size = match version {
             Version::V1 => 4,
@@ -144,6 +177,7 @@ impl<'a> DataBlock<'a> {
         })
     }
 
+    /// Parse time values
     fn parse_time(&self, arr: &[u8], version: Version) -> Result<i64, TzFileError> {
         Ok(match version {
             Version::V1 => i32::from_be_bytes(arr.try_into()?).into(),
@@ -151,6 +185,7 @@ impl<'a> DataBlock<'a> {
         })
     }
 
+    /// Parse time zone data
     fn parse(&self, header: &Header) -> Result<TimeZone, TzFileError> {
         let mut transitions = Vec::with_capacity(header.transition_count);
         for (arr_time, &local_time_type_index) in self.transition_times.chunks_exact(self.time_size).zip(self.transition_types) {
@@ -224,6 +259,7 @@ impl<'a> DataBlock<'a> {
     }
 }
 
+/// Parse TZif footer
 fn parse_footer(footer: &[u8], use_string_extensions: bool) -> Result<Option<TransitionRule>, TzFileError> {
     let footer = str::from_utf8(footer)?;
     if !(footer.starts_with('\n') && footer.ends_with('\n')) {
@@ -242,6 +278,7 @@ fn parse_footer(footer: &[u8], use_string_extensions: bool) -> Result<Option<Tra
     }
 }
 
+/// Parse TZif file as described in [RFC 8536](https://datatracker.ietf.org/doc/html/rfc8536)
 pub(crate) fn parse_tz_file(bytes: &[u8]) -> Result<TimeZone, TzError> {
     let mut cursor = Cursor::new(bytes);
 
@@ -289,7 +326,9 @@ pub(crate) fn parse_tz_file(bytes: &[u8]) -> Result<TimeZone, TzError> {
     }
 }
 
+/// Open the TZif file corresponding to a TZ string
 pub(crate) fn get_tz_file(tz_string: &str) -> Result<File, TzFileError> {
+    // Possible system timezone directories
     const ZONE_INFO_DIRECTORIES: [&str; 3] = ["/usr/share/zoneinfo", "/share/zoneinfo", "/etc/zoneinfo"];
 
     if tz_string.starts_with('/') {
