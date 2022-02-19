@@ -1,6 +1,6 @@
 //! This crate provides the `TimeZone` and `DateTime` structs, which can be used to determine local time on a given time zone.
 //!
-//! This allows to convert between an [Unix timestamp](https://en.wikipedia.org/wiki/Unix_time) and a calendar time exprimed in the [proleptic gregorian calendar](https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar) with a provided time zone.
+//! This allows to convert between a [Unix timestamp](https://en.wikipedia.org/wiki/Unix_time) and a calendar time exprimed in the [proleptic gregorian calendar](https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar) with a provided time zone.
 //!
 //! Time zones are provided to the library with a [POSIX `TZ` string](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap08.html) which can be read from the environment.
 //!
@@ -91,7 +91,7 @@
 //!     assert_eq!(date_time.year_day(), 364);
 //!     assert_eq!(date_time.local_time_type().ut_offset(), -3600);
 //!
-//!     // Create a date time from a time zone and an unix time
+//!     // Create a date time from a time zone and a Unix time
 //!     // 2000-01-01T00:00:00Z
 //!     let date_time = DateTime::from_unix_time(&time_zone_fixed, 946684800)?;
 //!     assert_eq!(date_time.second(), 0);
@@ -105,7 +105,7 @@
 //!     assert_eq!(date_time.year_day(), 364);
 //!     assert_eq!(date_time.local_time_type().ut_offset(), -3600);
 //!
-//!     // Get the corresponding UTC unix time
+//!     // Get the corresponding UTC Unix time
 //!     let unix_time = date_time.unix_time();
 //!     assert_eq!(unix_time, 946684800);
 //! # Ok(())
@@ -333,7 +333,7 @@ impl RuleDay {
         }
     }
 
-    /// Returns the UTC unix time in seconds associated to the transition date for the provided year
+    /// Returns the UTC Unix time in seconds associated to the transition date for the provided year
     ///
     /// ## Inputs
     ///
@@ -371,7 +371,7 @@ enum TransitionRule {
 }
 
 impl TransitionRule {
-    /// Find the local time type associated to the transition rule at the specified unix time in seconds
+    /// Find the local time type associated to the transition rule at the specified Unix time in seconds
     fn find_local_time_type(&self, unix_time: i64) -> Result<&LocalTimeType> {
         match self {
             Self::Fixed(local_time_type) => Ok(local_time_type),
@@ -384,7 +384,7 @@ impl TransitionRule {
                 let current_year_dst_start_unix_time = dst_start.unix_time(current_year, dst_start_time_in_utc);
                 let current_year_dst_end_unix_time = dst_end.unix_time(current_year, dst_end_time_in_utc);
 
-                // Check DST start/end unix times for previous/current/next years to support for transition day times outside of [0h, 24h] range
+                // Check DST start/end Unix times for previous/current/next years to support for transition day times outside of [0h, 24h] range
                 let is_dst = match current_year_dst_start_unix_time.cmp(&current_year_dst_end_unix_time) {
                     Ordering::Less | Ordering::Equal => {
                         if unix_time < current_year_dst_start_unix_time {
@@ -508,7 +508,7 @@ impl TimeZone {
         }
     }
 
-    /// Find the local time type associated to the time zone at the specified unix time in seconds
+    /// Find the local time type associated to the time zone at the specified Unix time in seconds
     pub fn find_local_time_type(&self, unix_time: i64) -> Result<&LocalTimeType> {
         match self.transitions.last() {
             None => match &self.extra_rule {
@@ -537,7 +537,7 @@ impl TimeZone {
         self.find_local_time_type(SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs().try_into()?)
     }
 
-    /// Convert unix time to unix leap time, from the list of leap seconds in the time zone
+    /// Convert Unix time to Unix leap time, from the list of leap seconds in the time zone
     fn unix_time_to_unix_leap_time(&self, unix_time: i64) -> i64 {
         let mut unix_leap_time = unix_time;
 
@@ -551,7 +551,7 @@ impl TimeZone {
         unix_leap_time
     }
 
-    /// Convert unix leap time to unix time, from the list of leap seconds in the time zone
+    /// Convert Unix leap time to Unix time, from the list of leap seconds in the time zone
     fn unix_leap_time_to_unix_time(&self, unix_leap_time: i64) -> i64 {
         let index = self.leap_seconds.partition_point(|x| x.unix_leap_time < unix_leap_time);
         let correction = if index > 0 { self.leap_seconds[index - 1].correction } else { 0 };
@@ -741,7 +741,7 @@ impl DateTime {
         Ok(date_time)
     }
 
-    /// Construct date time from a time zone and an unix time in seconds
+    /// Construct date time from a time zone and a Unix time in seconds
     pub fn from_unix_time(time_zone: &TimeZone, unix_time: i64) -> Result<Self> {
         use constants::*;
 
@@ -811,7 +811,7 @@ impl DateTime {
         })
     }
 
-    /// Returns the UTC unix time in seconds associated to the date time
+    /// Returns the UTC Unix time in seconds associated to the date time
     pub fn unix_time(&self) -> i64 {
         use constants::*;
 
