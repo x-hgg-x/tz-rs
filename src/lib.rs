@@ -21,7 +21,7 @@
 //! # Ok(())
 //! # }
 //! ```
-//! ```ignore
+//! ```rust,ignore
 //!     // Get local time zone (UNIX only)
 //!     let time_zone_local = TimeZone::local()?;
 //!     // Get the current local time type
@@ -103,7 +103,7 @@
 //! # Ok(())
 //! # }
 //! ```
-//! ```ignore
+//! ```rust,ignore
 //!     // Get the current date time at the local time zone (UNIX only)
 //!     let time_zone_local = TimeZone::local()?;
 //!     let _date_time = DateTime::now(&time_zone_local)?;
@@ -578,12 +578,12 @@ impl UtcDateTime {
     ///
     /// ## Inputs
     ///
-    /// * `full_year: `Year
-    /// * `month: `Month in `[0, 11]`
-    /// * `month_day: `Day of the month in `[1, 31]`
-    /// * `hour: `Hours since midnight in `[0, 23]`
-    /// * `minute: `Minutes in `[0, 59]`
-    /// * `second: `Seconds in `[0, 60]`, with a possible leap second
+    /// * `full_year`: Year
+    /// * `month`: Month in `[0, 11]`
+    /// * `month_day`: Day of the month in `[1, 31]`
+    /// * `hour`: Hours since midnight in `[0, 23]`
+    /// * `minute`: Minutes in `[0, 59]`
+    /// * `second`: Seconds in `[0, 60]`, with a possible leap second
     ///
     pub fn new(full_year: i32, month: u8, month_day: u8, hour: u8, minute: u8, second: u8) -> Result<Self> {
         use constants::*;
