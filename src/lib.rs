@@ -543,7 +543,7 @@ impl TimeZone {
     }
 }
 
-/// UTC date time
+/// UTC date time exprimed in the [proleptic gregorian calendar](https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar)
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct UtcDateTime {
     /// Seconds in `[0, 60]`, with a possible leap second
@@ -634,7 +634,7 @@ impl UtcDateTime {
     }
 }
 
-/// Date time associated to a local time type
+/// Date time associated to a local time type, exprimed in the [proleptic gregorian calendar](https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar)
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct DateTime {
     /// Seconds in `[0, 60]`, with a possible leap second
