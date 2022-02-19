@@ -12,6 +12,12 @@ Two formats are currently accepted for the `TZ` string:
 * `std offset[dst[offset][,start[/time],end[/time]]]` providing a time zone description
 * `file` or `:file` providing the path to a [TZif file](https://datatracker.ietf.org/doc/html/rfc8536), which is absolute or relative to the system timezone directory.
 
+## Context
+
+Calls to libc `localtime_r` and other related functions from Rust are not safe in a multithreaded application, because they may internally set the `TZ` environment variable with the `setenv` function, which is not thread-safe.
+
+See [RUSTSEC-2020-0071](https://rustsec.org/advisories/RUSTSEC-2020-0071.html) and [RUSTSEC-2020-0159](https://rustsec.org/advisories/RUSTSEC-2020-0159.html) for more information.
+
 ## Documentation
 
 Documentation is hosted on [docs.rs](https://docs.rs/tz-rs/latest/tz).
