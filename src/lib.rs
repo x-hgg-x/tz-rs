@@ -455,6 +455,10 @@ impl TimeZone {
 
     /// Construct a time zone from a POSIX TZ string, as described in [the POSIX documentation of the `TZ` environment variable](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap08.html).
     pub fn from_posix_tz(tz_string: &str) -> Result<Self> {
+        if tz_string.is_empty() {
+            return Err(TzError::TzStringError(TzStringError::InvalidTzString("empty TZ string")));
+        }
+
         if tz_string == "localtime" {
             return tz_file::parse_tz_file(&fs::read("/etc/localtime")?);
         }
@@ -951,6 +955,7 @@ mod test {
         assert_eq!(time_zone_utc.find_local_time_type(0)?.ut_offset(), 0);
 
         assert!(TimeZone::from_posix_tz("EST5EDT,0/0,J365/25").is_err());
+        assert!(TimeZone::from_posix_tz("").is_err());
 
         Ok(())
     }
