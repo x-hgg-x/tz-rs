@@ -5,7 +5,7 @@
 //! ## Construct a time zone object
 //!
 //! ```rust
-//! # fn timezone() -> Result<(), tz::TzError> {
+//! # fn main() -> Result<(), tz::TzError> {
 //!     use tz::TimeZone;
 //!
 //!     // 2000-01-01T00:00:00Z
@@ -18,13 +18,18 @@
 //!     // Get fixed time zone at GMT-1
 //!     let time_zone_fixed = TimeZone::fixed(-3600);
 //!     assert_eq!(time_zone_fixed.find_local_time_type(unix_time)?.ut_offset(), -3600);
-//!
-//!     // Get local time zone
+//! # Ok(())
+//! # }
+//! ```
+//! ```ignore
+//!     // Get local time zone (UNIX only)
 //!     let time_zone_local = TimeZone::local()?;
-//!
 //!     // Get the current local time type
 //!     let _current_local_time_type = time_zone_local.find_current_local_time_type()?;
-//!
+//! ```
+//! ```rust
+//! # fn main() -> Result<(), tz::TzError> {
+//! # use tz::TimeZone;
 //!     // Get time zone from a TZ string:
 //!     // From an absolute file
 //!     let _ = TimeZone::from_posix_tz("/usr/share/zoneinfo/Pacific/Auckland");
@@ -35,7 +40,7 @@
 //!     TimeZone::from_posix_tz("<-03>3")?;
 //!     TimeZone::from_posix_tz("NZST-12:00:00NZDT-13:00:00,M10.1.0,M3.3.0")?;
 //!     // Use a leading colon to force searching for a corresponding file
-//!     TimeZone::from_posix_tz(":UTC")?;
+//!     let _ = TimeZone::from_posix_tz(":UTC");
 //! # Ok(())
 //! # }
 //! ```
@@ -43,7 +48,7 @@
 //! ## Construct a date time object
 //!
 //! ```rust
-//! # fn datetime() -> Result<(), tz::TzError> {
+//! # fn main() -> Result<(), tz::TzError> {
 //!     use tz::{DateTime, TimeZone, UtcDateTime};
 //!
 //!     // Create a new UTC date time
@@ -95,12 +100,13 @@
 //!     // Get the corresponding UTC unix time
 //!     let unix_time = date_time.unix_time();
 //!     assert_eq!(unix_time, 946684800);
-//!
-//!     // Get the current date time at the local time zone
-//!     let time_zone_local = TimeZone::local()?;
-//!     let _date_time = DateTime::now(&time_zone_local)?;
 //! # Ok(())
 //! # }
+//! ```
+//! ```ignore
+//!     // Get the current date time at the local time zone (UNIX only)
+//!     let time_zone_local = TimeZone::local()?;
+//!     let _date_time = DateTime::now(&time_zone_local)?;
 //! ```
 
 mod constants;
@@ -451,6 +457,7 @@ impl TimeZone {
     }
 
     /// Returns local time zone
+    #[cfg(unix)]
     pub fn local() -> Result<Self> {
         Self::from_posix_tz("localtime")
     }
@@ -950,17 +957,20 @@ mod test {
 
     #[test]
     fn test_time_zone_from_posix_tz() -> Result<()> {
-        let time_zone_local_1 = TimeZone::local()?;
-        let time_zone_local_2 = TimeZone::from_posix_tz("localtime")?;
-        let time_zone_local_3 = TimeZone::from_posix_tz("/etc/localtime")?;
-        let time_zone_local_4 = TimeZone::from_posix_tz(":/etc/localtime")?;
+        #[cfg(unix)]
+        {
+            let time_zone_local_1 = TimeZone::local()?;
+            let time_zone_local_2 = TimeZone::from_posix_tz("localtime")?;
+            let time_zone_local_3 = TimeZone::from_posix_tz("/etc/localtime")?;
+            let time_zone_local_4 = TimeZone::from_posix_tz(":/etc/localtime")?;
 
-        assert_eq!(time_zone_local_1, time_zone_local_2);
-        assert_eq!(time_zone_local_1, time_zone_local_3);
-        assert_eq!(time_zone_local_1, time_zone_local_4);
+            assert_eq!(time_zone_local_1, time_zone_local_2);
+            assert_eq!(time_zone_local_1, time_zone_local_3);
+            assert_eq!(time_zone_local_1, time_zone_local_4);
 
-        let time_zone_utc = TimeZone::from_posix_tz("UTC")?;
-        assert_eq!(time_zone_utc.find_local_time_type(0)?.ut_offset(), 0);
+            let time_zone_utc = TimeZone::from_posix_tz("UTC")?;
+            assert_eq!(time_zone_utc.find_local_time_type(0)?.ut_offset(), 0);
+        }
 
         assert!(TimeZone::from_posix_tz("EST5EDT,0/0,J365/25").is_err());
         assert!(TimeZone::from_posix_tz("").is_err());

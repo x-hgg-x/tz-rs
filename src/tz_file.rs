@@ -328,18 +328,25 @@ pub(crate) fn parse_tz_file(bytes: &[u8]) -> Result<TimeZone, TzError> {
 
 /// Open the TZif file corresponding to a TZ string
 pub(crate) fn get_tz_file(tz_string: &str) -> Result<File, TzFileError> {
-    // Possible system timezone directories
-    const ZONE_INFO_DIRECTORIES: [&str; 3] = ["/usr/share/zoneinfo", "/share/zoneinfo", "/etc/zoneinfo"];
+    // Don't check system timezone directories on non-UNIX platforms
+    #[cfg(not(unix))]
+    return Ok(File::open(tz_string)?);
 
-    if tz_string.starts_with('/') {
-        Ok(File::open(tz_string)?)
-    } else {
-        for folder in ZONE_INFO_DIRECTORIES {
-            if let Ok(file) = File::open(format!("{}/{}", folder, tz_string)) {
-                return Ok(file);
+    #[cfg(unix)]
+    {
+        // Possible system timezone directories
+        const ZONE_INFO_DIRECTORIES: [&str; 3] = ["/usr/share/zoneinfo", "/share/zoneinfo", "/etc/zoneinfo"];
+
+        if tz_string.starts_with('/') {
+            Ok(File::open(tz_string)?)
+        } else {
+            for folder in ZONE_INFO_DIRECTORIES {
+                if let Ok(file) = File::open(format!("{}/{}", folder, tz_string)) {
+                    return Ok(file);
+                }
             }
+            Err(TzFileError::IoError(io::ErrorKind::NotFound.into()))
         }
-        Err(TzFileError::IoError(io::ErrorKind::NotFound.into()))
     }
 }
 

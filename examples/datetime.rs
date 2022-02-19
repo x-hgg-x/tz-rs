@@ -16,13 +16,16 @@ fn main() -> Result<()> {
     let time_zone_fixed = TimeZone::fixed(-3600);
     println!("{:?}", time_zone_fixed.find_local_time_type(unix_time)?.ut_offset());
 
-    // Get local time zone
-    let time_zone_local = TimeZone::local()?;
-    println!("{:?}", time_zone_local.find_local_time_type(unix_time)?.ut_offset());
+    #[cfg(unix)]
+    {
+        // Get local time zone
+        let time_zone_local = TimeZone::local()?;
+        println!("{:?}", time_zone_local.find_local_time_type(unix_time)?.ut_offset());
 
-    // Get the current local time type
-    let current_local_time_type = time_zone_local.find_current_local_time_type()?;
-    println!("{:?}", current_local_time_type);
+        // Get the current local time type
+        let current_local_time_type = time_zone_local.find_current_local_time_type()?;
+        println!("{:?}", current_local_time_type);
+    }
 
     // Get time zone from a TZ string:
     // From an absolute file
@@ -34,7 +37,7 @@ fn main() -> Result<()> {
     TimeZone::from_posix_tz("<-03>3")?;
     TimeZone::from_posix_tz("NZST-12:00:00NZDT-13:00:00,M10.1.0,M3.3.0")?;
     // Use a leading colon to force searching for a corresponding file
-    TimeZone::from_posix_tz(":UTC")?;
+    let _ = TimeZone::from_posix_tz(":UTC");
 
     //
     // DateTime
@@ -62,10 +65,13 @@ fn main() -> Result<()> {
     // Get the corresponding UTC unix time
     println!("{}", date_time.unix_time());
 
-    // Get the current date time at the local time zone
-    let time_zone_local = TimeZone::local()?;
-    let date_time = DateTime::now(&time_zone_local)?;
-    println!("{:#?}", date_time);
+    #[cfg(unix)]
+    {
+        // Get the current date time at the local time zone
+        let time_zone_local = TimeZone::local()?;
+        let date_time = DateTime::now(&time_zone_local)?;
+        println!("{:#?}", date_time);
+    }
 
     Ok(())
 }
