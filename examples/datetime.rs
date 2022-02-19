@@ -33,6 +33,8 @@ fn main() -> Result<()> {
     TimeZone::from_posix_tz("HST10")?;
     TimeZone::from_posix_tz("<-03>3")?;
     TimeZone::from_posix_tz("NZST-12:00:00NZDT-13:00:00,M10.1.0,M3.3.0")?;
+    // Use a leading colon to force searching for a corresponding file
+    TimeZone::from_posix_tz(":UTC")?;
 
     //
     // DateTime
