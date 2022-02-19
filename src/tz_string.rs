@@ -79,7 +79,7 @@ fn parse_time_zone_designation<'a>(cursor: &mut Cursor<'a>) -> Result<&'a [u8], 
     };
 
     if unquoted.len() < 3 {
-        return Err(TzStringError::InvalidTzString("invalid characters in time zone designation"));
+        return Err(TzStringError::InvalidTzString("time zone designation must have at least 3 characters"));
     }
 
     Ok(unquoted)
