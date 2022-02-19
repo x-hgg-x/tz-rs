@@ -717,7 +717,13 @@ impl DateTime {
 
     /// Construct date time from a time zone and an UTC date time
     pub fn from_utc_date_time(time_zone: &TimeZone, utc_date_time: UtcDateTime) -> Result<Self> {
-        Self::from_unix_time(time_zone, utc_date_time.to_date_time().unix_time())
+        // Preserve leap seconds
+        let utc_leap = utc_date_time.second.max(59) - 59;
+
+        let mut date_time = Self::from_unix_time(time_zone, utc_date_time.to_date_time().unix_time() - utc_leap as i64)?;
+        date_time.second += utc_leap;
+
+        Ok(date_time)
     }
 
     /// Construct date time from a time zone and an unix time in seconds
@@ -1005,6 +1011,29 @@ mod test {
             assert_eq!(DateTime::from_unix_time(&time_zone_cet, unix_time)?, date_time_cet);
             assert_eq!(date_time_cet.unix_time(), unix_time);
         }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_date_time_leap_seconds() -> Result<()> {
+        let utc_date_time = UtcDateTime::new(1972, 5, 30, 23, 59, 60)?;
+        let date_time = DateTime::from_utc_date_time(&TimeZone::fixed(-3600), utc_date_time)?;
+
+        let date_time_result = DateTime {
+            second: 60,
+            minute: 59,
+            hour: 22,
+            month_day: 30,
+            month: 5,
+            year: 72,
+            week_day: 5,
+            year_day: 181,
+            local_time_type: LocalTimeType::with_ut_offset(-3600),
+        };
+
+        assert_eq!(date_time, date_time_result);
+        assert_eq!(date_time.unix_time(), date_time_result.unix_time());
 
         Ok(())
     }
