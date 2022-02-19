@@ -117,6 +117,9 @@
 //!     let _date_time = DateTime::now(&time_zone_local)?;
 //! ```
 
+#![forbid(unsafe_code)]
+#![deny(missing_docs)]
+
 mod constants;
 mod cursor;
 mod tz_file;
@@ -140,6 +143,7 @@ pub type Result<T> = std::result::Result<T, TzError>;
 #[non_exhaustive]
 #[derive(Debug)]
 pub enum TzError {
+    /// The given input exceeded the any rationale date/time range
     ConversionError(TryFromIntError),
     /// I/O error
     IoError(io::Error),
