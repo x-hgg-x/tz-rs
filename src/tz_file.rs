@@ -222,7 +222,7 @@ impl<'a> DataBlock<'a> {
             }
 
             let time_zone_designation = match self.time_zone_designations[char_index..].iter().position(|&c| c == b'\0') {
-                Some(position) => str::from_utf8(&self.time_zone_designations[char_index..char_index + position])?.to_owned(),
+                Some(position) => str::from_utf8(&self.time_zone_designations[char_index..char_index + position])?.into(),
                 None => return Err(TzFileError::InvalidTzFile("invalid time zone designation char index")),
             };
 
@@ -364,7 +364,7 @@ mod test {
 
         let time_zone_result = TimeZone {
             transitions: Vec::new(),
-            local_time_types: vec![LocalTimeType { ut_offset: 0, is_dst: false, time_zone_designation: "UTC".to_owned() }],
+            local_time_types: vec![LocalTimeType { ut_offset: 0, is_dst: false, time_zone_designation: "UTC".into() }],
             leap_seconds: vec![
                 LeapSecond { unix_leap_time: 78796800, correction: 1 },
                 LeapSecond { unix_leap_time: 94694401, correction: 2 },
@@ -428,21 +428,21 @@ mod test {
                 Transition { unix_leap_time: -712150200, local_time_type_index: 5 },
             ],
             local_time_types: vec![
-                LocalTimeType { ut_offset: -37886, is_dst: false, time_zone_designation: "LMT".to_owned() },
-                LocalTimeType { ut_offset: -37800, is_dst: false, time_zone_designation: "HST".to_owned() },
-                LocalTimeType { ut_offset: -34200, is_dst: true, time_zone_designation: "HDT".to_owned() },
-                LocalTimeType { ut_offset: -34200, is_dst: true, time_zone_designation: "HWT".to_owned() },
-                LocalTimeType { ut_offset: -34200, is_dst: true, time_zone_designation: "HPT".to_owned() },
-                LocalTimeType { ut_offset: -36000, is_dst: false, time_zone_designation: "HST".to_owned() },
+                LocalTimeType { ut_offset: -37886, is_dst: false, time_zone_designation: "LMT".into() },
+                LocalTimeType { ut_offset: -37800, is_dst: false, time_zone_designation: "HST".into() },
+                LocalTimeType { ut_offset: -34200, is_dst: true, time_zone_designation: "HDT".into() },
+                LocalTimeType { ut_offset: -34200, is_dst: true, time_zone_designation: "HWT".into() },
+                LocalTimeType { ut_offset: -34200, is_dst: true, time_zone_designation: "HPT".into() },
+                LocalTimeType { ut_offset: -36000, is_dst: false, time_zone_designation: "HST".into() },
             ],
             leap_seconds: Vec::new(),
-            extra_rule: Some(TransitionRule::Fixed(LocalTimeType { ut_offset: -36000, is_dst: false, time_zone_designation: "HST".to_owned() })),
+            extra_rule: Some(TransitionRule::Fixed(LocalTimeType { ut_offset: -36000, is_dst: false, time_zone_designation: "HST".into() })),
         };
 
         assert_eq!(time_zone, time_zone_result);
 
-        assert_eq!(*time_zone.find_local_time_type(-1156939200)?, LocalTimeType { ut_offset: -34200, is_dst: true, time_zone_designation: "HDT".to_owned() });
-        assert_eq!(*time_zone.find_local_time_type(1546300800)?, LocalTimeType { ut_offset: -36000, is_dst: false, time_zone_designation: "HST".to_owned() });
+        assert_eq!(*time_zone.find_local_time_type(-1156939200)?, LocalTimeType { ut_offset: -34200, is_dst: true, time_zone_designation: "HDT".into() });
+        assert_eq!(*time_zone.find_local_time_type(1546300800)?, LocalTimeType { ut_offset: -36000, is_dst: false, time_zone_designation: "HST".into() });
 
         Ok(())
     }
@@ -455,11 +455,11 @@ mod test {
 
         let time_zone_result = TimeZone {
             transitions: vec![Transition { unix_leap_time: 2145916800, local_time_type_index: 0 }],
-            local_time_types: vec![LocalTimeType { ut_offset: 7200, is_dst: false, time_zone_designation: "IST".to_owned() }],
+            local_time_types: vec![LocalTimeType { ut_offset: 7200, is_dst: false, time_zone_designation: "IST".into() }],
             leap_seconds: Vec::new(),
             extra_rule: Some(TransitionRule::Alternate {
-                std: LocalTimeType { ut_offset: 7200, is_dst: false, time_zone_designation: "IST".to_owned() },
-                dst: LocalTimeType { ut_offset: 10800, is_dst: true, time_zone_designation: "IDT".to_owned() },
+                std: LocalTimeType { ut_offset: 7200, is_dst: false, time_zone_designation: "IST".into() },
+                dst: LocalTimeType { ut_offset: 10800, is_dst: true, time_zone_designation: "IDT".into() },
                 dst_start: RuleDay::MonthWeekDay { month: 3, week: 4, week_day: 4 },
                 dst_start_time: 93600,
                 dst_end: RuleDay::MonthWeekDay { month: 10, week: 5, week_day: 0 },

@@ -224,14 +224,14 @@ fn parse_rule_block(cursor: &mut Cursor, use_string_extensions: bool) -> Result<
 pub(crate) fn parse_posix_tz(tz_string: &[u8], use_string_extensions: bool) -> Result<TransitionRule, TzStringError> {
     let mut cursor = Cursor::new(tz_string);
 
-    let std_time_zone = str::from_utf8(parse_time_zone_designation(&mut cursor)?)?.to_owned();
+    let std_time_zone = str::from_utf8(parse_time_zone_designation(&mut cursor)?)?.into();
     let std_offset = parse_offset(&mut cursor)?;
 
     if cursor.is_empty() {
         return Ok(TransitionRule::Fixed(LocalTimeType { ut_offset: -std_offset, is_dst: false, time_zone_designation: std_time_zone }));
     }
 
-    let dst_time_zone = str::from_utf8(parse_time_zone_designation(&mut cursor)?)?.to_owned();
+    let dst_time_zone = str::from_utf8(parse_time_zone_designation(&mut cursor)?)?.into();
 
     let dst_offset = match cursor.remaining().get(0) {
         Some(&b',') => std_offset - 3600,
@@ -270,7 +270,7 @@ mod test {
         let tz_string = b"HST10";
 
         let transition_rule = parse_posix_tz(tz_string, false)?;
-        let transition_rule_result = TransitionRule::Fixed(LocalTimeType { ut_offset: -36000, is_dst: false, time_zone_designation: "HST".to_owned() });
+        let transition_rule_result = TransitionRule::Fixed(LocalTimeType { ut_offset: -36000, is_dst: false, time_zone_designation: "HST".into() });
 
         assert_eq!(transition_rule, transition_rule_result);
         assert_eq!(transition_rule.find_local_time_type(0)?.ut_offset(), -36000);
@@ -285,8 +285,8 @@ mod test {
         let transition_rule = parse_posix_tz(tz_string, false)?;
 
         let transition_rule_result = TransitionRule::Alternate {
-            std: LocalTimeType { ut_offset: -10800, is_dst: false, time_zone_designation: "-03".to_owned() },
-            dst: LocalTimeType { ut_offset: 10800, is_dst: true, time_zone_designation: "+03".to_owned() },
+            std: LocalTimeType { ut_offset: -10800, is_dst: false, time_zone_designation: "-03".into() },
+            dst: LocalTimeType { ut_offset: 10800, is_dst: true, time_zone_designation: "+03".into() },
             dst_start: RuleDay::Julian1WithoutLeap(1),
             dst_start_time: 7200,
             dst_end: RuleDay::Julian1WithoutLeap(365),
@@ -305,8 +305,8 @@ mod test {
         let transition_rule = parse_posix_tz(tz_string, false)?;
 
         let transition_rule_result = TransitionRule::Alternate {
-            std: LocalTimeType { ut_offset: 43200, is_dst: false, time_zone_designation: "NZST".to_owned() },
-            dst: LocalTimeType { ut_offset: 46800, is_dst: true, time_zone_designation: "NZDT".to_owned() },
+            std: LocalTimeType { ut_offset: 43200, is_dst: false, time_zone_designation: "NZST".into() },
+            dst: LocalTimeType { ut_offset: 46800, is_dst: true, time_zone_designation: "NZDT".into() },
             dst_start: RuleDay::MonthWeekDay { month: 10, week: 1, week_day: 0 },
             dst_start_time: 7200,
             dst_end: RuleDay::MonthWeekDay { month: 3, week: 3, week_day: 0 },
@@ -330,8 +330,8 @@ mod test {
         let transition_rule = parse_posix_tz(tz_string, false)?;
 
         let transition_rule_result = TransitionRule::Alternate {
-            std: LocalTimeType { ut_offset: 3600, is_dst: false, time_zone_designation: "IST".to_owned() },
-            dst: LocalTimeType { ut_offset: 0, is_dst: true, time_zone_designation: "GMT".to_owned() },
+            std: LocalTimeType { ut_offset: 3600, is_dst: false, time_zone_designation: "IST".into() },
+            dst: LocalTimeType { ut_offset: 0, is_dst: true, time_zone_designation: "GMT".into() },
             dst_start: RuleDay::MonthWeekDay { month: 10, week: 5, week_day: 0 },
             dst_start_time: 7200,
             dst_end: RuleDay::MonthWeekDay { month: 3, week: 5, week_day: 0 },
@@ -357,8 +357,8 @@ mod test {
         let transition_rule = parse_posix_tz(tz_string, true)?;
 
         let transition_rule_result = TransitionRule::Alternate {
-            std: LocalTimeType { ut_offset: -10800, is_dst: false, time_zone_designation: "-03".to_owned() },
-            dst: LocalTimeType { ut_offset: -7200, is_dst: true, time_zone_designation: "-02".to_owned() },
+            std: LocalTimeType { ut_offset: -10800, is_dst: false, time_zone_designation: "-03".into() },
+            dst: LocalTimeType { ut_offset: -7200, is_dst: true, time_zone_designation: "-02".into() },
             dst_start: RuleDay::MonthWeekDay { month: 3, week: 5, week_day: 0 },
             dst_start_time: -7200,
             dst_end: RuleDay::MonthWeekDay { month: 10, week: 5, week_day: 0 },
@@ -384,8 +384,8 @@ mod test {
         let transition_rule = parse_posix_tz(tz_string, true)?;
 
         let transition_rule_result = TransitionRule::Alternate {
-            std: LocalTimeType { ut_offset: -18000, is_dst: false, time_zone_designation: "EST".to_owned() },
-            dst: LocalTimeType { ut_offset: -14400, is_dst: true, time_zone_designation: "EDT".to_owned() },
+            std: LocalTimeType { ut_offset: -18000, is_dst: false, time_zone_designation: "EST".into() },
+            dst: LocalTimeType { ut_offset: -14400, is_dst: true, time_zone_designation: "EDT".into() },
             dst_start: RuleDay::Julian0WithLeap(0),
             dst_start_time: 0,
             dst_end: RuleDay::Julian1WithoutLeap(365),
