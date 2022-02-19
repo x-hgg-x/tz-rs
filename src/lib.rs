@@ -211,7 +211,7 @@ struct LeapSecond {
     correction: i32,
 }
 
-/// Local time type associted to a time zone
+/// Local time type associated to a time zone
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct LocalTimeType {
     /// Offset from UTC in seconds
