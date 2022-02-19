@@ -12,7 +12,7 @@ Documentation is hosted on [docs.rs](https://docs.rs/tz-rs/latest/tz).
 
 This crate is mainly intended for UNIX platforms.
 
-Since the time zone database files are not included in this crate, non UNIX users users can download a copy of the database on the [IANA site](https://www.iana.org/time-zones) and compile the time zone database files to a local directory.
+Since the time zone database files are not included in this crate, non UNIX users can download a copy of the database on the [IANA site](https://www.iana.org/time-zones) and compile the time zone database files to a local directory.
 
 The database files can then be read by specifying an absolute path in the `TZ` string:
 
