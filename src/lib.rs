@@ -649,6 +649,26 @@ impl UtcDateTime {
             local_time_type: LocalTimeType::with_ut_offset(0),
         }
     }
+
+    /// Construct date time from a unix time in seconds
+    pub fn from_unix_time(unix_time: i64) -> Result<Self> {
+        let dt = DateTime::from_unix_time(&TimeZone::utc(), unix_time)?;
+        Ok(Self {
+            second: dt.second,
+            minute: dt.minute,
+            hour: dt.hour,
+            month_day: dt.month_day,
+            month: dt.month,
+            year: dt.year,
+            week_day: dt.week_day,
+            year_day: dt.year_day,
+        })
+    }
+
+    /// Returns the current date time in UTC
+    pub fn now() -> Result<Self> {
+        Self::from_unix_time(SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs().try_into()?)
+    }
 }
 
 /// Date time associated to a local time type, exprimed in the [proleptic gregorian calendar](https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar)
