@@ -8,6 +8,18 @@ A pure Rust reimplementation of libc functions `localtime`, `gmtime` and `mktime
 
 Documentation is hosted on [docs.rs](https://docs.rs/tz-rs/latest/tz).
 
+## Platform support
+
+This crate is mainly intended for UNIX platforms.
+
+Since the time zone database files are not included in this crate, Windows users can download a copy of the database on the [IANA site](https://www.iana.org/time-zones) and compile the time zone database files to a local directory.
+
+The database files can then be read by specifying an absolute path in the `TZ` string:
+
+```rust
+    TimeZone::from_posix_tz(format!("{}/usr/share/zoneinfo/Pacific/Auckland", local_database_dir))?;
+```
+
 ## License
 
 This project is licensed under either of
