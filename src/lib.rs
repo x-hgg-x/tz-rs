@@ -122,6 +122,7 @@ use std::fmt;
 use std::fs::{self, File};
 use std::io::{self, Read};
 use std::num::TryFromIntError;
+use std::sync::Arc;
 use std::time::{SystemTime, SystemTimeError};
 
 use tz_file::TzFileError;
@@ -222,7 +223,7 @@ pub struct LocalTimeType {
     /// Daylight Saving Time indicator
     is_dst: bool,
     /// Time zone designation
-    time_zone_designation: String,
+    time_zone_designation: Option<Arc<str>>,
 }
 
 impl LocalTimeType {
@@ -238,7 +239,7 @@ impl LocalTimeType {
 
     /// Returns time zone designation
     pub fn time_zone_designation(&self) -> &str {
-        &self.time_zone_designation
+        self.time_zone_designation.as_deref().unwrap_or_default()
     }
 
     /// Construct the local time type associated to UTC
@@ -248,7 +249,7 @@ impl LocalTimeType {
 
     /// Construct a local time type with the specified offset in seconds
     pub fn with_ut_offset(ut_offset: i32) -> Self {
-        Self { ut_offset, is_dst: false, time_zone_designation: "".to_owned() }
+        Self { ut_offset, is_dst: false, time_zone_designation: None }
     }
 }
 
@@ -1001,8 +1002,8 @@ mod test {
         assert_eq!(*transition_rule_fixed.find_local_time_type(0)?, LocalTimeType::utc());
 
         let transition_rule_neg = TransitionRule::Alternate {
-            std: LocalTimeType { ut_offset: 0, is_dst: false, time_zone_designation: "".to_owned() },
-            dst: LocalTimeType { ut_offset: 0, is_dst: true, time_zone_designation: "".to_owned() },
+            std: LocalTimeType { ut_offset: 0, is_dst: false, time_zone_designation: None },
+            dst: LocalTimeType { ut_offset: 0, is_dst: true, time_zone_designation: None },
             dst_start: RuleDay::Julian0WithLeap(100),
             dst_start_time: 0,
             dst_end: RuleDay::Julian0WithLeap(101),
@@ -1195,6 +1196,12 @@ mod test {
         assert_eq!(date_time, date_time_result);
 
         Ok(())
+    }
+
+    #[test]
+    fn test_date_time_sync_and_send() {
+        trait AssertSyncSendStatic: Sync + Send + 'static {}
+        impl AssertSyncSendStatic for DateTime {}
     }
 
     #[test]
