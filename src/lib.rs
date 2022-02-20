@@ -480,6 +480,11 @@ impl TimeZone {
         Ok(local_time_zone)
     }
 
+    /// Construct a time zone from the contents of a time zone file
+    pub fn from_tz_data(bytes: &[u8]) -> Result<TimeZone> {
+        tz_file::parse_tz_file(bytes)
+    }
+
     /// Construct a time zone from a POSIX TZ string, as described in [the POSIX documentation of the `TZ` environment variable](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap08.html).
     pub fn from_posix_tz(tz_string: &str) -> Result<Self> {
         if tz_string.is_empty() {
