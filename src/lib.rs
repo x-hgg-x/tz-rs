@@ -794,7 +794,7 @@ impl UtcDateTime {
 }
 
 /// Date time associated to a local time type, exprimed in the [proleptic gregorian calendar](https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar)
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct DateTime {
     /// Seconds in `[0, 60]`, with a possible leap second
     second: u8,
@@ -919,6 +919,26 @@ impl DateTime {
     }
 }
 
+impl PartialEq for DateTime {
+    fn eq(&self, other: &Self) -> bool {
+        (self.unix_time, &self.local_time_type) == (other.unix_time, &other.local_time_type)
+    }
+}
+
+impl Eq for DateTime {}
+
+impl PartialOrd for DateTime {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        match self.unix_time.cmp(&other.unix_time) {
+            Ordering::Equal => match self.local_time_type == other.local_time_type {
+                true => Some(Ordering::Equal),
+                false => None,
+            },
+            result => Some(result),
+        }
+    }
+}
+
 /// Check if a year is a leap year.
 ///
 /// ## Inputs
@@ -973,6 +993,19 @@ fn days_since_unix_epoch(year: i32, month: usize, month_day: i64) -> i64 {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    fn assert_identic_date_time(x: &DateTime, y: &DateTime) {
+        assert_eq!(x.second, y.second);
+        assert_eq!(x.minute, y.minute);
+        assert_eq!(x.hour, y.hour);
+        assert_eq!(x.month_day, y.month_day);
+        assert_eq!(x.month, y.month);
+        assert_eq!(x.year, y.year);
+        assert_eq!(x.week_day, y.week_day);
+        assert_eq!(x.year_day, y.year_day);
+        assert_eq!(x.local_time_type, y.local_time_type);
+        assert_eq!(x.unix_time, y.unix_time);
+    }
 
     #[test]
     fn test_rule_day() -> Result<()> {
@@ -1154,21 +1187,21 @@ mod test {
             assert_eq!(date_time_cet.unix_time(), unix_time);
             assert_eq!(date_time_eet.unix_time(), unix_time);
 
-            assert_eq!(utc_date_time.project(&time_zone_utc)?, date_time_utc);
-            assert_eq!(utc_date_time.project(&time_zone_cet)?, date_time_cet);
-            assert_eq!(utc_date_time.project(&time_zone_eet)?, date_time_eet);
+            assert_identic_date_time(&utc_date_time.project(&time_zone_utc)?, &date_time_utc);
+            assert_identic_date_time(&utc_date_time.project(&time_zone_cet)?, &date_time_cet);
+            assert_identic_date_time(&utc_date_time.project(&time_zone_eet)?, &date_time_eet);
 
-            assert_eq!(date_time_utc.project(&time_zone_utc)?, date_time_utc);
-            assert_eq!(date_time_cet.project(&time_zone_utc)?, date_time_utc);
-            assert_eq!(date_time_eet.project(&time_zone_utc)?, date_time_utc);
+            assert_identic_date_time(&date_time_utc.project(&time_zone_utc)?, &date_time_utc);
+            assert_identic_date_time(&date_time_cet.project(&time_zone_utc)?, &date_time_utc);
+            assert_identic_date_time(&date_time_eet.project(&time_zone_utc)?, &date_time_utc);
 
-            assert_eq!(date_time_utc.project(&time_zone_cet)?, date_time_cet);
-            assert_eq!(date_time_cet.project(&time_zone_cet)?, date_time_cet);
-            assert_eq!(date_time_eet.project(&time_zone_cet)?, date_time_cet);
+            assert_identic_date_time(&date_time_utc.project(&time_zone_cet)?, &date_time_cet);
+            assert_identic_date_time(&date_time_cet.project(&time_zone_cet)?, &date_time_cet);
+            assert_identic_date_time(&date_time_eet.project(&time_zone_cet)?, &date_time_cet);
 
-            assert_eq!(date_time_utc.project(&time_zone_eet)?, date_time_eet);
-            assert_eq!(date_time_cet.project(&time_zone_eet)?, date_time_eet);
-            assert_eq!(date_time_eet.project(&time_zone_eet)?, date_time_eet);
+            assert_identic_date_time(&date_time_utc.project(&time_zone_eet)?, &date_time_eet);
+            assert_identic_date_time(&date_time_cet.project(&time_zone_eet)?, &date_time_eet);
+            assert_identic_date_time(&date_time_eet.project(&time_zone_eet)?, &date_time_eet);
         }
 
         Ok(())
@@ -1214,6 +1247,27 @@ mod test {
         assert_eq!(utc_date_time_3.cmp(&utc_date_time_1), Ordering::Greater);
         assert_eq!(utc_date_time_3.cmp(&utc_date_time_2), Ordering::Greater);
         assert_eq!(utc_date_time_3.cmp(&utc_date_time_3), Ordering::Equal);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_date_time_ord() -> Result<()> {
+        let tz = TimeZone::from_posix_tz("Europe/Paris")?;
+        let utc = UtcDateTime::new(2022, 9, 30, 0, 30, 0)?.project(&TimeZone::utc())?;
+        let cest = UtcDateTime::new(2022, 9, 30, 0, 30, 0)?.project(&tz)?;
+        let cet = UtcDateTime::new(2022, 9, 30, 1, 30, 0)?.project(&tz)?;
+
+        assert_eq!(cest.hour(), cet.hour());
+        assert!(utc != cest);
+        assert!(utc != cet);
+        assert!(cet != cest);
+        assert!(utc < cet);
+        assert!(cet > utc);
+        assert!(cest < cet);
+        assert!(cet > cest);
+        assert!(!(utc < cest));
+        assert!(!(utc > cest));
 
         Ok(())
     }
