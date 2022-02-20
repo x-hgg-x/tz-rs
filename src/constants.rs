@@ -30,8 +30,6 @@ pub const CUM_DAY_IN_MONTHS_NORMAL_YEAR: [i64; 12] = [0, 31, 59, 90, 120, 151, 1
 
 /// Unix time at `2000-03-01T00:00:00Z` (Wednesday)
 pub const UNIX_OFFSET_SECS: i64 = 951868800;
-/// Number of cumulated days in January and February in a normal year
-pub const OFFSET_DAYS: i64 = 31 + 28;
 /// Number of years between `2000` and `1900`
 pub const OFFSET_YEARS: i64 = 100;
 /// Month days in a leap year from March

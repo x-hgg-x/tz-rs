@@ -16,16 +16,13 @@ fn main() -> Result<()> {
     let time_zone_fixed = TimeZone::fixed(-3600);
     println!("{:?}", time_zone_fixed.find_local_time_type(unix_time)?.ut_offset());
 
-    #[cfg(unix)]
-    {
-        // Get local time zone
-        let time_zone_local = TimeZone::local()?;
-        println!("{:?}", time_zone_local.find_local_time_type(unix_time)?.ut_offset());
+    // Get local time zone (UNIX only)
+    let time_zone_local = TimeZone::local()?;
+    println!("{:?}", time_zone_local.find_local_time_type(unix_time)?.ut_offset());
 
-        // Get the current local time type
-        let current_local_time_type = time_zone_local.find_current_local_time_type()?;
-        println!("{:?}", current_local_time_type);
-    }
+    // Get the current local time type
+    let current_local_time_type = time_zone_local.find_current_local_time_type()?;
+    println!("{:?}", current_local_time_type);
 
     // Get time zone from a TZ string:
     // From an absolute file
@@ -43,29 +40,36 @@ fn main() -> Result<()> {
     // DateTime
     //
 
+    // Get the current UTC date time
+    let current_utc_date_time = UtcDateTime::now()?;
+    println!("{:?}", current_utc_date_time);
+
     // Create a new UTC date time (2000-01-01T00:00:00Z)
-    let date_time = DateTime::new_utc(2000, 0, 1, 0, 0, 0)?;
+    let utc_date_time = UtcDateTime::new(2000, 0, 1, 0, 0, 0)?;
+    println!("{:?}", utc_date_time);
+
+    // Create a new UTC date time from a Unix time (2000-01-01T00:00:00Z)
+    let other_utc_date_time = UtcDateTime::from_unix_time(946684800)?;
+    println!("{:?}", other_utc_date_time);
+
+    // Project the UTC date time to a time zone
+    let date_time = utc_date_time.project(&TimeZone::fixed(-3600))?;
     println!("{:#?}", date_time);
 
-    // Create a date time from a time zone and an UTC date time (2000-01-01T00:00:00Z)
-    let time_zone_fixed = TimeZone::fixed(-3600);
-    let date_time = DateTime::new_utc(2000, 0, 1, 0, 0, 0)?.project(&time_zone_fixed)?;
-    println!("{:#?}", date_time);
+    // Project the date time to another time zone
+    let other_date_time = date_time.project(&TimeZone::fixed(3600))?;
+    println!("{:#?}", other_date_time);
 
-    // Create a date time from a time zone and an UTC unix time (2000-01-01T00:00:00Z)
-    let date_time = DateTime::from_unix_time(&time_zone_fixed, 946684800)?;
-    println!("{:#?}", date_time);
-
-    // Get the corresponding UTC unix time
+    // Get the corresponding UTC Unix times
+    println!("{}", utc_date_time.unix_time());
+    println!("{}", other_utc_date_time.unix_time());
     println!("{}", date_time.unix_time());
+    println!("{}", other_date_time.unix_time());
 
-    #[cfg(unix)]
-    {
-        // Get the current date time at the local time zone
-        let time_zone_local = TimeZone::local()?;
-        let date_time = DateTime::now(&time_zone_local)?;
-        println!("{:#?}", date_time);
-    }
+    // Get the current date time at the local time zone (UNIX only)
+    let time_zone_local = TimeZone::local()?;
+    let date_time = DateTime::now(&time_zone_local)?;
+    println!("{:#?}", date_time);
 
     Ok(())
 }

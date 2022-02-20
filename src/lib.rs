@@ -10,7 +10,7 @@
 //!
 //! # Usage
 //!
-//! ## Construct a time zone object
+//! ## Time zone
 //!
 //! ```rust
 //! # fn main() -> Result<(), tz::TzError> {
@@ -26,18 +26,12 @@
 //!     // Get fixed time zone at GMT-1
 //!     let time_zone_fixed = TimeZone::fixed(-3600);
 //!     assert_eq!(time_zone_fixed.find_local_time_type(unix_time)?.ut_offset(), -3600);
-//! # Ok(())
-//! # }
-//! ```
-//! ```rust,ignore
+//!
 //!     // Get local time zone (UNIX only)
 //!     let time_zone_local = TimeZone::local()?;
 //!     // Get the current local time type
 //!     let _current_local_time_type = time_zone_local.find_current_local_time_type()?;
-//! ```
-//! ```rust
-//! # fn main() -> Result<(), tz::TzError> {
-//! # use tz::TimeZone;
+//!
 //!     // Get time zone from a TZ string:
 //!     // From an absolute file
 //!     let _ = TimeZone::from_posix_tz("/usr/share/zoneinfo/Pacific/Auckland");
@@ -53,29 +47,34 @@
 //! # }
 //! ```
 //!
-//! ## Construct a date time object
+//! ## Date time
 //!
 //! ```rust
 //! # fn main() -> Result<(), tz::TzError> {
-//!     use tz::{DateTime, TimeZone};
+//!     use tz::{DateTime, TimeZone, UtcDateTime};
+//!
+//!     // Get the current UTC date time
+//!     let _current_utc_date_time = UtcDateTime::now()?;
 //!
 //!     // Create a new UTC date time (2000-01-01T00:00:00Z)
-//!     let date_time = DateTime::new_utc(2000, 0, 1, 0, 0, 0)?;
-//!     assert_eq!(date_time.second(), 0);
-//!     assert_eq!(date_time.minute(), 0);
-//!     assert_eq!(date_time.hour(), 0);
-//!     assert_eq!(date_time.month_day(), 1);
-//!     assert_eq!(date_time.month(), 0);
-//!     assert_eq!(date_time.year(), 100);
-//!     assert_eq!(date_time.full_year(), 2000);
-//!     assert_eq!(date_time.week_day(), 6);
-//!     assert_eq!(date_time.year_day(), 0);
-//!     assert_eq!(date_time.local_time_type().ut_offset(), 0);
-//!     assert_eq!(date_time.unix_time(), 946684800);
+//!     let utc_date_time = UtcDateTime::new(2000, 0, 1, 0, 0, 0)?;
+//!     assert_eq!(utc_date_time.second(), 0);
+//!     assert_eq!(utc_date_time.minute(), 0);
+//!     assert_eq!(utc_date_time.hour(), 0);
+//!     assert_eq!(utc_date_time.month_day(), 1);
+//!     assert_eq!(utc_date_time.month(), 0);
+//!     assert_eq!(utc_date_time.year(), 100);
+//!     assert_eq!(utc_date_time.full_year(), 2000);
+//!     assert_eq!(utc_date_time.week_day(), 6);
+//!     assert_eq!(utc_date_time.year_day(), 0);
+//!     assert_eq!(utc_date_time.unix_time(), 946684800);
 //!
-//!     // Create a date time from a time zone and an UTC date time (2000-01-01T00:00:00Z)
-//!     let time_zone_fixed = TimeZone::fixed(-3600);
-//!     let date_time = DateTime::new_utc(2000, 0, 1, 0, 0, 0)?.project(&time_zone_fixed)?;
+//!     // Create a new UTC date time from a Unix time (2000-01-01T00:00:00Z)
+//!     let other_utc_date_time = UtcDateTime::from_unix_time(946684800)?;
+//!     assert_eq!(other_utc_date_time, utc_date_time);
+//!
+//!     // Project the UTC date time to a time zone
+//!     let date_time = utc_date_time.project(&TimeZone::fixed(-3600))?;
 //!     assert_eq!(date_time.second(), 0);
 //!     assert_eq!(date_time.minute(), 0);
 //!     assert_eq!(date_time.hour(), 23);
@@ -88,26 +87,25 @@
 //!     assert_eq!(date_time.local_time_type().ut_offset(), -3600);
 //!     assert_eq!(date_time.unix_time(), 946684800);
 //!
-//!     // Create a date time from a time zone and an UTC unix time (2000-01-01T00:00:00Z)
-//!     let date_time = DateTime::from_unix_time(&time_zone_fixed, 946684800)?;
-//!     assert_eq!(date_time.second(), 0);
-//!     assert_eq!(date_time.minute(), 0);
-//!     assert_eq!(date_time.hour(), 23);
-//!     assert_eq!(date_time.month_day(), 31);
-//!     assert_eq!(date_time.month(), 11);
-//!     assert_eq!(date_time.year(), 99);
-//!     assert_eq!(date_time.full_year(), 1999);
-//!     assert_eq!(date_time.week_day(), 5);
-//!     assert_eq!(date_time.year_day(), 364);
-//!     assert_eq!(date_time.local_time_type().ut_offset(), -3600);
-//!     assert_eq!(date_time.unix_time(), 946684800);
-//! # Ok(())
-//! # }
-//! ```
-//! ```rust,ignore
+//!     // Project the date time to another time zone
+//!     let other_date_time = date_time.project(&TimeZone::fixed(3600))?;
+//!     assert_eq!(other_date_time.second(), 0);
+//!     assert_eq!(other_date_time.minute(), 0);
+//!     assert_eq!(other_date_time.hour(), 1);
+//!     assert_eq!(other_date_time.month_day(), 1);
+//!     assert_eq!(other_date_time.month(), 0);
+//!     assert_eq!(other_date_time.year(), 100);
+//!     assert_eq!(other_date_time.full_year(), 2000);
+//!     assert_eq!(other_date_time.week_day(), 6);
+//!     assert_eq!(other_date_time.year_day(), 0);
+//!     assert_eq!(other_date_time.local_time_type().ut_offset(), 3600);
+//!     assert_eq!(other_date_time.unix_time(), 946684800);
+//!
 //!     // Get the current date time at the local time zone (UNIX only)
 //!     let time_zone_local = TimeZone::local()?;
 //!     let _date_time = DateTime::now(&time_zone_local)?;
+//! # Ok(())
+//! # }
 //! ```
 
 mod constants;
@@ -327,7 +325,7 @@ impl RuleDay {
         }
     }
 
-    /// Returns the UTC unix time in seconds associated to the transition date for the provided year
+    /// Returns the UTC Unix time in seconds associated to the transition date for the provided year
     ///
     /// ## Inputs
     ///
@@ -365,7 +363,7 @@ enum TransitionRule {
 }
 
 impl TransitionRule {
-    /// Find the local time type associated to the transition rule at the specified unix time in seconds
+    /// Find the local time type associated to the transition rule at the specified Unix time in seconds
     fn find_local_time_type(&self, unix_time: i64) -> Result<&LocalTimeType> {
         match self {
             Self::Fixed(local_time_type) => Ok(local_time_type),
@@ -373,12 +371,12 @@ impl TransitionRule {
                 let dst_start_time_in_utc = (dst_start_time - std.ut_offset).into();
                 let dst_end_time_in_utc = (dst_end_time - dst.ut_offset).into();
 
-                let current_year = DateTime::from_unix_time(&TimeZone::utc(), unix_time)?.year();
+                let current_year = UtcDateTime::from_unix_time(unix_time)?.year();
 
                 let current_year_dst_start_unix_time = dst_start.unix_time(current_year, dst_start_time_in_utc);
                 let current_year_dst_end_unix_time = dst_end.unix_time(current_year, dst_end_time_in_utc);
 
-                // Check DST start/end unix times for previous/current/next years to support for transition day times outside of [0h, 24h] range
+                // Check DST start/end Unix times for previous/current/next years to support for transition day times outside of [0h, 24h] range
                 let is_dst = match current_year_dst_start_unix_time.cmp(&current_year_dst_end_unix_time) {
                     Ordering::Less | Ordering::Equal => {
                         if unix_time < current_year_dst_start_unix_time {
@@ -458,10 +456,18 @@ impl TimeZone {
         Self { transitions: Vec::new(), local_time_types: vec![LocalTimeType::with_ut_offset(ut_offset)], leap_seconds: Vec::new(), extra_rule: None }
     }
 
-    /// Returns local time zone
-    #[cfg(unix)]
+    /// Returns local time zone.
+    ///
+    /// This method in not supported on non-UNIX platforms, and returns the UTC time zone instead.
+    ///
     pub fn local() -> Result<Self> {
-        Self::from_posix_tz("localtime")
+        #[cfg(not(unix))]
+        let local_time_zone = Self::utc();
+
+        #[cfg(unix)]
+        let local_time_zone = Self::from_posix_tz("localtime")?;
+
+        Ok(local_time_zone)
     }
 
     /// Construct a time zone from a POSIX TZ string, as described in [the POSIX documentation of the `TZ` environment variable](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap08.html).
@@ -502,7 +508,7 @@ impl TimeZone {
         }
     }
 
-    /// Find the local time type associated to the time zone at the specified unix time in seconds
+    /// Find the local time type associated to the time zone at the specified Unix time in seconds
     pub fn find_local_time_type(&self, unix_time: i64) -> Result<&LocalTimeType> {
         match self.transitions.last() {
             None => match &self.extra_rule {
@@ -531,7 +537,7 @@ impl TimeZone {
         self.find_local_time_type(SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs().try_into()?)
     }
 
-    /// Convert unix time to unix leap time, from the list of leap seconds in the time zone
+    /// Convert Unix time to Unix leap time, from the list of leap seconds in the time zone
     fn unix_time_to_unix_leap_time(&self, unix_time: i64) -> i64 {
         let mut unix_leap_time = unix_time;
 
@@ -545,12 +551,228 @@ impl TimeZone {
         unix_leap_time
     }
 
-    /// Convert unix leap time to unix time, from the list of leap seconds in the time zone
+    /// Convert Unix leap time to Unix time, from the list of leap seconds in the time zone
     fn unix_leap_time_to_unix_time(&self, unix_leap_time: i64) -> i64 {
         let index = self.leap_seconds.partition_point(|x| x.unix_leap_time < unix_leap_time);
         let correction = if index > 0 { self.leap_seconds[index - 1].correction } else { 0 };
 
         unix_leap_time - correction as i64
+    }
+}
+
+/// UTC date time exprimed in the [proleptic gregorian calendar](https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar)
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct UtcDateTime {
+    /// Seconds in `[0, 60]`, with a possible leap second
+    second: u8,
+    /// Minutes in `[0, 59]`
+    minute: u8,
+    /// Hours since midnight in `[0, 23]`
+    hour: u8,
+    /// Day of the month in `[1, 31]`
+    month_day: u8,
+    /// Month in `[0, 11]`
+    month: u8,
+    /// Years since 1900
+    year: i32,
+}
+
+impl UtcDateTime {
+    /// Returns seconds in `[0, 60]`, with a possible leap second
+    pub fn second(&self) -> u8 {
+        self.second
+    }
+
+    /// Returns minutes in `[0, 59]`
+    pub fn minute(&self) -> u8 {
+        self.minute
+    }
+
+    /// Returns hours since midnight in `[0, 23]`
+    pub fn hour(&self) -> u8 {
+        self.hour
+    }
+
+    /// Returns day of the month in `[1, 31]`
+    pub fn month_day(&self) -> u8 {
+        self.month_day
+    }
+
+    /// Returns month in `[0, 11]`
+    pub fn month(&self) -> u8 {
+        self.month
+    }
+
+    /// Returns years since 1900
+    pub fn year(&self) -> i32 {
+        self.year
+    }
+
+    /// Returns year
+    pub fn full_year(&self) -> i32 {
+        self.year + 1900
+    }
+
+    /// Returns days since Sunday in `[0, 6]`
+    pub fn week_day(&self) -> u8 {
+        let days_since_unix_epoch = days_since_unix_epoch(self.year, self.month.into(), self.month_day.into());
+        (4 + days_since_unix_epoch).rem_euclid(constants::DAYS_PER_WEEK) as u8
+    }
+
+    /// Returns days since January 1 in `[0, 365]`
+    pub fn year_day(&self) -> u16 {
+        let leap = (self.month >= 2 && is_leap_year(self.year)) as i64;
+        (constants::CUM_DAY_IN_MONTHS_NORMAL_YEAR[self.month as usize] + leap + self.month_day as i64 - 1) as u16
+    }
+
+    /// Returns the Unix time in seconds associated to the UTC date time
+    pub fn unix_time(&self) -> i64 {
+        use constants::*;
+
+        let mut result = days_since_unix_epoch(self.year, self.month.into(), self.month_day.into());
+        result *= HOURS_PER_DAY;
+        result += self.hour as i64;
+        result *= MINUTES_PER_HOUR;
+        result += self.minute as i64;
+        result *= SECONDS_PER_MINUTE;
+        result += self.second as i64;
+
+        result
+    }
+
+    /// Construct a UTC date time
+    ///
+    /// ## Inputs
+    ///
+    /// * `full_year`: Year
+    /// * `month`: Month in `[0, 11]`
+    /// * `month_day`: Day of the month in `[1, 31]`
+    /// * `hour`: Hours since midnight in `[0, 23]`
+    /// * `minute`: Minutes in `[0, 59]`
+    /// * `second`: Seconds in `[0, 60]`, with a possible leap second
+    ///
+    pub fn new(full_year: i32, month: u8, month_day: u8, hour: u8, minute: u8, second: u8) -> Result<Self> {
+        use constants::*;
+
+        let year = full_year - 1900;
+
+        if !(0..=11).contains(&month) {
+            return Err(TzError::DateTimeInputError("invalid month"));
+        }
+        if !(1..=31).contains(&month_day) {
+            return Err(TzError::DateTimeInputError("invalid month day"));
+        }
+        if !(0..=23).contains(&hour) {
+            return Err(TzError::DateTimeInputError("invalid hour"));
+        }
+        if !(0..=59).contains(&minute) {
+            return Err(TzError::DateTimeInputError("invalid minute"));
+        }
+        if !(0..=60).contains(&second) {
+            return Err(TzError::DateTimeInputError("invalid second"));
+        }
+
+        let leap = is_leap_year(year) as i64;
+
+        let mut day_in_month = DAY_IN_MONTHS_NORMAL_YEAR[month as usize];
+        if month == 1 {
+            day_in_month += leap;
+        }
+
+        if month_day as i64 > day_in_month {
+            return Err(TzError::DateTimeInputError("invalid month day"));
+        }
+
+        Ok(Self { second, minute, hour, month_day, month, year })
+    }
+
+    /// Construct a UTC date time from a Unix time in seconds
+    pub fn from_unix_time(unix_time: i64) -> Result<Self> {
+        use constants::*;
+
+        let seconds = unix_time - UNIX_OFFSET_SECS;
+        let mut remaining_days = seconds / SECONDS_PER_DAY;
+        let mut remaining_seconds = seconds % SECONDS_PER_DAY;
+        if remaining_seconds < 0 {
+            remaining_seconds += SECONDS_PER_DAY;
+            remaining_days -= 1;
+        }
+
+        let mut cycles_400_years = remaining_days / DAYS_PER_400_YEARS;
+        remaining_days %= DAYS_PER_400_YEARS;
+        if remaining_days < 0 {
+            remaining_days += DAYS_PER_400_YEARS;
+            cycles_400_years -= 1;
+        }
+
+        let cycles_100_years = (remaining_days / DAYS_PER_100_YEARS).min(3);
+        remaining_days -= cycles_100_years * DAYS_PER_100_YEARS;
+
+        let cycles_4_years = (remaining_days / DAYS_PER_4_YEARS).min(24);
+        remaining_days -= cycles_4_years * DAYS_PER_4_YEARS;
+
+        let remaining_years = (remaining_days / DAYS_PER_NORMAL_YEAR).min(3);
+        remaining_days -= remaining_years * DAYS_PER_NORMAL_YEAR;
+
+        let mut year = OFFSET_YEARS + remaining_years + cycles_4_years * 4 + cycles_100_years * 100 + cycles_400_years * 400;
+
+        let mut month = 2;
+        for days in DAY_IN_MONTHS_LEAP_YEAR_FROM_MARCH {
+            if remaining_days < days {
+                break;
+            }
+            remaining_days -= days;
+            month += 1;
+        }
+
+        if month >= MONTHS_PER_YEAR {
+            month -= MONTHS_PER_YEAR;
+            year += 1;
+        }
+
+        let month_day = 1 + remaining_days;
+
+        let hour = remaining_seconds / SECONDS_PER_HOUR;
+        let minute = (remaining_seconds / SECONDS_PER_MINUTE) % MINUTES_PER_HOUR;
+        let second = remaining_seconds % SECONDS_PER_MINUTE;
+
+        Ok(Self {
+            second: second.try_into()?,
+            minute: minute.try_into()?,
+            hour: hour.try_into()?,
+            month_day: month_day.try_into()?,
+            month: month.try_into()?,
+            year: year.try_into()?,
+        })
+    }
+
+    /// Returns the current UTC date time
+    pub fn now() -> Result<Self> {
+        Self::from_unix_time(SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs().try_into()?)
+    }
+
+    /// Project the UTC date time into a time zone.
+    ///
+    /// Leap seconds are not preserved.
+    ///
+    pub fn project(&self, time_zone: &TimeZone) -> Result<DateTime> {
+        let unix_time = self.unix_time();
+        let local_time_type = time_zone.find_local_time_type(unix_time)?;
+
+        let utc_date_time_with_offset = UtcDateTime::from_unix_time(unix_time + local_time_type.ut_offset() as i64)?;
+
+        Ok(DateTime {
+            second: utc_date_time_with_offset.second,
+            minute: utc_date_time_with_offset.minute,
+            hour: utc_date_time_with_offset.hour,
+            month_day: utc_date_time_with_offset.month_day,
+            month: utc_date_time_with_offset.month,
+            year: utc_date_time_with_offset.year,
+            week_day: utc_date_time_with_offset.week_day(),
+            year_day: utc_date_time_with_offset.year_day(),
+            local_time_type: local_time_type.clone(),
+            unix_time,
+        })
     }
 }
 
@@ -575,7 +797,7 @@ pub struct DateTime {
     year_day: u16,
     /// Local time type
     local_time_type: LocalTimeType,
-    /// UTC unix time in seconds
+    /// UTC Unix time in seconds
     unix_time: i64,
 }
 
@@ -630,72 +852,9 @@ impl DateTime {
         &self.local_time_type
     }
 
-    /// Returns UTC unix time in seconds
+    /// Returns UTC Unix time in seconds
     pub fn unix_time(&self) -> i64 {
         self.unix_time
-    }
-
-    /// Construct an UTC date time
-    ///
-    /// ## Inputs
-    ///
-    /// * `full_year`: Year
-    /// * `month`: Month in `[0, 11]`
-    /// * `month_day`: Day of the month in `[1, 31]`
-    /// * `hour`: Hours since midnight in `[0, 23]`
-    /// * `minute`: Minutes in `[0, 59]`
-    /// * `second`: Seconds in `[0, 60]`, with a possible leap second
-    ///
-    pub fn new_utc(full_year: i32, month: u8, month_day: u8, hour: u8, minute: u8, second: u8) -> Result<Self> {
-        use constants::*;
-
-        let year = full_year - 1900;
-
-        if !(0..=11).contains(&month) {
-            return Err(TzError::DateTimeInputError("invalid month"));
-        }
-        if !(1..=31).contains(&month_day) {
-            return Err(TzError::DateTimeInputError("invalid month day"));
-        }
-        if !(0..=23).contains(&hour) {
-            return Err(TzError::DateTimeInputError("invalid hour"));
-        }
-        if !(0..=59).contains(&minute) {
-            return Err(TzError::DateTimeInputError("invalid minute"));
-        }
-        if !(0..=60).contains(&second) {
-            return Err(TzError::DateTimeInputError("invalid second"));
-        }
-
-        let leap = is_leap_year(year) as i64;
-
-        let mut day_in_month = DAY_IN_MONTHS_NORMAL_YEAR[month as usize];
-        if month == 1 {
-            day_in_month += leap;
-        }
-
-        if month_day as i64 > day_in_month {
-            return Err(TzError::DateTimeInputError("invalid month day"));
-        }
-
-        let days_since_unix_epoch = days_since_unix_epoch(year, month.into(), month_day.into());
-
-        let week_day = (4 + days_since_unix_epoch).rem_euclid(DAYS_PER_WEEK).try_into()?;
-
-        let cum_day_in_months = [0, 31, 59 + leap, 90 + leap, 120 + leap, 151 + leap, 181 + leap, 212 + leap, 243 + leap, 273 + leap, 304 + leap, 334 + leap];
-        let year_day = (cum_day_in_months[month as usize] + month_day as i64 - 1).try_into()?;
-
-        let mut unix_time = days_since_unix_epoch;
-        unix_time *= HOURS_PER_DAY;
-        unix_time += hour as i64;
-        unix_time *= MINUTES_PER_HOUR;
-        unix_time += minute as i64;
-        unix_time *= SECONDS_PER_MINUTE;
-        unix_time += second as i64;
-
-        let local_time_type = LocalTimeType::utc();
-
-        Ok(Self { second, minute, hour, month_day, month, year, week_day, year_day, local_time_type, unix_time })
     }
 
     /// Project the date time into another time zone.
@@ -703,80 +862,40 @@ impl DateTime {
     /// Leap seconds are not preserved.
     ///
     pub fn project(&self, time_zone: &TimeZone) -> Result<Self> {
-        Self::from_unix_time(time_zone, self.unix_time)
+        let local_time_type = time_zone.find_local_time_type(self.unix_time)?;
+
+        let utc_date_time_with_offset = UtcDateTime::from_unix_time(self.unix_time + local_time_type.ut_offset() as i64)?;
+
+        Ok(DateTime {
+            second: utc_date_time_with_offset.second,
+            minute: utc_date_time_with_offset.minute,
+            hour: utc_date_time_with_offset.hour,
+            month_day: utc_date_time_with_offset.month_day,
+            month: utc_date_time_with_offset.month,
+            year: utc_date_time_with_offset.year,
+            week_day: utc_date_time_with_offset.week_day(),
+            year_day: utc_date_time_with_offset.year_day(),
+            local_time_type: local_time_type.clone(),
+            unix_time: self.unix_time,
+        })
     }
 
     /// Returns the current date time associated to the specified time zone
     pub fn now(time_zone: &TimeZone) -> Result<Self> {
-        Self::from_unix_time(time_zone, SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs().try_into()?)
-    }
-
-    /// Construct date time from a time zone and an UTC unix time in seconds
-    pub fn from_unix_time(time_zone: &TimeZone, unix_time: i64) -> Result<Self> {
-        use constants::*;
-
+        let unix_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs().try_into()?;
         let local_time_type = time_zone.find_local_time_type(unix_time)?;
 
-        let seconds = unix_time + local_time_type.ut_offset as i64 - UNIX_OFFSET_SECS;
-        let mut remaining_days = seconds / SECONDS_PER_DAY;
-        let mut remaining_seconds = seconds % SECONDS_PER_DAY;
-        if remaining_seconds < 0 {
-            remaining_seconds += SECONDS_PER_DAY;
-            remaining_days -= 1;
-        }
+        let utc_date_time_with_offset = UtcDateTime::from_unix_time(unix_time + local_time_type.ut_offset() as i64)?;
 
-        let week_day = (3 + remaining_days).rem_euclid(DAYS_PER_WEEK);
-
-        let mut cycles_400_years = remaining_days / DAYS_PER_400_YEARS;
-        remaining_days %= DAYS_PER_400_YEARS;
-        if remaining_days < 0 {
-            remaining_days += DAYS_PER_400_YEARS;
-            cycles_400_years -= 1;
-        }
-
-        let cycles_100_years = (remaining_days / DAYS_PER_100_YEARS).min(3);
-        remaining_days -= cycles_100_years * DAYS_PER_100_YEARS;
-
-        let cycles_4_years = (remaining_days / DAYS_PER_4_YEARS).min(24);
-        remaining_days -= cycles_4_years * DAYS_PER_4_YEARS;
-
-        let remaining_years = (remaining_days / DAYS_PER_NORMAL_YEAR).min(3);
-        remaining_days -= remaining_years * DAYS_PER_NORMAL_YEAR;
-
-        let leap = (remaining_years == 0 && (cycles_4_years != 0 || cycles_100_years == 0)) as i64;
-        let year_day = (remaining_days + OFFSET_DAYS + leap).rem_euclid(DAYS_PER_NORMAL_YEAR + leap);
-
-        let mut year = OFFSET_YEARS + remaining_years + cycles_4_years * 4 + cycles_100_years * 100 + cycles_400_years * 400;
-
-        let mut month = 2;
-        for days in DAY_IN_MONTHS_LEAP_YEAR_FROM_MARCH {
-            if remaining_days < days {
-                break;
-            }
-            remaining_days -= days;
-            month += 1;
-        }
-
-        if month >= MONTHS_PER_YEAR {
-            month -= MONTHS_PER_YEAR;
-            year += 1;
-        }
-
-        let month_day = 1 + remaining_days;
-
-        let hour = remaining_seconds / SECONDS_PER_HOUR;
-        let minute = (remaining_seconds / SECONDS_PER_MINUTE) % MINUTES_PER_HOUR;
-        let second = remaining_seconds % SECONDS_PER_MINUTE;
-
-        Ok(Self {
-            second: second.try_into()?,
-            minute: minute.try_into()?,
-            hour: hour.try_into()?,
-            month_day: month_day.try_into()?,
-            month: month.try_into()?,
-            year: year.try_into()?,
-            week_day: week_day.try_into()?,
-            year_day: year_day.try_into()?,
+        Ok(DateTime {
+            second: utc_date_time_with_offset.second,
+            minute: utc_date_time_with_offset.minute,
+            hour: utc_date_time_with_offset.hour,
+            month_day: utc_date_time_with_offset.month_day,
+            month: utc_date_time_with_offset.month,
+            year: utc_date_time_with_offset.year,
+            week_day: utc_date_time_with_offset.week_day(),
+            year_day: utc_date_time_with_offset.year_day(),
             local_time_type: local_time_type.clone(),
             unix_time,
         })
@@ -922,14 +1041,16 @@ mod test {
     fn test_time_zone_from_posix_tz() -> Result<()> {
         #[cfg(unix)]
         {
-            let time_zone_local_1 = TimeZone::local()?;
-            let time_zone_local_2 = TimeZone::from_posix_tz("localtime")?;
-            let time_zone_local_3 = TimeZone::from_posix_tz("/etc/localtime")?;
-            let time_zone_local_4 = TimeZone::from_posix_tz(":/etc/localtime")?;
+            let time_zone_local = TimeZone::local()?;
+            let time_zone_local_1 = TimeZone::from_posix_tz("localtime")?;
+            let time_zone_local_2 = TimeZone::from_posix_tz("/etc/localtime")?;
+            let time_zone_local_3 = TimeZone::from_posix_tz(":/etc/localtime")?;
 
-            assert_eq!(time_zone_local_1, time_zone_local_2);
-            assert_eq!(time_zone_local_1, time_zone_local_3);
-            assert_eq!(time_zone_local_1, time_zone_local_4);
+            assert_eq!(time_zone_local, time_zone_local_1);
+            assert_eq!(time_zone_local, time_zone_local_2);
+            assert_eq!(time_zone_local, time_zone_local_3);
+
+            assert!(matches!(time_zone_local.find_current_local_time_type(), Ok(_) | Err(TzError::NoLocalTimeType)));
 
             let time_zone_utc = TimeZone::from_posix_tz("UTC")?;
             assert_eq!(time_zone_utc.find_local_time_type(0)?.ut_offset(), 0);
@@ -951,6 +1072,10 @@ mod test {
 
         let time_zone_eet = TimeZone::fixed(7200);
         let eet = LocalTimeType::with_ut_offset(7200);
+
+        assert_eq!(DateTime::now(&time_zone_utc)?.local_time_type().ut_offset(), 0);
+        assert_eq!(DateTime::now(&time_zone_cet)?.local_time_type().ut_offset(), 3600);
+        assert_eq!(DateTime::now(&time_zone_eet)?.local_time_type().ut_offset(), 7200);
 
         let unix_times = [-93750523200, -11670955200, -8515195200, -8483659200, -8389051200, 951825600, 983448000, 1078056000, 4107585600, 32540356800];
 
@@ -997,9 +1122,24 @@ mod test {
         ];
 
         for (((unix_time, date_time_utc), date_time_cet), date_time_eet) in unix_times.into_iter().zip(date_times_utc).zip(date_times_cet).zip(date_times_eet) {
+            let utc_date_time = UtcDateTime::from_unix_time(unix_time)?;
+
+            assert_eq!(utc_date_time.second(), date_time_utc.second());
+            assert_eq!(utc_date_time.minute(), date_time_utc.minute());
+            assert_eq!(utc_date_time.hour(), date_time_utc.hour());
+            assert_eq!(utc_date_time.month_day(), date_time_utc.month_day());
+            assert_eq!(utc_date_time.month(), date_time_utc.month());
+            assert_eq!(utc_date_time.year(), date_time_utc.year());
+            assert_eq!(utc_date_time.full_year(), date_time_utc.full_year());
+
+            assert_eq!(utc_date_time.unix_time(), unix_time);
             assert_eq!(date_time_utc.unix_time(), unix_time);
             assert_eq!(date_time_cet.unix_time(), unix_time);
             assert_eq!(date_time_eet.unix_time(), unix_time);
+
+            assert_eq!(utc_date_time.project(&time_zone_utc)?, date_time_utc);
+            assert_eq!(utc_date_time.project(&time_zone_cet)?, date_time_cet);
+            assert_eq!(utc_date_time.project(&time_zone_eet)?, date_time_eet);
 
             assert_eq!(date_time_utc.project(&time_zone_utc)?, date_time_utc);
             assert_eq!(date_time_cet.project(&time_zone_utc)?, date_time_utc);
@@ -1019,7 +1159,7 @@ mod test {
 
     #[test]
     fn test_date_time_leap_seconds() -> Result<()> {
-        let utc_date_time = DateTime::new_utc(1972, 5, 30, 23, 59, 60)?;
+        let utc_date_time = UtcDateTime::new(1972, 5, 30, 23, 59, 60)?;
         let date_time = utc_date_time.project(&TimeZone::fixed(-3600))?;
 
         let date_time_result = DateTime {

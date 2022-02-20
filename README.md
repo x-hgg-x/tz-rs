@@ -4,7 +4,7 @@
 
 A pure Rust reimplementation of libc functions [`localtime`](https://en.cppreference.com/w/c/chrono/localtime), [`gmtime`](https://en.cppreference.com/w/c/chrono/gmtime) and [`mktime`](https://en.cppreference.com/w/c/chrono/mktime).
 
-This crate allows to convert between an [Unix timestamp](https://en.wikipedia.org/wiki/Unix_time) and a calendar time exprimed in the [proleptic gregorian calendar](https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar) with a provided time zone.
+This crate allows to convert between a [Unix timestamp](https://en.wikipedia.org/wiki/Unix_time) and a calendar time exprimed in the [proleptic gregorian calendar](https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar) with a provided time zone.
 
 Time zones are provided to the library with a [POSIX `TZ` string](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap08.html) which can be read from the environment.
 
@@ -26,7 +26,7 @@ Documentation is hosted on [docs.rs](https://docs.rs/tz-rs/latest/tz).
 
 This crate is mainly intended for UNIX platforms.
 
-Since the time zone database files are not included in this crate, non UNIX users can download a copy of the database on the [IANA site](https://www.iana.org/time-zones) and compile the time zone database files to a local directory.
+Since the time zone database files are not included in this crate, non-UNIX users can download a copy of the database on the [IANA site](https://www.iana.org/time-zones) and compile the time zone database files to a local directory.
 
 The database files can then be read by specifying an absolute path in the `TZ` string:
 
