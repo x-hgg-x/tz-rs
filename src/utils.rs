@@ -4,7 +4,7 @@ use std::io::{Error, ErrorKind};
 use std::ops::Index;
 
 /// A `Cursor` contains a slice of a buffer and a read count.
-#[derive(Debug, Default, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct Cursor<'a> {
     /// Slice representing the remaining data to be read
     remaining: &'a [u8],
