@@ -826,6 +826,11 @@ impl DateTime {
 
         result
     }
+
+    /// Changes the associated time zone
+    pub fn with_timezone(&self, time_zone: &TimeZone) -> Result<Self> {
+        Self::from_unix_time(time_zone, self.unix_time())
+    }
 }
 
 /// Check if a year is a leap year.
@@ -1079,5 +1084,90 @@ mod test {
         assert_eq!(days_since_unix_epoch(104, 1, 29), 12477);
         assert_eq!(days_since_unix_epoch(200, 2, 1), 47541);
         assert_eq!(days_since_unix_epoch(1101, 2, 1), 376624);
+    }
+
+    #[test]
+    fn test_with_timezone() -> Result<()> {
+        let utc = DateTime::from_unix_time(&TimeZone::utc(), 1645360496)?;
+        assert_eq!(
+            &utc,
+            &DateTime {
+                second: 56,
+                minute: 34,
+                hour: 12,
+                month_day: 20,
+                month: 1,
+                year: 122,
+                week_day: 0,
+                year_day: 50,
+                local_time_type: LocalTimeType {
+                    ut_offset: 0,
+                    is_dst: false,
+                    time_zone_designation: "".into(),
+                },
+            },
+        );
+
+        let berlin = utc.with_timezone(&TimeZone::from_posix_tz("Europe/Berlin")?)?;
+        assert_eq!(
+            &berlin,
+            &DateTime {
+                second: 56,
+                minute: 34,
+                hour: 13,
+                month_day: 20,
+                month: 1,
+                year: 122,
+                week_day: 0,
+                year_day: 50,
+                local_time_type: LocalTimeType {
+                    ut_offset: 3600,
+                    is_dst: false,
+                    time_zone_designation: "CET".into(),
+                },
+            },
+        );
+
+        let maseru = berlin.with_timezone(&TimeZone::from_posix_tz("Africa/Maseru")?)?;
+        assert_eq!(
+            &maseru,
+            &DateTime {
+                second: 56,
+                minute: 34,
+                hour: 14,
+                month_day: 20,
+                month: 1,
+                year: 122,
+                week_day: 0,
+                year_day: 50,
+                local_time_type: LocalTimeType {
+                    ut_offset: 7200,
+                    is_dst: false,
+                    time_zone_designation: "SAST".into(),
+                },
+            },
+        );
+
+        let belize = maseru.with_timezone(&TimeZone::from_posix_tz("America/Belize")?)?;
+        assert_eq!(
+            &belize,
+            &DateTime {
+                second: 56,
+                minute: 34,
+                hour: 6,
+                month_day: 20,
+                month: 1,
+                year: 122,
+                week_day: 0,
+                year_day: 50,
+                local_time_type: LocalTimeType {
+                    ut_offset: -21600,
+                    is_dst: false,
+                    time_zone_designation: "CST".into(),
+                },
+            },
+        );
+
+        Ok(())
     }
 }
