@@ -1,6 +1,6 @@
 //! Functions used for parsing a TZ string.
 
-use crate::cursor::Cursor;
+use crate::utils::*;
 use crate::{LocalTimeType, RuleDay, TransitionRule};
 
 use std::error;

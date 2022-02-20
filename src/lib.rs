@@ -112,9 +112,9 @@
 //! ```
 
 mod constants;
-mod cursor;
 mod tz_file;
 mod tz_string;
+mod utils;
 
 use std::cmp::Ordering;
 use std::error;

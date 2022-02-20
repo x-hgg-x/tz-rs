@@ -1,4 +1,4 @@
-//! This module provides the `Cursor` struct, used for reading an in-memory buffer one or several bytes at a time.
+//! Some useful utilities.
 
 use std::io::{Error, ErrorKind};
 

@@ -1,7 +1,7 @@
 //! Functions used for parsing a TZif file.
 
-use crate::cursor::Cursor;
 use crate::tz_string::{self, TzStringError};
+use crate::utils::*;
 use crate::{LeapSecond, LocalTimeType, TimeZone, Transition, TransitionRule, TzError};
 
 use std::array::TryFromSliceError;
