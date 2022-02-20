@@ -580,6 +580,20 @@ pub struct UtcDateTime {
     year: i32,
 }
 
+impl Ord for UtcDateTime {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let self_tuple = (self.year, self.month, self.month_day, self.hour, self.second, self.minute);
+        let other_tuple = (other.year, other.month, other.month_day, other.hour, other.second, other.minute);
+        self_tuple.cmp(&other_tuple)
+    }
+}
+
+impl PartialOrd for UtcDateTime {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 impl UtcDateTime {
     /// Returns seconds in `[0, 60]`, with a possible leap second
     pub fn second(&self) -> u8 {
@@ -1179,6 +1193,27 @@ mod test {
         };
 
         assert_eq!(date_time, date_time_result);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_utc_date_time_ord() -> Result<()> {
+        let utc_date_time_1 = UtcDateTime::new(1972, 5, 30, 23, 59, 59)?;
+        let utc_date_time_2 = UtcDateTime::new(1972, 5, 30, 23, 59, 60)?;
+        let utc_date_time_3 = UtcDateTime::new(1972, 6, 1, 0, 0, 0)?;
+
+        assert_eq!(utc_date_time_1.cmp(&utc_date_time_1), Ordering::Equal);
+        assert_eq!(utc_date_time_1.cmp(&utc_date_time_2), Ordering::Less);
+        assert_eq!(utc_date_time_1.cmp(&utc_date_time_3), Ordering::Less);
+
+        assert_eq!(utc_date_time_2.cmp(&utc_date_time_1), Ordering::Greater);
+        assert_eq!(utc_date_time_2.cmp(&utc_date_time_2), Ordering::Equal);
+        assert_eq!(utc_date_time_2.cmp(&utc_date_time_3), Ordering::Less);
+
+        assert_eq!(utc_date_time_3.cmp(&utc_date_time_1), Ordering::Greater);
+        assert_eq!(utc_date_time_3.cmp(&utc_date_time_2), Ordering::Greater);
+        assert_eq!(utc_date_time_3.cmp(&utc_date_time_3), Ordering::Equal);
 
         Ok(())
     }
