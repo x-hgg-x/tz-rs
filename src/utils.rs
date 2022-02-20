@@ -1,6 +1,7 @@
 //! Some useful utilities.
 
 use std::io::{Error, ErrorKind};
+use std::ops::Index;
 
 /// A `Cursor` contains a slice of a buffer and a read count.
 #[derive(Debug, Default, Eq, PartialEq)]
@@ -71,6 +72,34 @@ impl<'a> Cursor<'a> {
         match self.remaining.iter().position(f) {
             None => self.read_exact(self.remaining.len()),
             Some(position) => self.read_exact(position),
+        }
+    }
+}
+
+/// Vector type guaranteed to hold at least one element
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct NonEmptyVec<T> {
+    /// First element
+    pub first: T,
+    /// Other elements
+    pub tail: Vec<T>,
+}
+
+impl<T> NonEmptyVec<T> {
+    /// Construct a `NonEmptyVec` with one element
+    pub fn one(first: T) -> Self {
+        Self { first, tail: Vec::new() }
+    }
+}
+
+impl<T> Index<usize> for NonEmptyVec<T> {
+    type Output = T;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        if index == 0 {
+            &self.first
+        } else {
+            &self.tail[index - 1]
         }
     }
 }

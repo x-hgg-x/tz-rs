@@ -8,7 +8,7 @@
 //! Time zones are provided to the library with a [POSIX `TZ` string](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap08.html) which can be read from the environment.
 //!
 //! Two formats are currently accepted for the `TZ` string:
-//! * `std offset[dst[offset][,start[/time],end[/time]]]` providing a time zone description
+//! * `std offset[dst[offset][,start[/time],end[/time]]]` providing a time zone description,
 //! * `file` or `:file` providing the path to a [TZif file](https://datatracker.ietf.org/doc/html/rfc8536), which is absolute or relative to the system timezone directory.
 //!
 //! # Usage
@@ -127,6 +127,7 @@ use std::time::{SystemTime, SystemTimeError};
 
 use tz_file::TzFileError;
 use tz_string::TzStringError;
+use utils::*;
 
 /// Alias for [`std::result::Result`] with the crate unified error
 pub type Result<T> = std::result::Result<T, TzError>;
@@ -441,8 +442,8 @@ impl TransitionRule {
 pub struct TimeZone {
     /// List of transitions
     transitions: Vec<Transition>,
-    /// List of local time types
-    local_time_types: Vec<LocalTimeType>,
+    /// List of local time types (cannot be empty)
+    local_time_types: NonEmptyVec<LocalTimeType>,
     /// List of leap seconds
     leap_seconds: Vec<LeapSecond>,
     /// Extra transition rule applicable after the last transition
@@ -457,7 +458,12 @@ impl TimeZone {
 
     /// Returns time zone with fixed UTC offset in seconds
     pub fn fixed(ut_offset: i32) -> Self {
-        Self { transitions: Vec::new(), local_time_types: vec![LocalTimeType::with_ut_offset(ut_offset)], leap_seconds: Vec::new(), extra_rule: None }
+        Self {
+            transitions: Vec::new(),
+            local_time_types: NonEmptyVec::one(LocalTimeType::with_ut_offset(ut_offset)),
+            leap_seconds: Vec::new(),
+            extra_rule: None,
+        }
     }
 
     /// Returns local time zone.
@@ -504,8 +510,8 @@ impl TimeZone {
                 let rule = tz_string::parse_posix_tz(tz_string.as_bytes(), false)?;
 
                 let local_time_types = match &rule {
-                    TransitionRule::Fixed(local_time_type) => vec![local_time_type.clone()],
-                    TransitionRule::Alternate { std, dst, .. } => vec![std.clone(), dst.clone()],
+                    TransitionRule::Fixed(local_time_type) => NonEmptyVec::one(local_time_type.clone()),
+                    TransitionRule::Alternate { std, dst, .. } => NonEmptyVec { first: std.clone(), tail: vec![dst.clone()] },
                 };
                 Ok(TimeZone { transitions: Vec::new(), local_time_types, leap_seconds: Vec::new(), extra_rule: Some(rule) })
             }
@@ -517,7 +523,7 @@ impl TimeZone {
         match self.transitions.last() {
             None => match &self.extra_rule {
                 Some(extra_rule) => extra_rule.find_local_time_type(unix_time),
-                None => Ok(&self.local_time_types[0]),
+                None => Ok(&self.local_time_types.first),
             },
             Some(last_transition) => {
                 let unix_leap_time = self.unix_time_to_unix_leap_time(unix_time);
@@ -1045,12 +1051,14 @@ mod test {
 
     #[test]
     fn test_time_zone() -> Result<()> {
-        let time_zone_1 = TimeZone { transitions: Vec::new(), local_time_types: vec![LocalTimeType::utc()], leap_seconds: Vec::new(), extra_rule: None };
+        let time_zone_1 =
+            TimeZone { transitions: Vec::new(), local_time_types: NonEmptyVec::one(LocalTimeType::utc()), leap_seconds: Vec::new(), extra_rule: None };
+
         assert_eq!(*time_zone_1.find_local_time_type(0)?, LocalTimeType::utc());
 
         let time_zone_2 = TimeZone {
             transitions: Vec::new(),
-            local_time_types: vec![LocalTimeType::utc()],
+            local_time_types: NonEmptyVec::one(LocalTimeType::utc()),
             leap_seconds: Vec::new(),
             extra_rule: Some(TransitionRule::Fixed(LocalTimeType::with_ut_offset(3600))),
         };
@@ -1059,7 +1067,7 @@ mod test {
 
         let time_zone_3 = TimeZone {
             transitions: vec![Transition { unix_leap_time: 0, local_time_type_index: 0 }],
-            local_time_types: vec![LocalTimeType::utc()],
+            local_time_types: NonEmptyVec::one(LocalTimeType::utc()),
             leap_seconds: Vec::new(),
             extra_rule: None,
         };
@@ -1069,7 +1077,7 @@ mod test {
 
         let time_zone_4 = TimeZone {
             transitions: vec![Transition { unix_leap_time: 0, local_time_type_index: 0 }],
-            local_time_types: vec![LocalTimeType::utc()],
+            local_time_types: NonEmptyVec::one(LocalTimeType::utc()),
             leap_seconds: Vec::new(),
             extra_rule: Some(TransitionRule::Fixed(LocalTimeType::with_ut_offset(3600))),
         };

@@ -22,6 +22,8 @@ pub enum TzFileError {
     TryFromSliceError(TryFromSliceError),
     /// I/O error
     IoError(io::Error),
+    /// Empty vector error
+    EmptyVectorError,
     /// Unified error for parsing a TZ string
     TzStringError(TzStringError),
     /// Invalid TZif file
@@ -36,6 +38,7 @@ impl fmt::Display for TzFileError {
             Self::Utf8Error(error) => error.fmt(f),
             Self::TryFromSliceError(error) => error.fmt(f),
             Self::IoError(error) => error.fmt(f),
+            Self::EmptyVectorError => write!(f, "vector must be non-empty"),
             Self::TzStringError(error) => error.fmt(f),
             Self::InvalidTzFile(error) => write!(f, "invalid TZ file: {}", error),
             Self::UnsupportedTzFile(error) => write!(f, "unsupported TZ file: {}", error),
@@ -203,8 +206,7 @@ impl<'a> DataBlock<'a> {
             return Err(TzFileError::InvalidTzFile("invalid transition"));
         }
 
-        let mut local_time_types = Vec::with_capacity(header.type_count);
-        for arr in self.local_time_types.chunks_exact(6) {
+        let mut local_time_types_iter = self.local_time_types.chunks_exact(6).map(|arr| {
             let ut_offset = i32::from_be_bytes(arr[0..4].try_into()?);
             if ut_offset == i32::MIN {
                 return Err(TzFileError::InvalidTzFile("invalid UTC offset"));
@@ -226,8 +228,14 @@ impl<'a> DataBlock<'a> {
                 None => return Err(TzFileError::InvalidTzFile("invalid time zone designation char index")),
             };
 
-            local_time_types.push(LocalTimeType { ut_offset, is_dst, time_zone_designation });
-        }
+            Ok(LocalTimeType { ut_offset, is_dst, time_zone_designation })
+        });
+
+        let local_time_types = match local_time_types_iter.next() {
+            Some(Ok(first)) => NonEmptyVec { first, tail: Result::from_iter(local_time_types_iter)? },
+            Some(Err(error)) => return Err(error),
+            None => return Err(TzFileError::EmptyVectorError),
+        };
 
         let mut leap_seconds = Vec::with_capacity(header.leap_count);
         for arr in self.leap_seconds.chunks_exact(self.time_size + 4) {
@@ -364,7 +372,7 @@ mod test {
 
         let time_zone_result = TimeZone {
             transitions: Vec::new(),
-            local_time_types: vec![LocalTimeType { ut_offset: 0, is_dst: false, time_zone_designation: Some("UTC".into()) }],
+            local_time_types: NonEmptyVec::one(LocalTimeType { ut_offset: 0, is_dst: false, time_zone_designation: Some("UTC".into()) }),
             leap_seconds: vec![
                 LeapSecond { unix_leap_time: 78796800, correction: 1 },
                 LeapSecond { unix_leap_time: 94694401, correction: 2 },
@@ -427,14 +435,16 @@ mod test {
                 Transition { unix_leap_time: -765376200, local_time_type_index: 1 },
                 Transition { unix_leap_time: -712150200, local_time_type_index: 5 },
             ],
-            local_time_types: vec![
-                LocalTimeType { ut_offset: -37886, is_dst: false, time_zone_designation: Some("LMT".into()) },
-                LocalTimeType { ut_offset: -37800, is_dst: false, time_zone_designation: Some("HST".into()) },
-                LocalTimeType { ut_offset: -34200, is_dst: true, time_zone_designation: Some("HDT".into()) },
-                LocalTimeType { ut_offset: -34200, is_dst: true, time_zone_designation: Some("HWT".into()) },
-                LocalTimeType { ut_offset: -34200, is_dst: true, time_zone_designation: Some("HPT".into()) },
-                LocalTimeType { ut_offset: -36000, is_dst: false, time_zone_designation: Some("HST".into()) },
-            ],
+            local_time_types: NonEmptyVec {
+                first: LocalTimeType { ut_offset: -37886, is_dst: false, time_zone_designation: Some("LMT".into()) },
+                tail: vec![
+                    LocalTimeType { ut_offset: -37800, is_dst: false, time_zone_designation: Some("HST".into()) },
+                    LocalTimeType { ut_offset: -34200, is_dst: true, time_zone_designation: Some("HDT".into()) },
+                    LocalTimeType { ut_offset: -34200, is_dst: true, time_zone_designation: Some("HWT".into()) },
+                    LocalTimeType { ut_offset: -34200, is_dst: true, time_zone_designation: Some("HPT".into()) },
+                    LocalTimeType { ut_offset: -36000, is_dst: false, time_zone_designation: Some("HST".into()) },
+                ],
+            },
             leap_seconds: Vec::new(),
             extra_rule: Some(TransitionRule::Fixed(LocalTimeType { ut_offset: -36000, is_dst: false, time_zone_designation: Some("HST".into()) })),
         };
@@ -455,7 +465,7 @@ mod test {
 
         let time_zone_result = TimeZone {
             transitions: vec![Transition { unix_leap_time: 2145916800, local_time_type_index: 0 }],
-            local_time_types: vec![LocalTimeType { ut_offset: 7200, is_dst: false, time_zone_designation: Some("IST".into()) }],
+            local_time_types: NonEmptyVec::one(LocalTimeType { ut_offset: 7200, is_dst: false, time_zone_designation: Some("IST".into()) }),
             leap_seconds: Vec::new(),
             extra_rule: Some(TransitionRule::Alternate {
                 std: LocalTimeType { ut_offset: 7200, is_dst: false, time_zone_designation: Some("IST".into()) },

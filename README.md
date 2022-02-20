@@ -9,7 +9,7 @@ This crate allows to convert between a [Unix timestamp](https://en.wikipedia.org
 Time zones are provided to the library with a [POSIX `TZ` string](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap08.html) which can be read from the environment.
 
 Two formats are currently accepted for the `TZ` string:
-* `std offset[dst[offset][,start[/time],end[/time]]]` providing a time zone description
+* `std offset[dst[offset][,start[/time],end[/time]]]` providing a time zone description,
 * `file` or `:file` providing the path to a [TZif file](https://datatracker.ietf.org/doc/html/rfc8536), which is absolute or relative to the system timezone directory.
 
 ## Context
