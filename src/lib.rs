@@ -1,3 +1,6 @@
+#![forbid(unsafe_code)]
+#![deny(missing_docs)]
+
 //! This crate provides the `TimeZone` and `DateTime` structs, which can be used to determine local time on a given time zone.
 //!
 //! This allows to convert between an [Unix timestamp](https://en.wikipedia.org/wiki/Unix_time) and a calendar time exprimed in the [proleptic gregorian calendar](https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar) with a provided time zone.
