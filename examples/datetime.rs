@@ -43,22 +43,16 @@ fn main() -> Result<()> {
     // DateTime
     //
 
-    // Create a new UTC date time
-    // 2000-01-01T00:00:00Z
-    let utc_date_time = UtcDateTime::new(2000, 0, 1, 0, 0, 0)?;
-    let date_time = utc_date_time.to_date_time();
+    // Create a new UTC date time (2000-01-01T00:00:00Z)
+    let date_time = DateTime::new_utc(2000, 0, 1, 0, 0, 0)?;
     println!("{:#?}", date_time);
 
-    // Create a date time from a time zone and an UTC date time
+    // Create a date time from a time zone and an UTC date time (2000-01-01T00:00:00Z)
     let time_zone_fixed = TimeZone::fixed(-3600);
-
-    // 2000-01-01T00:00:00Z
-    let utc_date_time = UtcDateTime::new(2000, 0, 1, 0, 0, 0)?;
-    let date_time = DateTime::from_utc_date_time(&time_zone_fixed, utc_date_time)?;
+    let date_time = DateTime::new_utc(2000, 0, 1, 0, 0, 0)?.project(&time_zone_fixed)?;
     println!("{:#?}", date_time);
 
-    // Create a date time from a time zone and an unix time
-    // 2000-01-01T00:00:00Z
+    // Create a date time from a time zone and an UTC unix time (2000-01-01T00:00:00Z)
     let date_time = DateTime::from_unix_time(&time_zone_fixed, 946684800)?;
     println!("{:#?}", date_time);
 
