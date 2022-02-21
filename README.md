@@ -22,7 +22,7 @@ See [RUSTSEC-2020-0071](https://rustsec.org/advisories/RUSTSEC-2020-0071.html) a
 
 ## Documentation
 
-Documentation is hosted on [docs.rs](https://docs.rs/tz-rs/latest/tz).
+Documentation is hosted on [docs.rs](https://docs.rs/tz-rs/latest/tz/).
 
 ## Platform support
 
@@ -36,7 +36,7 @@ The database files can then be read by specifying an absolute path in the `TZ` s
 TimeZone::from_posix_tz(format!("{}/usr/share/zoneinfo/Pacific/Auckland", local_database_dir))?;
 ```
 
-Note that the determination of the local time zone is not supported on non UNIX platforms.
+Note that the determination of the local time zone is not supported on non-UNIX platforms.
 
 ## License
 
