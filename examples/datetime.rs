@@ -71,5 +71,27 @@ fn main() -> Result<()> {
     let date_time = DateTime::now(&time_zone_local)?;
     println!("{:#?}", date_time);
 
+    let date_time = DateTime::now(&TEST)?;
+    println!("{:#?}", date_time);
+
     Ok(())
 }
+
+use tz::statics::*;
+
+pub static TEST: StaticTimeZone = match StaticTimeZone::new(
+    &[Transition::new(2145916800, 0)],
+    (LocalTimeType::new(7200, false, Some("IST")), &[LocalTimeType::new(10800, true, Some("IDT"))]),
+    &[LeapSecond::new(0, 1)],
+    Some(TransitionRule::Alternate {
+        std: LocalTimeType::new(7200, false, Some("IST")),
+        dst: LocalTimeType::new(10800, true, Some("IDT")),
+        dst_start: RuleDay::MonthWeekDay { month: 3, week: 4, week_day: 4 },
+        dst_start_time: 93600,
+        dst_end: RuleDay::MonthWeekDay { month: 10, week: 5, week_day: 0 },
+        dst_end_time: 7200,
+    }),
+) {
+    Ok(x) => x,
+    Err(StaticTimeZoneError(e)) => panic!("{}", e),
+};

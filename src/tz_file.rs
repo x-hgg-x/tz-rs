@@ -2,7 +2,7 @@
 
 use crate::tz_string::{self, TzStringError};
 use crate::utils::*;
-use crate::{LeapSecond, LocalTimeType, TimeZone, Transition, TransitionRule, TzError};
+use crate::{LeapSecond, LocalTimeType, TimeZone, TimeZoneImpl, Transition, TransitionRule, TzError};
 
 use std::array::TryFromSliceError;
 use std::error;
