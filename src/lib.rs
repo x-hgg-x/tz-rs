@@ -641,8 +641,8 @@ pub struct UtcDateTime {
 
 impl Ord for UtcDateTime {
     fn cmp(&self, other: &Self) -> Ordering {
-        let self_tuple = (self.year, self.month, self.month_day, self.hour, self.second, self.minute);
-        let other_tuple = (other.year, other.month, other.month_day, other.hour, other.second, other.minute);
+        let self_tuple = (self.year, self.month, self.month_day, self.hour, self.minute, self.second);
+        let other_tuple = (other.year, other.month, other.month_day, other.hour, other.minute, other.second);
         self_tuple.cmp(&other_tuple)
     }
 }
