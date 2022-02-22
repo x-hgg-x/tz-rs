@@ -928,7 +928,7 @@ impl UtcDateTime {
     pub fn from_unix_time(unix_time: i64) -> Result<Self> {
         use constants::*;
 
-        let seconds = unix_time - UNIX_OFFSET_SECS;
+        let seconds = unix_time.checked_sub(UNIX_OFFSET_SECS).ok_or(TzError::DateTimeInputError("invalid Unix time"))?;
         let mut remaining_days = seconds / SECONDS_PER_DAY;
         let mut remaining_seconds = seconds % SECONDS_PER_DAY;
         if remaining_seconds < 0 {
