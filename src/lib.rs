@@ -125,6 +125,7 @@ use std::error;
 use std::fmt;
 use std::fs::{self, File};
 use std::io::{self, Read};
+use std::marker::PhantomData;
 use std::num::TryFromIntError;
 use std::sync::Arc;
 use std::time::{SystemTime, SystemTimeError};
@@ -685,6 +686,88 @@ pub trait DateTimeFunctions<S: AsRef<str> + Clone> {
             year: utc_date_time_with_offset.year,
             local_time_type,
             unix_time,
+        })
+    }
+
+    /// Project the date time into another time zone.
+    ///
+    /// Leap seconds are not preserved.
+    fn project_local<T: TimeZoneImpl<&'static str> + Default>(&self) -> Result<LocalDateTime<T>> {
+        Ok(LocalDateTime {
+            date_time: self.project(&T::default())?,
+            _phantom: PhantomData,
+        })
+    }
+}
+
+/// A [DateTime] in a specific [TimeZone]
+#[derive(Debug, Clone)]
+pub struct LocalDateTime<T: TimeZoneImpl<&'static str> + Default> {
+    date_time: DateTime<&'static str>,
+    _phantom: PhantomData<T>,
+}
+
+impl<T: TimeZoneImpl<&'static str> + Default> PartialEq for LocalDateTime<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.date_time.unix_time == other.date_time.unix_time
+    }
+}
+
+impl<T: TimeZoneImpl<&'static str> + Default> Eq for LocalDateTime<T> {
+}
+
+impl<T: TimeZoneImpl<&'static str> + Default> PartialOrd for LocalDateTime<T> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.date_time.unix_time.partial_cmp(&other.date_time.unix_time)
+    }
+}
+
+impl<T: TimeZoneImpl<&'static str> + Default> Ord for LocalDateTime<T> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.date_time.unix_time.cmp(&other.date_time.unix_time)
+    }
+}
+
+impl<T: TimeZoneImpl<&'static str> + Default> DateTimeFunctions<&'static str> for LocalDateTime<T> {
+    fn second(&self) -> u8 {
+        self.date_time.second
+    }
+
+    fn minute(&self) -> u8 {
+        self.date_time.minute
+    }
+
+    fn hour(&self) -> u8 {
+        self.date_time.hour
+    }
+
+    fn month_day(&self) -> u8 {
+        self.date_time.month_day
+    }
+
+    fn month(&self) -> u8 {
+        self.date_time.month
+    }
+
+    fn year(&self) -> i32 {
+        self.date_time.year
+    }
+
+    fn unix_time(&self) -> i64 {
+        self.date_time.unix_time
+    }
+
+    fn local_time_type(&self) -> &LocalTimeType<&'static str> {
+        &self.date_time.local_time_type
+    }
+}
+
+impl<T: TimeZoneImpl<&'static str> + Default> LocalDateTime<T> {
+    /// Returns the current date time associated to the specified time zone
+    pub fn now() -> Result<Self> {
+        Ok(Self {
+            date_time: DateTime::now(&T::default())?,
+            _phantom: PhantomData,
         })
     }
 }
