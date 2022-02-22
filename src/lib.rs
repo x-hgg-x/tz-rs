@@ -63,13 +63,13 @@
 //!
 //!     // Create a new UTC date time (2000-01-01T00:00:00Z)
 //!     let utc_date_time = UtcDateTime::new(2000, 0, 1, 0, 0, 0)?;
-//!     assert_eq!(utc_date_time.second(), 0);
-//!     assert_eq!(utc_date_time.minute(), 0);
-//!     assert_eq!(utc_date_time.hour(), 0);
-//!     assert_eq!(utc_date_time.month_day(), 1);
-//!     assert_eq!(utc_date_time.month(), 0);
-//!     assert_eq!(utc_date_time.year(), 100);
 //!     assert_eq!(utc_date_time.full_year(), 2000);
+//!     assert_eq!(utc_date_time.year(), 100);
+//!     assert_eq!(utc_date_time.month(), 0);
+//!     assert_eq!(utc_date_time.month_day(), 1);
+//!     assert_eq!(utc_date_time.hour(), 0);
+//!     assert_eq!(utc_date_time.minute(), 0);
+//!     assert_eq!(utc_date_time.second(), 0);
 //!     assert_eq!(utc_date_time.week_day(), 6);
 //!     assert_eq!(utc_date_time.year_day(), 0);
 //!     assert_eq!(utc_date_time.unix_time(), 946684800);
@@ -80,13 +80,13 @@
 //!
 //!     // Project the UTC date time to a time zone
 //!     let date_time = utc_date_time.project(&TimeZone::fixed(-3600))?;
-//!     assert_eq!(date_time.second(), 0);
-//!     assert_eq!(date_time.minute(), 0);
-//!     assert_eq!(date_time.hour(), 23);
-//!     assert_eq!(date_time.month_day(), 31);
-//!     assert_eq!(date_time.month(), 11);
-//!     assert_eq!(date_time.year(), 99);
 //!     assert_eq!(date_time.full_year(), 1999);
+//!     assert_eq!(date_time.year(), 99);
+//!     assert_eq!(date_time.month(), 11);
+//!     assert_eq!(date_time.month_day(), 31);
+//!     assert_eq!(date_time.hour(), 23);
+//!     assert_eq!(date_time.minute(), 0);
+//!     assert_eq!(date_time.second(), 0);
 //!     assert_eq!(date_time.week_day(), 5);
 //!     assert_eq!(date_time.year_day(), 364);
 //!     assert_eq!(date_time.local_time_type().ut_offset(), -3600);
@@ -94,13 +94,13 @@
 //!
 //!     // Project the date time to another time zone
 //!     let other_date_time = date_time.project(&TimeZone::fixed(3600))?;
-//!     assert_eq!(other_date_time.second(), 0);
-//!     assert_eq!(other_date_time.minute(), 0);
-//!     assert_eq!(other_date_time.hour(), 1);
-//!     assert_eq!(other_date_time.month_day(), 1);
-//!     assert_eq!(other_date_time.month(), 0);
-//!     assert_eq!(other_date_time.year(), 100);
 //!     assert_eq!(other_date_time.full_year(), 2000);
+//!     assert_eq!(other_date_time.year(), 100);
+//!     assert_eq!(other_date_time.month(), 0);
+//!     assert_eq!(other_date_time.month_day(), 1);
+//!     assert_eq!(other_date_time.hour(), 1);
+//!     assert_eq!(other_date_time.minute(), 0);
+//!     assert_eq!(other_date_time.second(), 0);
 //!     assert_eq!(other_date_time.week_day(), 6);
 //!     assert_eq!(other_date_time.year_day(), 0);
 //!     assert_eq!(other_date_time.local_time_type().ut_offset(), 3600);
@@ -578,84 +578,23 @@ impl TimeZone {
 }
 
 /// UTC date time exprimed in the [proleptic gregorian calendar](https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar)
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub struct UtcDateTime {
-    /// Seconds in `[0, 60]`, with a possible leap second
-    second: u8,
-    /// Minutes in `[0, 59]`
-    minute: u8,
-    /// Hours since midnight in `[0, 23]`
-    hour: u8,
-    /// Day of the month in `[1, 31]`
-    month_day: u8,
-    /// Month in `[0, 11]`
-    month: u8,
     /// Years since 1900
     year: i32,
-}
-
-impl Ord for UtcDateTime {
-    fn cmp(&self, other: &Self) -> Ordering {
-        let self_tuple = (self.year, self.month, self.month_day, self.hour, self.second, self.minute);
-        let other_tuple = (other.year, other.month, other.month_day, other.hour, other.second, other.minute);
-        self_tuple.cmp(&other_tuple)
-    }
-}
-
-impl PartialOrd for UtcDateTime {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
+    /// Month in `[0, 11]`
+    month: u8,
+    /// Day of the month in `[1, 31]`
+    month_day: u8,
+    /// Hours since midnight in `[0, 23]`
+    hour: u8,
+    /// Minutes in `[0, 59]`
+    minute: u8,
+    /// Seconds in `[0, 60]`, with a possible leap second
+    second: u8,
 }
 
 impl UtcDateTime {
-    /// Returns seconds in `[0, 60]`, with a possible leap second
-    pub fn second(&self) -> u8 {
-        self.second
-    }
-
-    /// Returns minutes in `[0, 59]`
-    pub fn minute(&self) -> u8 {
-        self.minute
-    }
-
-    /// Returns hours since midnight in `[0, 23]`
-    pub fn hour(&self) -> u8 {
-        self.hour
-    }
-
-    /// Returns day of the month in `[1, 31]`
-    pub fn month_day(&self) -> u8 {
-        self.month_day
-    }
-
-    /// Returns month in `[0, 11]`
-    pub fn month(&self) -> u8 {
-        self.month
-    }
-
-    /// Returns years since 1900
-    pub fn year(&self) -> i32 {
-        self.year
-    }
-
-    /// Returns year
-    pub fn full_year(&self) -> i32 {
-        self.year + 1900
-    }
-
-    /// Returns days since Sunday in `[0, 6]`
-    pub fn week_day(&self) -> u8 {
-        let days_since_unix_epoch = days_since_unix_epoch(self.year, self.month.into(), self.month_day.into());
-        (4 + days_since_unix_epoch).rem_euclid(constants::DAYS_PER_WEEK) as u8
-    }
-
-    /// Returns days since January 1 in `[0, 365]`
-    pub fn year_day(&self) -> u16 {
-        let leap = (self.month >= 2 && is_leap_year(self.year)) as i64;
-        (constants::CUM_DAY_IN_MONTHS_NORMAL_YEAR[self.month as usize] + leap + self.month_day as i64 - 1) as u16
-    }
-
     /// Returns the Unix time in seconds associated to the UTC date time
     pub fn unix_time(&self) -> i64 {
         use constants::*;
@@ -714,7 +653,7 @@ impl UtcDateTime {
             return Err(TzError::DateTimeInputError("invalid month day"));
         }
 
-        Ok(Self { second, minute, hour, month_day, month, year })
+        Ok(Self { year, month, month_day, hour, minute, second })
     }
 
     /// Construct a UTC date time from a Unix time in seconds
@@ -768,12 +707,12 @@ impl UtcDateTime {
         let second = remaining_seconds % SECONDS_PER_MINUTE;
 
         Ok(Self {
-            second: second.try_into()?,
-            minute: minute.try_into()?,
-            hour: hour.try_into()?,
-            month_day: month_day.try_into()?,
-            month: month.try_into()?,
             year: year.try_into()?,
+            month: month.try_into()?,
+            month_day: month_day.try_into()?,
+            hour: hour.try_into()?,
+            minute: minute.try_into()?,
+            second: second.try_into()?,
         })
     }
 
@@ -793,14 +732,12 @@ impl UtcDateTime {
         let utc_date_time_with_offset = UtcDateTime::from_unix_time(unix_time + local_time_type.ut_offset() as i64)?;
 
         Ok(DateTime {
-            second: utc_date_time_with_offset.second,
-            minute: utc_date_time_with_offset.minute,
-            hour: utc_date_time_with_offset.hour,
-            month_day: utc_date_time_with_offset.month_day,
-            month: utc_date_time_with_offset.month,
             year: utc_date_time_with_offset.year,
-            week_day: utc_date_time_with_offset.week_day(),
-            year_day: utc_date_time_with_offset.year_day(),
+            month: utc_date_time_with_offset.month,
+            month_day: utc_date_time_with_offset.month_day,
+            hour: utc_date_time_with_offset.hour,
+            minute: utc_date_time_with_offset.minute,
+            second: utc_date_time_with_offset.second,
             local_time_type: local_time_type.clone(),
             unix_time,
         })
@@ -810,22 +747,18 @@ impl UtcDateTime {
 /// Date time associated to a local time type, exprimed in the [proleptic gregorian calendar](https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar)
 #[derive(Debug, Clone)]
 pub struct DateTime {
-    /// Seconds in `[0, 60]`, with a possible leap second
-    second: u8,
-    /// Minutes in `[0, 59]`
-    minute: u8,
-    /// Hours since midnight in `[0, 23]`
-    hour: u8,
-    /// Day of the month in `[1, 31]`
-    month_day: u8,
-    /// Month in `[0, 11]`
-    month: u8,
     /// Years since 1900
     year: i32,
-    /// Days since Sunday in `[0, 6]`
-    week_day: u8,
-    /// Days since January 1 in `[0, 365]`
-    year_day: u16,
+    /// Month in `[0, 11]`
+    month: u8,
+    /// Day of the month in `[1, 31]`
+    month_day: u8,
+    /// Hours since midnight in `[0, 23]`
+    hour: u8,
+    /// Minutes in `[0, 59]`
+    minute: u8,
+    /// Seconds in `[0, 60]`, with a possible leap second
+    second: u8,
     /// Local time type
     local_time_type: LocalTimeType,
     /// UTC Unix time in seconds
@@ -845,51 +778,6 @@ impl PartialOrd for DateTime {
 }
 
 impl DateTime {
-    /// Returns seconds in `[0, 60]`, with a possible leap second
-    pub fn second(&self) -> u8 {
-        self.second
-    }
-
-    /// Returns minutes in `[0, 59]`
-    pub fn minute(&self) -> u8 {
-        self.minute
-    }
-
-    /// Returns hours since midnight in `[0, 23]`
-    pub fn hour(&self) -> u8 {
-        self.hour
-    }
-
-    /// Returns day of the month in `[1, 31]`
-    pub fn month_day(&self) -> u8 {
-        self.month_day
-    }
-
-    /// Returns month in `[0, 11]`
-    pub fn month(&self) -> u8 {
-        self.month
-    }
-
-    /// Returns years since 1900
-    pub fn year(&self) -> i32 {
-        self.year
-    }
-
-    /// Returns year
-    pub fn full_year(&self) -> i32 {
-        self.year + 1900
-    }
-
-    /// Returns days since Sunday in `[0, 6]`
-    pub fn week_day(&self) -> u8 {
-        self.week_day
-    }
-
-    /// Returns days since January 1 in `[0, 365]`
-    pub fn year_day(&self) -> u16 {
-        self.year_day
-    }
-
     /// Returns local time type
     pub fn local_time_type(&self) -> &LocalTimeType {
         &self.local_time_type
@@ -910,14 +798,12 @@ impl DateTime {
         let utc_date_time_with_offset = UtcDateTime::from_unix_time(self.unix_time + local_time_type.ut_offset() as i64)?;
 
         Ok(DateTime {
-            second: utc_date_time_with_offset.second,
-            minute: utc_date_time_with_offset.minute,
-            hour: utc_date_time_with_offset.hour,
-            month_day: utc_date_time_with_offset.month_day,
-            month: utc_date_time_with_offset.month,
             year: utc_date_time_with_offset.year,
-            week_day: utc_date_time_with_offset.week_day(),
-            year_day: utc_date_time_with_offset.year_day(),
+            month: utc_date_time_with_offset.month,
+            month_day: utc_date_time_with_offset.month_day,
+            hour: utc_date_time_with_offset.hour,
+            minute: utc_date_time_with_offset.minute,
+            second: utc_date_time_with_offset.second,
             local_time_type: local_time_type.clone(),
             unix_time: self.unix_time,
         })
@@ -931,19 +817,71 @@ impl DateTime {
         let utc_date_time_with_offset = UtcDateTime::from_unix_time(unix_time + local_time_type.ut_offset() as i64)?;
 
         Ok(DateTime {
-            second: utc_date_time_with_offset.second,
-            minute: utc_date_time_with_offset.minute,
-            hour: utc_date_time_with_offset.hour,
-            month_day: utc_date_time_with_offset.month_day,
-            month: utc_date_time_with_offset.month,
             year: utc_date_time_with_offset.year,
-            week_day: utc_date_time_with_offset.week_day(),
-            year_day: utc_date_time_with_offset.year_day(),
+            month: utc_date_time_with_offset.month,
+            month_day: utc_date_time_with_offset.month_day,
+            hour: utc_date_time_with_offset.hour,
+            minute: utc_date_time_with_offset.minute,
+            second: utc_date_time_with_offset.second,
             local_time_type: local_time_type.clone(),
             unix_time,
         })
     }
 }
+
+macro_rules! impl_datetime {
+    ($struct_name:ty) => {
+        impl $struct_name {
+            /// Returns year
+            pub fn full_year(&self) -> i32 {
+                self.year + 1900
+            }
+
+            /// Returns years since 1900
+            pub fn year(&self) -> i32 {
+                self.year
+            }
+
+            /// Returns month in `[0, 11]`
+            pub fn month(&self) -> u8 {
+                self.month
+            }
+
+            /// Returns day of the month in `[1, 31]`
+            pub fn month_day(&self) -> u8 {
+                self.month_day
+            }
+
+            /// Returns hours since midnight in `[0, 23]`
+            pub fn hour(&self) -> u8 {
+                self.hour
+            }
+
+            /// Returns minutes in `[0, 59]`
+            pub fn minute(&self) -> u8 {
+                self.minute
+            }
+
+            /// Returns seconds in `[0, 60]`, with a possible leap second
+            pub fn second(&self) -> u8 {
+                self.second
+            }
+
+            /// Returns days since Sunday in `[0, 6]`
+            pub fn week_day(&self) -> u8 {
+                week_day(self.year, self.month.into(), self.month_day.into())
+            }
+
+            /// Returns days since January 1 in `[0, 365]`
+            pub fn year_day(&self) -> u16 {
+                year_day(self.year, self.month.into(), self.month_day.into())
+            }
+        }
+    };
+}
+
+impl_datetime!(UtcDateTime);
+impl_datetime!(DateTime);
 
 /// Check if a year is a leap year.
 ///
@@ -996,19 +934,43 @@ fn days_since_unix_epoch(year: i32, month: usize, month_day: i64) -> i64 {
     result
 }
 
+/// Compute the number of days since Sunday in `[0, 6]`
+///
+/// ## Inputs
+///
+/// * `year`: Years since 1900
+/// * `month`: Month in `[0, 11]`
+/// * `month_day`: Day of the month in `[1, 31]`
+///
+fn week_day(year: i32, month: usize, month_day: i64) -> u8 {
+    let days_since_unix_epoch = days_since_unix_epoch(year, month, month_day);
+    (4 + days_since_unix_epoch).rem_euclid(constants::DAYS_PER_WEEK) as u8
+}
+
+/// Compute the number of days since January 1 in `[0, 365]`
+///
+/// ## Inputs
+///
+/// * `year`: Years since 1900
+/// * `month`: Month in `[0, 11]`
+/// * `month_day`: Day of the month in `[1, 31]`
+///
+fn year_day(year: i32, month: usize, month_day: i64) -> u16 {
+    let leap = (month >= 2 && is_leap_year(year)) as i64;
+    (constants::CUM_DAY_IN_MONTHS_NORMAL_YEAR[month] + leap + month_day - 1) as u16
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
 
     fn check_equal_date_time(x: &DateTime, y: &DateTime) {
-        assert_eq!(x.second, y.second);
-        assert_eq!(x.minute, y.minute);
-        assert_eq!(x.hour, y.hour);
-        assert_eq!(x.month_day, y.month_day);
-        assert_eq!(x.month, y.month);
         assert_eq!(x.year, y.year);
-        assert_eq!(x.week_day, y.week_day);
-        assert_eq!(x.year_day, y.year_day);
+        assert_eq!(x.month, y.month);
+        assert_eq!(x.month_day, y.month_day);
+        assert_eq!(x.hour, y.hour);
+        assert_eq!(x.minute, y.minute);
+        assert_eq!(x.second, y.second);
         assert_eq!(x.local_time_type, y.local_time_type);
         assert_eq!(x.unix_time, y.unix_time);
     }
@@ -1137,58 +1099,55 @@ mod test {
 
         let unix_times = [-93750523200, -11670955200, -8515195200, -8483659200, -8389051200, 951825600, 983448000, 1078056000, 4107585600, 32540356800];
 
-        #[rustfmt::skip]
         let date_times_utc = [
-            DateTime { second: 0, minute: 0, hour: 12, month_day: 1,  month: 2, year: -2901, week_day: 5, year_day: 59, local_time_type: utc.clone(), unix_time: -93750523200 },
-            DateTime { second: 0, minute: 0, hour: 12, month_day: 29, month: 1, year: -300,  week_day: 2, year_day: 59, local_time_type: utc.clone(), unix_time: -11670955200 },
-            DateTime { second: 0, minute: 0, hour: 12, month_day: 1,  month: 2, year: -200,  week_day: 1, year_day: 59, local_time_type: utc.clone(), unix_time: -8515195200 },
-            DateTime { second: 0, minute: 0, hour: 12, month_day: 1,  month: 2, year: -199,  week_day: 2, year_day: 59, local_time_type: utc.clone(), unix_time: -8483659200 },
-            DateTime { second: 0, minute: 0, hour: 12, month_day: 29, month: 1, year: -196,  week_day: 5, year_day: 59, local_time_type: utc.clone(), unix_time: -8389051200 },
-            DateTime { second: 0, minute: 0, hour: 12, month_day: 29, month: 1, year: 100,   week_day: 2, year_day: 59, local_time_type: utc.clone(), unix_time: 951825600 },
-            DateTime { second: 0, minute: 0, hour: 12, month_day: 1,  month: 2, year: 101,   week_day: 4, year_day: 59, local_time_type: utc.clone(), unix_time: 983448000 },
-            DateTime { second: 0, minute: 0, hour: 12, month_day: 29, month: 1, year: 104,   week_day: 0, year_day: 59, local_time_type: utc.clone(), unix_time: 1078056000 },
-            DateTime { second: 0, minute: 0, hour: 12, month_day: 1,  month: 2, year: 200,   week_day: 1, year_day: 59, local_time_type: utc.clone(), unix_time: 4107585600 },
-            DateTime { second: 0, minute: 0, hour: 12, month_day: 1,  month: 2, year: 1101,  week_day: 0, year_day: 59, local_time_type: utc,         unix_time: 32540356800 },
+            DateTime { year: -2901, month: 2, month_day: 1, hour: 12, minute: 0, second: 0, local_time_type: utc.clone(), unix_time: -93750523200 },
+            DateTime { year: -300, month: 1, month_day: 29, hour: 12, minute: 0, second: 0, local_time_type: utc.clone(), unix_time: -11670955200 },
+            DateTime { year: -200, month: 2, month_day: 1, hour: 12, minute: 0, second: 0, local_time_type: utc.clone(), unix_time: -8515195200 },
+            DateTime { year: -199, month: 2, month_day: 1, hour: 12, minute: 0, second: 0, local_time_type: utc.clone(), unix_time: -8483659200 },
+            DateTime { year: -196, month: 1, month_day: 29, hour: 12, minute: 0, second: 0, local_time_type: utc.clone(), unix_time: -8389051200 },
+            DateTime { year: 100, month: 1, month_day: 29, hour: 12, minute: 0, second: 0, local_time_type: utc.clone(), unix_time: 951825600 },
+            DateTime { year: 101, month: 2, month_day: 1, hour: 12, minute: 0, second: 0, local_time_type: utc.clone(), unix_time: 983448000 },
+            DateTime { year: 104, month: 1, month_day: 29, hour: 12, minute: 0, second: 0, local_time_type: utc.clone(), unix_time: 1078056000 },
+            DateTime { year: 200, month: 2, month_day: 1, hour: 12, minute: 0, second: 0, local_time_type: utc.clone(), unix_time: 4107585600 },
+            DateTime { year: 1101, month: 2, month_day: 1, hour: 12, minute: 0, second: 0, local_time_type: utc, unix_time: 32540356800 },
         ];
 
-        #[rustfmt::skip]
         let date_times_cet = [
-            DateTime { second: 0, minute: 0, hour: 13, month_day: 1,  month: 2, year: -2901, week_day: 5, year_day: 59, local_time_type: cet.clone(), unix_time: -93750523200 },
-            DateTime { second: 0, minute: 0, hour: 13, month_day: 29, month: 1, year: -300,  week_day: 2, year_day: 59, local_time_type: cet.clone(), unix_time: -11670955200 },
-            DateTime { second: 0, minute: 0, hour: 13, month_day: 1,  month: 2, year: -200,  week_day: 1, year_day: 59, local_time_type: cet.clone(), unix_time: -8515195200 },
-            DateTime { second: 0, minute: 0, hour: 13, month_day: 1,  month: 2, year: -199,  week_day: 2, year_day: 59, local_time_type: cet.clone(), unix_time: -8483659200 },
-            DateTime { second: 0, minute: 0, hour: 13, month_day: 29, month: 1, year: -196,  week_day: 5, year_day: 59, local_time_type: cet.clone(), unix_time: -8389051200 },
-            DateTime { second: 0, minute: 0, hour: 13, month_day: 29, month: 1, year: 100,   week_day: 2, year_day: 59, local_time_type: cet.clone(), unix_time: 951825600 },
-            DateTime { second: 0, minute: 0, hour: 13, month_day: 1,  month: 2, year: 101,   week_day: 4, year_day: 59, local_time_type: cet.clone(), unix_time: 983448000 },
-            DateTime { second: 0, minute: 0, hour: 13, month_day: 29, month: 1, year: 104,   week_day: 0, year_day: 59, local_time_type: cet.clone(), unix_time: 1078056000 },
-            DateTime { second: 0, minute: 0, hour: 13, month_day: 1,  month: 2, year: 200,   week_day: 1, year_day: 59, local_time_type: cet.clone(), unix_time: 4107585600 },
-            DateTime { second: 0, minute: 0, hour: 13, month_day: 1,  month: 2, year: 1101,  week_day: 0, year_day: 59, local_time_type: cet,         unix_time: 32540356800 },
+            DateTime { year: -2901, month: 2, month_day: 1, hour: 13, minute: 0, second: 0, local_time_type: cet.clone(), unix_time: -93750523200 },
+            DateTime { year: -300, month: 1, month_day: 29, hour: 13, minute: 0, second: 0, local_time_type: cet.clone(), unix_time: -11670955200 },
+            DateTime { year: -200, month: 2, month_day: 1, hour: 13, minute: 0, second: 0, local_time_type: cet.clone(), unix_time: -8515195200 },
+            DateTime { year: -199, month: 2, month_day: 1, hour: 13, minute: 0, second: 0, local_time_type: cet.clone(), unix_time: -8483659200 },
+            DateTime { year: -196, month: 1, month_day: 29, hour: 13, minute: 0, second: 0, local_time_type: cet.clone(), unix_time: -8389051200 },
+            DateTime { year: 100, month: 1, month_day: 29, hour: 13, minute: 0, second: 0, local_time_type: cet.clone(), unix_time: 951825600 },
+            DateTime { year: 101, month: 2, month_day: 1, hour: 13, minute: 0, second: 0, local_time_type: cet.clone(), unix_time: 983448000 },
+            DateTime { year: 104, month: 1, month_day: 29, hour: 13, minute: 0, second: 0, local_time_type: cet.clone(), unix_time: 1078056000 },
+            DateTime { year: 200, month: 2, month_day: 1, hour: 13, minute: 0, second: 0, local_time_type: cet.clone(), unix_time: 4107585600 },
+            DateTime { year: 1101, month: 2, month_day: 1, hour: 13, minute: 0, second: 0, local_time_type: cet, unix_time: 32540356800 },
         ];
 
-        #[rustfmt::skip]
         let date_times_eet = [
-            DateTime { second: 0, minute: 0, hour: 14, month_day: 1,  month: 2, year: -2901, week_day: 5, year_day: 59, local_time_type: eet.clone(), unix_time: -93750523200 },
-            DateTime { second: 0, minute: 0, hour: 14, month_day: 29, month: 1, year: -300,  week_day: 2, year_day: 59, local_time_type: eet.clone(), unix_time: -11670955200 },
-            DateTime { second: 0, minute: 0, hour: 14, month_day: 1,  month: 2, year: -200,  week_day: 1, year_day: 59, local_time_type: eet.clone(), unix_time: -8515195200 },
-            DateTime { second: 0, minute: 0, hour: 14, month_day: 1,  month: 2, year: -199,  week_day: 2, year_day: 59, local_time_type: eet.clone(), unix_time: -8483659200 },
-            DateTime { second: 0, minute: 0, hour: 14, month_day: 29, month: 1, year: -196,  week_day: 5, year_day: 59, local_time_type: eet.clone(), unix_time: -8389051200 },
-            DateTime { second: 0, minute: 0, hour: 14, month_day: 29, month: 1, year: 100,   week_day: 2, year_day: 59, local_time_type: eet.clone(), unix_time: 951825600 },
-            DateTime { second: 0, minute: 0, hour: 14, month_day: 1,  month: 2, year: 101,   week_day: 4, year_day: 59, local_time_type: eet.clone(), unix_time: 983448000 },
-            DateTime { second: 0, minute: 0, hour: 14, month_day: 29, month: 1, year: 104,   week_day: 0, year_day: 59, local_time_type: eet.clone(), unix_time: 1078056000 },
-            DateTime { second: 0, minute: 0, hour: 14, month_day: 1,  month: 2, year: 200,   week_day: 1, year_day: 59, local_time_type: eet.clone(), unix_time: 4107585600 },
-            DateTime { second: 0, minute: 0, hour: 14, month_day: 1,  month: 2, year: 1101,  week_day: 0, year_day: 59, local_time_type: eet,         unix_time: 32540356800 },
+            DateTime { year: -2901, month: 2, month_day: 1, hour: 14, minute: 0, second: 0, local_time_type: eet.clone(), unix_time: -93750523200 },
+            DateTime { year: -300, month: 1, month_day: 29, hour: 14, minute: 0, second: 0, local_time_type: eet.clone(), unix_time: -11670955200 },
+            DateTime { year: -200, month: 2, month_day: 1, hour: 14, minute: 0, second: 0, local_time_type: eet.clone(), unix_time: -8515195200 },
+            DateTime { year: -199, month: 2, month_day: 1, hour: 14, minute: 0, second: 0, local_time_type: eet.clone(), unix_time: -8483659200 },
+            DateTime { year: -196, month: 1, month_day: 29, hour: 14, minute: 0, second: 0, local_time_type: eet.clone(), unix_time: -8389051200 },
+            DateTime { year: 100, month: 1, month_day: 29, hour: 14, minute: 0, second: 0, local_time_type: eet.clone(), unix_time: 951825600 },
+            DateTime { year: 101, month: 2, month_day: 1, hour: 14, minute: 0, second: 0, local_time_type: eet.clone(), unix_time: 983448000 },
+            DateTime { year: 104, month: 1, month_day: 29, hour: 14, minute: 0, second: 0, local_time_type: eet.clone(), unix_time: 1078056000 },
+            DateTime { year: 200, month: 2, month_day: 1, hour: 14, minute: 0, second: 0, local_time_type: eet.clone(), unix_time: 4107585600 },
+            DateTime { year: 1101, month: 2, month_day: 1, hour: 14, minute: 0, second: 0, local_time_type: eet, unix_time: 32540356800 },
         ];
 
         for (((unix_time, date_time_utc), date_time_cet), date_time_eet) in unix_times.into_iter().zip(date_times_utc).zip(date_times_cet).zip(date_times_eet) {
             let utc_date_time = UtcDateTime::from_unix_time(unix_time)?;
 
-            assert_eq!(utc_date_time.second(), date_time_utc.second());
-            assert_eq!(utc_date_time.minute(), date_time_utc.minute());
-            assert_eq!(utc_date_time.hour(), date_time_utc.hour());
-            assert_eq!(utc_date_time.month_day(), date_time_utc.month_day());
-            assert_eq!(utc_date_time.month(), date_time_utc.month());
-            assert_eq!(utc_date_time.year(), date_time_utc.year());
             assert_eq!(utc_date_time.full_year(), date_time_utc.full_year());
+            assert_eq!(utc_date_time.year(), date_time_utc.year());
+            assert_eq!(utc_date_time.month(), date_time_utc.month());
+            assert_eq!(utc_date_time.month_day(), date_time_utc.month_day());
+            assert_eq!(utc_date_time.hour(), date_time_utc.hour());
+            assert_eq!(utc_date_time.minute(), date_time_utc.minute());
+            assert_eq!(utc_date_time.second(), date_time_utc.second());
 
             assert_eq!(utc_date_time.unix_time(), unix_time);
             assert_eq!(date_time_utc.unix_time(), unix_time);
@@ -1224,14 +1183,12 @@ mod test {
         let date_time = utc_date_time.project(&TimeZone::fixed(-3600))?;
 
         let date_time_result = DateTime {
-            second: 00,
-            minute: 00,
-            hour: 23,
-            month_day: 30,
-            month: 5,
             year: 72,
-            week_day: 5,
-            year_day: 181,
+            month: 5,
+            month_day: 30,
+            hour: 23,
+            minute: 00,
+            second: 00,
             local_time_type: LocalTimeType::with_ut_offset(-3600),
             unix_time: 78796800,
         };
@@ -1342,5 +1299,35 @@ mod test {
         assert_eq!(days_since_unix_epoch(104, 1, 29), 12477);
         assert_eq!(days_since_unix_epoch(200, 2, 1), 47541);
         assert_eq!(days_since_unix_epoch(1101, 2, 1), 376624);
+    }
+
+    #[test]
+    fn test_week_day() {
+        assert_eq!(week_day(70, 0, 1), 4);
+
+        assert_eq!(week_day(100, 0, 1), 6);
+        assert_eq!(week_day(100, 1, 28), 1);
+        assert_eq!(week_day(100, 1, 29), 2);
+        assert_eq!(week_day(100, 2, 1), 3);
+        assert_eq!(week_day(100, 11, 31), 0);
+
+        assert_eq!(week_day(101, 0, 1), 1);
+        assert_eq!(week_day(101, 1, 28), 3);
+        assert_eq!(week_day(101, 2, 1), 4);
+        assert_eq!(week_day(101, 11, 31), 1);
+    }
+
+    #[test]
+    fn test_year_day() {
+        assert_eq!(year_day(100, 0, 1), 0);
+        assert_eq!(year_day(100, 1, 28), 58);
+        assert_eq!(year_day(100, 1, 29), 59);
+        assert_eq!(year_day(100, 2, 1), 60);
+        assert_eq!(year_day(100, 11, 31), 365);
+
+        assert_eq!(year_day(101, 0, 1), 0);
+        assert_eq!(year_day(101, 1, 28), 58);
+        assert_eq!(year_day(101, 2, 1), 59);
+        assert_eq!(year_day(101, 11, 31), 364);
     }
 }
