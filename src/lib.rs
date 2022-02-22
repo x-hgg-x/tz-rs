@@ -763,6 +763,14 @@ impl<T: TimeZoneImpl<&'static str> + Default> DateTimeFunctions<&'static str> fo
 }
 
 impl<T: TimeZoneImpl<&'static str> + Default> LocalDateTime<T> {
+    /// Construct a DateTime from a Unix time in seconds
+    pub fn from_unix_time(unix_time: i64) -> Result<Self> {
+        Ok(Self {
+            date_time: DateTime::from_unix_time(unix_time, &T::default())?,
+            _phantom: PhantomData,
+        })
+    }
+
     /// Returns the current date time associated to the specified time zone
     pub fn now() -> Result<Self> {
         Ok(Self {
@@ -1039,12 +1047,12 @@ impl<S: AsRef<str> + Clone> DateTimeFunctions<S> for DateTime<S> {
 }
 
 impl<S: AsRef<str> + Clone> DateTime<S> {
-    /// Returns the current date time associated to the specified time zone
-    pub fn now(time_zone: &impl TimeZoneImpl<S>) -> Result<Self> {
-        let unix_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs().try_into()?;
+    /// Construct a DateTime from a Unix time in seconds
+    pub fn from_unix_time(unix_time: i64, time_zone: &impl TimeZoneImpl<S>) -> Result<Self> {
         let local_time_type = time_zone.find_local_time_type(unix_time)?;
-
-        let utc_date_time_with_offset = UtcDateTime::from_unix_time(unix_time + local_time_type.ut_offset() as i64)?;
+        let utc_date_time_with_offset = UtcDateTime::from_unix_time(
+            unix_time.checked_add(local_time_type.ut_offset() as i64).ok_or(TzError::DateTimeInputError("invalid Unix time"))?
+        )?;
 
         Ok(DateTime {
             second: utc_date_time_with_offset.second,
@@ -1056,6 +1064,11 @@ impl<S: AsRef<str> + Clone> DateTime<S> {
             local_time_type: local_time_type.clone(),
             unix_time,
         })
+    }
+
+    /// Returns the current date time associated to the specified time zone
+    pub fn now(time_zone: &impl TimeZoneImpl<S>) -> Result<Self> {
+        Self::from_unix_time(SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs().try_into()?, time_zone)
     }
 }
 
