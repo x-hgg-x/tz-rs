@@ -41,11 +41,11 @@ fn main() -> Result<()> {
     //
 
     // Get the current UTC date time
-    let current_utc_date_time = UtcDateTime::now()?;
+    let current_utc_date_time = UtcDateTime::<i64>::now()?;
     println!("{:?}", current_utc_date_time);
 
     // Create a new UTC date time (2000-01-01T00:00:00Z)
-    let utc_date_time = UtcDateTime::new(2000, 0, 1, 0, 0, 0)?;
+    let utc_date_time = UtcDateTime::<i64>::new(2000, 0, 1, 0, 0, 0, ())?;
     println!("{:?}", utc_date_time);
 
     // Create a new UTC date time from a Unix time (2000-01-01T00:00:00Z)
@@ -68,10 +68,10 @@ fn main() -> Result<()> {
 
     // Get the current date time at the local time zone (UNIX only)
     let time_zone_local = TimeZone::local()?;
-    let date_time = DateTime::now(&time_zone_local)?;
+    let date_time = DateTime::<f64>::now(&time_zone_local)?;
     println!("{:#?}", date_time);
 
-    let date_time = DateTime::now(&TEST)?;
+    let date_time = DateTime::<f64, _>::now(&TEST)?;
     println!("{:#?}", date_time);
 
     Ok(())

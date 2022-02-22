@@ -59,10 +59,10 @@
 //!     use tz::{DateTime, DateTimeFunctions, TimeZone, TimeZoneImpl, UtcDateTime};
 //!
 //!     // Get the current UTC date time
-//!     let _current_utc_date_time = UtcDateTime::now()?;
+//!     let _current_utc_date_time = UtcDateTime::<i64>::now()?;
 //!
 //!     // Create a new UTC date time (2000-01-01T00:00:00Z)
-//!     let utc_date_time = UtcDateTime::new(2000, 0, 1, 0, 0, 0)?;
+//!     let utc_date_time = UtcDateTime::<i64>::new(2000, 0, 1, 0, 0, 0, ())?;
 //!     assert_eq!(utc_date_time.second(), 0);
 //!     assert_eq!(utc_date_time.minute(), 0);
 //!     assert_eq!(utc_date_time.hour(), 0);
@@ -73,6 +73,7 @@
 //!     assert_eq!(utc_date_time.week_day(), 6);
 //!     assert_eq!(utc_date_time.year_day(), 0);
 //!     assert_eq!(utc_date_time.unix_time(), 946684800);
+//!     assert_eq!(utc_date_time.fraction(), ());
 //!
 //!     // Create a new UTC date time from a Unix time (2000-01-01T00:00:00Z)
 //!     let other_utc_date_time = UtcDateTime::from_unix_time(946684800)?;
@@ -108,7 +109,7 @@
 //!
 //!     // Get the current date time at the local time zone (UNIX only)
 //!     let time_zone_local = TimeZone::local()?;
-//!     let _date_time = DateTime::now(&time_zone_local)?;
+//!     let date_time = DateTime::<i64>::now(&time_zone_local)?;
 //! # Ok(())
 //! # }
 //! ```
@@ -128,6 +129,7 @@ use std::io::{self, Read};
 use std::marker::PhantomData;
 use std::num::TryFromIntError;
 use std::sync::Arc;
+use std::time::Duration;
 use std::time::{SystemTime, SystemTimeError};
 
 use tz_file::TzFileError;
@@ -623,8 +625,108 @@ impl TimeZoneImpl for TimeZone {
     }
 }
 
+pub trait UnixTime: Copy + PartialOrd + PartialEq + std::fmt::Debug {
+    type Fractional: Copy + PartialOrd + PartialEq + std::fmt::Debug;
+
+    fn from_secs(secs: i64, fract: Self::Fractional) -> Self;
+    fn from_duration(duration: &Duration) -> Result<Self>;
+    fn is_fraction_valid(f: Self::Fractional) -> bool;
+    fn checked_add(self, seconds: i64) -> Result<Self>;
+    fn checked_sub(self, seconds: i64) -> Result<Self>;
+    fn as_secs(self) -> Result<i64>;
+    fn as_fraction(self) -> Self::Fractional;
+}
+
+pub trait OrdTractionUnixTime: UnixTime {
+    fn fract_ord(left: Self::Fractional, right: Self::Fractional) -> Ordering;
+    fn fract_eq(left: Self::Fractional, right: Self::Fractional) -> bool;
+}
+
+impl UnixTime for i64 {
+    type Fractional = ();
+
+    fn from_secs(secs: i64, _: Self::Fractional) -> Self {
+        secs
+    }
+
+    fn from_duration(duration: &Duration) -> Result<Self> {
+        Ok(duration.as_secs().try_into()?)
+    }
+
+    fn is_fraction_valid(_: Self::Fractional) -> bool {
+        true
+    }
+
+    fn checked_add(self, seconds: i64) -> Result<Self> {
+        let secs = seconds.try_into().map_err(|_| TzError::DateTimeInputError("invalid Unix time"))?;
+        i64::checked_add(self, secs).ok_or(TzError::DateTimeInputError("invalid Unix time"))
+    }
+
+    fn checked_sub(self, seconds: i64) -> Result<Self> {
+        let secs = seconds.try_into().map_err(|_| TzError::DateTimeInputError("invalid Unix time"))?;
+        i64::checked_sub(self, secs).ok_or(TzError::DateTimeInputError("invalid Unix time"))
+    }
+
+    fn as_secs(self) -> Result<i64> {
+        Ok(self)
+    }
+
+    fn as_fraction(self) -> Self::Fractional {
+        ()
+    }
+}
+
+impl OrdTractionUnixTime for i64 {
+    fn fract_ord(_: Self::Fractional, _: Self::Fractional) -> Ordering {
+        Ordering::Equal
+    }
+
+    fn fract_eq(_: Self::Fractional, _: Self::Fractional) -> bool {
+        true
+    }
+}
+
+impl UnixTime for f64 {
+    type Fractional = f32;
+
+    fn from_secs(secs: i64, fract: Self::Fractional) -> Self {
+        (secs as f64) + (fract as f64)
+    }
+
+    fn from_duration(duration: &Duration) -> Result<Self> {
+        Ok(duration.as_secs_f64())
+    }
+
+    fn is_fraction_valid(f: Self::Fractional) -> bool {
+        (0_f32..1_f32).contains(&f)
+    }
+
+    fn checked_add(self, seconds: i64) -> Result<Self> {
+        Ok(self + seconds as f64)
+    }
+
+    fn checked_sub(self, seconds: i64) -> Result<Self> {
+        Ok(self - seconds as f64)
+    }
+
+    fn as_secs(self) -> Result<i64> {
+        if self >= i64::MIN as _ && self <= i64::MAX as _ {
+            Ok(self as i64)
+        } else {
+            Err(TzError::DateTimeInputError("invalid Unix time"))
+        }
+    }
+
+    fn as_fraction(self) -> Self::Fractional {
+        self.fract() as f32
+    }
+}
+
 // Functions of a date/time object
-pub trait DateTimeFunctions<S: AsRef<str> + Clone> {
+pub trait DateTimeFunctions<U: UnixTime, S: AsRef<str> + Clone> {
+    /// Return the fractional second in `[0, 1)`
+    fn fraction(&self) -> <U as UnixTime>::Fractional;
+
     /// Returns seconds in `[0, 60]`, with a possible leap second
     fn second(&self) -> u8;
 
@@ -664,7 +766,7 @@ pub trait DateTimeFunctions<S: AsRef<str> + Clone> {
     }
 
     /// Returns UTC Unix time in seconds
-    fn unix_time(&self) -> i64;
+    fn unix_time(&self) -> U;
 
     /// Returns local time type
     fn local_time_type(&self) -> &LocalTimeType<S>;
@@ -672,10 +774,10 @@ pub trait DateTimeFunctions<S: AsRef<str> + Clone> {
     /// Project the date time into another time zone.
     ///
     /// Leap seconds are not preserved.
-    fn project<V: AsRef<str> + Clone>(&self, time_zone: &impl TimeZoneImpl<V>) -> Result<DateTime<V>> {
+    fn project<V: AsRef<str> + Clone>(&self, time_zone: &impl TimeZoneImpl<V>) -> Result<DateTime<U, V>> {
         let unix_time = self.unix_time();
-        let local_time_type = time_zone.find_local_time_type(unix_time)?.clone();
-        let utc_date_time_with_offset = UtcDateTime::from_unix_time(unix_time + local_time_type.ut_offset() as i64)?;
+        let local_time_type = time_zone.find_local_time_type(unix_time.as_secs()?)?.clone();
+        let utc_date_time_with_offset = UtcDateTime::from_unix_time(unix_time.checked_add(local_time_type.ut_offset() as i64)?)?;
 
         Ok(DateTime {
             second: utc_date_time_with_offset.second,
@@ -692,7 +794,7 @@ pub trait DateTimeFunctions<S: AsRef<str> + Clone> {
     /// Project the date time into another time zone.
     ///
     /// Leap seconds are not preserved.
-    fn project_local<T: TimeZoneImpl<&'static str> + Default>(&self) -> Result<LocalDateTime<T>> {
+    fn project_local<T: TimeZoneImpl<&'static str> + Default>(&self) -> Result<LocalDateTime<T, U>> {
         Ok(LocalDateTime {
             date_time: self.project(&T::default())?,
             _phantom: PhantomData,
@@ -702,40 +804,44 @@ pub trait DateTimeFunctions<S: AsRef<str> + Clone> {
     /// Project the local date time into a UTC date time.
     ///
     /// Leap seconds are not preserved.
-    fn project_utc<T: TimeZoneImpl<&'static str> + Default>(&self) -> Result<UtcDateTime> {
+    fn project_utc<T: TimeZoneImpl<&'static str> + Default>(&self) -> Result<UtcDateTime<U>> {
         UtcDateTime::from_unix_time(self.unix_time())
     }
 }
 
 /// A [DateTime] in a specific [TimeZone]
 #[derive(Debug, Clone)]
-pub struct LocalDateTime<T: TimeZoneImpl<&'static str> + Default> {
-    date_time: DateTime<&'static str>,
+pub struct LocalDateTime<T: TimeZoneImpl<&'static str> + Default, U: UnixTime = i64> {
+    date_time: DateTime<U, &'static str>,
     _phantom: PhantomData<T>,
 }
 
-impl<T: TimeZoneImpl<&'static str> + Default> PartialEq for LocalDateTime<T> {
+impl<T: TimeZoneImpl<&'static str> + Default, U: UnixTime> PartialEq for LocalDateTime<T, U> {
     fn eq(&self, other: &Self) -> bool {
         self.date_time.unix_time == other.date_time.unix_time
     }
 }
 
-impl<T: TimeZoneImpl<&'static str> + Default> Eq for LocalDateTime<T> {
+impl<T: TimeZoneImpl<&'static str> + Default, U: UnixTime + Eq> Eq for LocalDateTime<T, U> {
 }
 
-impl<T: TimeZoneImpl<&'static str> + Default> PartialOrd for LocalDateTime<T> {
+impl<T: TimeZoneImpl<&'static str> + Default, U: UnixTime> PartialOrd for LocalDateTime<T, U> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.date_time.unix_time.partial_cmp(&other.date_time.unix_time)
     }
 }
 
-impl<T: TimeZoneImpl<&'static str> + Default> Ord for LocalDateTime<T> {
+impl<T: TimeZoneImpl<&'static str> + Default, U: UnixTime + Ord> Ord for LocalDateTime<T, U> {
     fn cmp(&self, other: &Self) -> Ordering {
         self.date_time.unix_time.cmp(&other.date_time.unix_time)
     }
 }
 
-impl<T: TimeZoneImpl<&'static str> + Default> DateTimeFunctions<&'static str> for LocalDateTime<T> {
+impl<U: UnixTime, T: TimeZoneImpl<&'static str> + Default> DateTimeFunctions<U, &'static str> for LocalDateTime<T, U> {
+    fn fraction(&self) -> <U as UnixTime>::Fractional {
+        self.date_time.unix_time.as_fraction()
+    }
+
     fn second(&self) -> u8 {
         self.date_time.second
     }
@@ -760,7 +866,7 @@ impl<T: TimeZoneImpl<&'static str> + Default> DateTimeFunctions<&'static str> fo
         self.date_time.year
     }
 
-    fn unix_time(&self) -> i64 {
+    fn unix_time(&self) -> U {
         self.date_time.unix_time
     }
 
@@ -788,8 +894,10 @@ impl<T: TimeZoneImpl<&'static str> + Default> LocalDateTime<T> {
 }
 
 /// UTC date time exprimed in the [proleptic gregorian calendar](https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar)
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct UtcDateTime {
+#[derive(Debug, Clone, PartialEq)]
+pub struct UtcDateTime<U: UnixTime = i64> {
+    /// Fractional seconds
+    fraction: <U as UnixTime>::Fractional,
     /// Seconds in `[0, 60]`, with a possible leap second
     second: u8,
     /// Minutes in `[0, 59]`
@@ -804,21 +912,33 @@ pub struct UtcDateTime {
     year: i32,
 }
 
-impl Ord for UtcDateTime {
-    fn cmp(&self, other: &Self) -> Ordering {
-        let self_tuple = (self.year, self.month, self.month_day, self.hour, self.second, self.minute);
-        let other_tuple = (other.year, other.month, other.month_day, other.hour, other.second, other.minute);
-        self_tuple.cmp(&other_tuple)
-    }
-}
-
-impl PartialOrd for UtcDateTime {
+impl<U: UnixTime> PartialOrd for UtcDateTime<U> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
+        let self_tuple = (self.year, self.month, self.month_day, self.hour, self.minute, self.second, self.fraction);
+        let other_tuple = (other.year, other.month, other.month_day, other.hour, other.minute, other.second, other.fraction);
+        self_tuple.partial_cmp(&other_tuple)
     }
 }
 
-impl DateTimeFunctions<&'static str> for UtcDateTime {
+impl<U: UnixTime + OrdTractionUnixTime + Ord> Ord for UtcDateTime<U> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let self_tuple = (self.year, self.month, self.month_day, self.hour, self.minute, self.second);
+        let other_tuple = (other.year, other.month, other.month_day, other.hour, other.minute, other.second);
+        match self_tuple.cmp(&other_tuple) {
+            Ordering::Equal => U::fract_ord(self.fraction, other.fraction),
+            result => result,
+        }
+    }
+}
+
+impl<U: UnixTime + Eq> Eq for UtcDateTime<U> {
+}
+
+impl<U: UnixTime> DateTimeFunctions<U, &'static str> for UtcDateTime<U> {
+    fn fraction(&self) -> <U as UnixTime>::Fractional {
+        self.fraction
+    }
+
     fn second(&self) -> u8 {
         self.second
     }
@@ -853,7 +973,7 @@ impl DateTimeFunctions<&'static str> for UtcDateTime {
         (constants::CUM_DAY_IN_MONTHS_NORMAL_YEAR[self.month as usize] + leap + self.month_day as i64 - 1) as u16
     }
 
-    fn unix_time(&self) -> i64 {
+    fn unix_time(&self) -> U {
         use constants::*;
 
         let mut result = days_since_unix_epoch(self.year, self.month.into(), self.month_day.into());
@@ -864,7 +984,7 @@ impl DateTimeFunctions<&'static str> for UtcDateTime {
         result *= SECONDS_PER_MINUTE;
         result += self.second as i64;
 
-        result
+        U::from_secs(result, self.fraction)
     }
 
     fn local_time_type(&self) -> &LocalTimeType<&'static str> {
@@ -872,12 +992,12 @@ impl DateTimeFunctions<&'static str> for UtcDateTime {
         UTC
     }
 
-    fn project_utc<T: TimeZoneImpl<&'static str> + Default>(&self) -> Result<UtcDateTime> {
+    fn project_utc<T: TimeZoneImpl<&'static str> + Default>(&self) -> Result<UtcDateTime<U>> {
         Ok(self.clone())
     }
 }
 
-impl UtcDateTime {
+impl<U: UnixTime> UtcDateTime<U> {
     /// Construct a UTC date time
     ///
     /// ## Inputs
@@ -889,7 +1009,7 @@ impl UtcDateTime {
     /// * `minute`: Minutes in `[0, 59]`
     /// * `second`: Seconds in `[0, 60]`, with a possible leap second
     ///
-    pub fn new(full_year: i32, month: u8, month_day: u8, hour: u8, minute: u8, second: u8) -> Result<Self> {
+    pub fn new(full_year: i32, month: u8, month_day: u8, hour: u8, minute: u8, second: u8, fraction: <U as UnixTime>::Fractional) -> Result<Self> {
         use constants::*;
 
         let year = full_year - 1900;
@@ -909,6 +1029,9 @@ impl UtcDateTime {
         if !(0..=60).contains(&second) {
             return Err(TzError::DateTimeInputError("invalid second"));
         }
+        if !U::is_fraction_valid(fraction) {
+            return Err(TzError::DateTimeInputError("invalid fraction"));
+        }
 
         let leap = is_leap_year(year) as i64;
 
@@ -921,14 +1044,16 @@ impl UtcDateTime {
             return Err(TzError::DateTimeInputError("invalid month day"));
         }
 
-        Ok(Self { second, minute, hour, month_day, month, year })
+        Ok(Self { second, minute, hour, month_day, month, year, fraction })
     }
 
     /// Construct a UTC date time from a Unix time in seconds
-    pub fn from_unix_time(unix_time: i64) -> Result<Self> {
+    pub fn from_unix_time(unix_time: U) -> Result<Self> {
         use constants::*;
 
-        let seconds = unix_time.checked_sub(UNIX_OFFSET_SECS).ok_or(TzError::DateTimeInputError("invalid Unix time"))?;
+        let seconds = unix_time.checked_sub(UNIX_OFFSET_SECS)?;
+        let fraction = seconds.as_fraction();
+        let seconds = seconds.as_secs()?;
         let mut remaining_days = seconds / SECONDS_PER_DAY;
         let mut remaining_seconds = seconds % SECONDS_PER_DAY;
         if remaining_seconds < 0 {
@@ -981,18 +1106,19 @@ impl UtcDateTime {
             month_day: month_day.try_into()?,
             month: month.try_into()?,
             year: year.try_into()?,
+            fraction,
         })
     }
 
     /// Returns the current UTC date time
     pub fn now() -> Result<Self> {
-        Self::from_unix_time(SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs().try_into()?)
+        Self::from_unix_time(UnixTime::from_duration(&SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?)?)
     }
 }
 
 /// Date time associated to a local time type, exprimed in the [proleptic gregorian calendar](https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar)
 #[derive(Debug, Clone)]
-pub struct DateTime<S: AsRef<str> + Clone = Arc<str>> {
+pub struct DateTime<U: UnixTime = i64, S: AsRef<str> + Clone = Arc<str>> {
     /// Seconds in `[0, 60]`, with a possible leap second
     second: u8,
     /// Minutes in `[0, 59]`
@@ -1008,22 +1134,35 @@ pub struct DateTime<S: AsRef<str> + Clone = Arc<str>> {
     /// Local time type
     local_time_type: LocalTimeType<S>,
     /// UTC Unix time in seconds
-    unix_time: i64,
+    unix_time: U,
 }
 
-impl PartialEq for DateTime {
+impl<U: UnixTime, S: AsRef<str> + Clone> PartialEq for DateTime<U, S> {
     fn eq(&self, other: &Self) -> bool {
         self.unix_time == other.unix_time
     }
 }
 
-impl PartialOrd for DateTime {
+impl<U: UnixTime + Eq, S: AsRef<str> + Clone> Eq for DateTime<U, S> {
+}
+
+impl<U: UnixTime, S: AsRef<str> + Clone> PartialOrd for DateTime<U, S> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.unix_time.partial_cmp(&other.unix_time)
     }
 }
 
-impl<S: AsRef<str> + Clone> DateTimeFunctions<S> for DateTime<S> {
+impl<U: UnixTime + Ord, S: AsRef<str> + Clone> Ord for DateTime<U, S> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.unix_time.cmp(&other.unix_time)
+    }
+}
+
+impl<U: UnixTime, S: AsRef<str> + Clone> DateTimeFunctions<U, S> for DateTime<U, S> {
+    fn fraction(&self) -> <U as UnixTime>::Fractional {
+        self.unix_time.as_fraction()
+    }
+
     fn second(&self) -> u8 {
         self.second
     }
@@ -1048,7 +1187,7 @@ impl<S: AsRef<str> + Clone> DateTimeFunctions<S> for DateTime<S> {
         self.year
     }
 
-    fn unix_time(&self) -> i64 {
+    fn unix_time(&self) -> U {
         self.unix_time
     }
 
@@ -1057,13 +1196,11 @@ impl<S: AsRef<str> + Clone> DateTimeFunctions<S> for DateTime<S> {
     }
 }
 
-impl<S: AsRef<str> + Clone> DateTime<S> {
+impl<U: UnixTime, S: AsRef<str> + Clone> DateTime<U, S> {
     /// Construct a DateTime from a Unix time in seconds
-    pub fn from_unix_time(unix_time: i64, time_zone: &impl TimeZoneImpl<S>) -> Result<Self> {
-        let local_time_type = time_zone.find_local_time_type(unix_time)?;
-        let utc_date_time_with_offset = UtcDateTime::from_unix_time(
-            unix_time.checked_add(local_time_type.ut_offset() as i64).ok_or(TzError::DateTimeInputError("invalid Unix time"))?
-        )?;
+    pub fn from_unix_time(unix_time: U, time_zone: &impl TimeZoneImpl<S>) -> Result<Self> {
+        let local_time_type = time_zone.find_local_time_type(unix_time.as_secs()?)?;
+        let utc_date_time_with_offset = UtcDateTime::from_unix_time(unix_time.checked_add(local_time_type.ut_offset() as i64)?)?;
 
         Ok(DateTime {
             second: utc_date_time_with_offset.second,
@@ -1079,7 +1216,7 @@ impl<S: AsRef<str> + Clone> DateTime<S> {
 
     /// Returns the current date time associated to the specified time zone
     pub fn now(time_zone: &impl TimeZoneImpl<S>) -> Result<Self> {
-        Self::from_unix_time(SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs().try_into()?, time_zone)
+        Self::from_unix_time(U::from_duration(&SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?)?, time_zone)
     }
 }
 
@@ -1267,9 +1404,9 @@ mod test {
         let time_zone_eet = TimeZone::fixed(7200);
         let eet = LocalTimeType::with_ut_offset(7200);
 
-        assert_eq!(DateTime::now(&time_zone_utc)?.local_time_type().ut_offset(), 0);
-        assert_eq!(DateTime::now(&time_zone_cet)?.local_time_type().ut_offset(), 3600);
-        assert_eq!(DateTime::now(&time_zone_eet)?.local_time_type().ut_offset(), 7200);
+        assert_eq!(DateTime::<i64>::now(&time_zone_utc)?.local_time_type().ut_offset(), 0);
+        assert_eq!(DateTime::<i64>::now(&time_zone_cet)?.local_time_type().ut_offset(), 3600);
+        assert_eq!(DateTime::<i64>::now(&time_zone_eet)?.local_time_type().ut_offset(), 7200);
 
         let unix_times = [-93750523200, -11670955200, -8515195200, -8483659200, -8389051200, 951825600, 983448000, 1078056000, 4107585600, 32540356800];
 
@@ -1356,7 +1493,7 @@ mod test {
 
     #[test]
     fn test_date_time_leap_seconds() -> Result<()> {
-        let utc_date_time = UtcDateTime::new(1972, 5, 30, 23, 59, 60)?;
+        let utc_date_time = UtcDateTime::new(1972, 5, 30, 23, 59, 60, ())?;
         let date_time = utc_date_time.project(&TimeZone::fixed(-3600))?;
 
         let date_time_result = DateTime {
@@ -1432,9 +1569,9 @@ mod test {
 
     #[test]
     fn test_utc_date_time_ord() -> Result<()> {
-        let utc_date_time_1 = UtcDateTime::new(1972, 5, 30, 23, 59, 59)?;
-        let utc_date_time_2 = UtcDateTime::new(1972, 5, 30, 23, 59, 60)?;
-        let utc_date_time_3 = UtcDateTime::new(1972, 6, 1, 0, 0, 0)?;
+        let utc_date_time_1 = UtcDateTime::<i64>::new(1972, 5, 30, 23, 59, 59, ())?;
+        let utc_date_time_2 = UtcDateTime::<i64>::new(1972, 5, 30, 23, 59, 60, ())?;
+        let utc_date_time_3 = UtcDateTime::<i64>::new(1972, 6, 1, 0, 0, 0, ())?;
 
         assert_eq!(utc_date_time_1.cmp(&utc_date_time_1), Ordering::Equal);
         assert_eq!(utc_date_time_1.cmp(&utc_date_time_2), Ordering::Less);
