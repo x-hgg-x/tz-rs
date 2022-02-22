@@ -698,6 +698,13 @@ pub trait DateTimeFunctions<S: AsRef<str> + Clone> {
             _phantom: PhantomData,
         })
     }
+
+    /// Project the local date time into a UTC date time.
+    ///
+    /// Leap seconds are not preserved.
+    fn project_utc<T: TimeZoneImpl<&'static str> + Default>(&self) -> Result<UtcDateTime> {
+        UtcDateTime::from_unix_time(self.unix_time())
+    }
 }
 
 /// A [DateTime] in a specific [TimeZone]
@@ -863,6 +870,10 @@ impl DateTimeFunctions<&'static str> for UtcDateTime {
     fn local_time_type(&self) -> &LocalTimeType<&'static str> {
         const UTC: &LocalTimeType<&'static str> = &LocalTimeType::new(0, false, Some("UTC"));
         UTC
+    }
+
+    fn project_utc<T: TimeZoneImpl<&'static str> + Default>(&self) -> Result<UtcDateTime> {
+        Ok(self.clone())
     }
 }
 
