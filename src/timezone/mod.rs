@@ -242,6 +242,69 @@ impl AlternateTime {
 
         Ok(Self { std, dst, dst_start, dst_start_time, dst_end, dst_end_time })
     }
+
+    /// Find the local time type associated to the alternate transition rule at the specified Unix time in seconds
+    fn find_local_time_type(&self, unix_time: i64) -> Result<&LocalTimeType> {
+        let dst_start_time_in_utc = (self.dst_start_time - self.std.ut_offset).into();
+        let dst_end_time_in_utc = (self.dst_end_time - self.dst.ut_offset).into();
+
+        let current_year = UtcDateTime::from_unix_time(unix_time)?.year();
+
+        let current_year_dst_start_unix_time = self.dst_start.unix_time(current_year, dst_start_time_in_utc);
+        let current_year_dst_end_unix_time = self.dst_end.unix_time(current_year, dst_end_time_in_utc);
+
+        // Check DST start/end Unix times for previous/current/next years to support for transition day times outside of [0h, 24h] range
+        let is_dst = match current_year_dst_start_unix_time.cmp(&current_year_dst_end_unix_time) {
+            Ordering::Less | Ordering::Equal => {
+                if unix_time < current_year_dst_start_unix_time {
+                    let previous_year_dst_end_unix_time = self.dst_end.unix_time(current_year - 1, dst_end_time_in_utc);
+                    if unix_time < previous_year_dst_end_unix_time {
+                        let previous_year_dst_start_unix_time = self.dst_start.unix_time(current_year - 1, dst_start_time_in_utc);
+                        previous_year_dst_start_unix_time <= unix_time
+                    } else {
+                        false
+                    }
+                } else if unix_time < current_year_dst_end_unix_time {
+                    true
+                } else {
+                    let next_year_dst_start_unix_time = self.dst_start.unix_time(current_year + 1, dst_start_time_in_utc);
+                    if next_year_dst_start_unix_time <= unix_time {
+                        let next_year_dst_end_unix_time = self.dst_end.unix_time(current_year + 1, dst_end_time_in_utc);
+                        unix_time < next_year_dst_end_unix_time
+                    } else {
+                        false
+                    }
+                }
+            }
+            Ordering::Greater => {
+                if unix_time < current_year_dst_end_unix_time {
+                    let previous_year_dst_start_unix_time = self.dst_start.unix_time(current_year - 1, dst_start_time_in_utc);
+                    if unix_time < previous_year_dst_start_unix_time {
+                        let previous_year_dst_end_unix_time = self.dst_end.unix_time(current_year - 1, dst_end_time_in_utc);
+                        unix_time < previous_year_dst_end_unix_time
+                    } else {
+                        true
+                    }
+                } else if unix_time < current_year_dst_start_unix_time {
+                    false
+                } else {
+                    let next_year_dst_end_unix_time = self.dst_end.unix_time(current_year + 1, dst_end_time_in_utc);
+                    if next_year_dst_end_unix_time <= unix_time {
+                        let next_year_dst_start_unix_time = self.dst_start.unix_time(current_year + 1, dst_start_time_in_utc);
+                        next_year_dst_start_unix_time <= unix_time
+                    } else {
+                        true
+                    }
+                }
+            }
+        };
+
+        if is_dst {
+            Ok(&self.dst)
+        } else {
+            Ok(&self.std)
+        }
+    }
 }
 
 /// Transition rule
@@ -258,67 +321,7 @@ impl TransitionRule {
     fn find_local_time_type(&self, unix_time: i64) -> Result<&LocalTimeType> {
         match self {
             Self::Fixed(local_time_type) => Ok(local_time_type),
-            Self::Alternate(AlternateTime { std, dst, dst_start, dst_start_time, dst_end, dst_end_time }) => {
-                let dst_start_time_in_utc = (dst_start_time - std.ut_offset).into();
-                let dst_end_time_in_utc = (dst_end_time - dst.ut_offset).into();
-
-                let current_year = UtcDateTime::from_unix_time(unix_time)?.year();
-
-                let current_year_dst_start_unix_time = dst_start.unix_time(current_year, dst_start_time_in_utc);
-                let current_year_dst_end_unix_time = dst_end.unix_time(current_year, dst_end_time_in_utc);
-
-                // Check DST start/end Unix times for previous/current/next years to support for transition day times outside of [0h, 24h] range
-                let is_dst = match current_year_dst_start_unix_time.cmp(&current_year_dst_end_unix_time) {
-                    Ordering::Less | Ordering::Equal => {
-                        if unix_time < current_year_dst_start_unix_time {
-                            let previous_year_dst_end_unix_time = dst_end.unix_time(current_year - 1, dst_end_time_in_utc);
-                            if unix_time < previous_year_dst_end_unix_time {
-                                let previous_year_dst_start_unix_time = dst_start.unix_time(current_year - 1, dst_start_time_in_utc);
-                                previous_year_dst_start_unix_time <= unix_time
-                            } else {
-                                false
-                            }
-                        } else if unix_time < current_year_dst_end_unix_time {
-                            true
-                        } else {
-                            let next_year_dst_start_unix_time = dst_start.unix_time(current_year + 1, dst_start_time_in_utc);
-                            if next_year_dst_start_unix_time <= unix_time {
-                                let next_year_dst_end_unix_time = dst_end.unix_time(current_year + 1, dst_end_time_in_utc);
-                                unix_time < next_year_dst_end_unix_time
-                            } else {
-                                false
-                            }
-                        }
-                    }
-                    Ordering::Greater => {
-                        if unix_time < current_year_dst_end_unix_time {
-                            let previous_year_dst_start_unix_time = dst_start.unix_time(current_year - 1, dst_start_time_in_utc);
-                            if unix_time < previous_year_dst_start_unix_time {
-                                let previous_year_dst_end_unix_time = dst_end.unix_time(current_year - 1, dst_end_time_in_utc);
-                                unix_time < previous_year_dst_end_unix_time
-                            } else {
-                                true
-                            }
-                        } else if unix_time < current_year_dst_start_unix_time {
-                            false
-                        } else {
-                            let next_year_dst_end_unix_time = dst_end.unix_time(current_year + 1, dst_end_time_in_utc);
-                            if next_year_dst_end_unix_time <= unix_time {
-                                let next_year_dst_start_unix_time = dst_start.unix_time(current_year + 1, dst_start_time_in_utc);
-                                next_year_dst_start_unix_time <= unix_time
-                            } else {
-                                true
-                            }
-                        }
-                    }
-                };
-
-                if is_dst {
-                    Ok(dst)
-                } else {
-                    Ok(std)
-                }
-            }
+            Self::Alternate(alternate_time) => alternate_time.find_local_time_type(unix_time),
         }
     }
 }

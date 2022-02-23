@@ -424,17 +424,36 @@ mod test {
         assert_eq!(DateTime::now(&time_zone_cet)?.local_time_type().ut_offset(), 3600);
         assert_eq!(DateTime::now(&time_zone_eet)?.local_time_type().ut_offset(), 7200);
 
-        let unix_times = [-93750523200, -11670955200, -8515195200, -8483659200, -8389051200, 951825600, 983448000, 1078056000, 4107585600, 32540356800];
+        let unix_times = [
+            -93750523200,
+            -11670955200,
+            -11670868800,
+            -8515195200,
+            -8483659200,
+            -8389051200,
+            -8388964800,
+            951825600,
+            951912000,
+            983448000,
+            1078056000,
+            1078142400,
+            4107585600,
+            32540356800,
+        ];
 
         let date_times_utc = [
             DateTime { year: -2901, month: 2, month_day: 1, hour: 12, minute: 0, second: 0, local_time_type: utc.clone(), unix_time: -93750523200 },
             DateTime { year: -300, month: 1, month_day: 29, hour: 12, minute: 0, second: 0, local_time_type: utc.clone(), unix_time: -11670955200 },
+            DateTime { year: -300, month: 2, month_day: 1, hour: 12, minute: 0, second: 0, local_time_type: utc.clone(), unix_time: -11670868800 },
             DateTime { year: -200, month: 2, month_day: 1, hour: 12, minute: 0, second: 0, local_time_type: utc.clone(), unix_time: -8515195200 },
             DateTime { year: -199, month: 2, month_day: 1, hour: 12, minute: 0, second: 0, local_time_type: utc.clone(), unix_time: -8483659200 },
             DateTime { year: -196, month: 1, month_day: 29, hour: 12, minute: 0, second: 0, local_time_type: utc.clone(), unix_time: -8389051200 },
+            DateTime { year: -196, month: 2, month_day: 1, hour: 12, minute: 0, second: 0, local_time_type: utc.clone(), unix_time: -8388964800 },
             DateTime { year: 100, month: 1, month_day: 29, hour: 12, minute: 0, second: 0, local_time_type: utc.clone(), unix_time: 951825600 },
+            DateTime { year: 100, month: 2, month_day: 1, hour: 12, minute: 0, second: 0, local_time_type: utc.clone(), unix_time: 951912000 },
             DateTime { year: 101, month: 2, month_day: 1, hour: 12, minute: 0, second: 0, local_time_type: utc.clone(), unix_time: 983448000 },
             DateTime { year: 104, month: 1, month_day: 29, hour: 12, minute: 0, second: 0, local_time_type: utc.clone(), unix_time: 1078056000 },
+            DateTime { year: 104, month: 2, month_day: 1, hour: 12, minute: 0, second: 0, local_time_type: utc.clone(), unix_time: 1078142400 },
             DateTime { year: 200, month: 2, month_day: 1, hour: 12, minute: 0, second: 0, local_time_type: utc.clone(), unix_time: 4107585600 },
             DateTime { year: 1101, month: 2, month_day: 1, hour: 12, minute: 0, second: 0, local_time_type: utc, unix_time: 32540356800 },
         ];
@@ -442,12 +461,16 @@ mod test {
         let date_times_cet = [
             DateTime { year: -2901, month: 2, month_day: 1, hour: 13, minute: 0, second: 0, local_time_type: cet.clone(), unix_time: -93750523200 },
             DateTime { year: -300, month: 1, month_day: 29, hour: 13, minute: 0, second: 0, local_time_type: cet.clone(), unix_time: -11670955200 },
+            DateTime { year: -300, month: 2, month_day: 1, hour: 13, minute: 0, second: 0, local_time_type: cet.clone(), unix_time: -11670868800 },
             DateTime { year: -200, month: 2, month_day: 1, hour: 13, minute: 0, second: 0, local_time_type: cet.clone(), unix_time: -8515195200 },
             DateTime { year: -199, month: 2, month_day: 1, hour: 13, minute: 0, second: 0, local_time_type: cet.clone(), unix_time: -8483659200 },
             DateTime { year: -196, month: 1, month_day: 29, hour: 13, minute: 0, second: 0, local_time_type: cet.clone(), unix_time: -8389051200 },
+            DateTime { year: -196, month: 2, month_day: 1, hour: 13, minute: 0, second: 0, local_time_type: cet.clone(), unix_time: -8388964800 },
             DateTime { year: 100, month: 1, month_day: 29, hour: 13, minute: 0, second: 0, local_time_type: cet.clone(), unix_time: 951825600 },
+            DateTime { year: 100, month: 2, month_day: 1, hour: 13, minute: 0, second: 0, local_time_type: cet.clone(), unix_time: 951912000 },
             DateTime { year: 101, month: 2, month_day: 1, hour: 13, minute: 0, second: 0, local_time_type: cet.clone(), unix_time: 983448000 },
             DateTime { year: 104, month: 1, month_day: 29, hour: 13, minute: 0, second: 0, local_time_type: cet.clone(), unix_time: 1078056000 },
+            DateTime { year: 104, month: 2, month_day: 1, hour: 13, minute: 0, second: 0, local_time_type: cet.clone(), unix_time: 1078142400 },
             DateTime { year: 200, month: 2, month_day: 1, hour: 13, minute: 0, second: 0, local_time_type: cet.clone(), unix_time: 4107585600 },
             DateTime { year: 1101, month: 2, month_day: 1, hour: 13, minute: 0, second: 0, local_time_type: cet, unix_time: 32540356800 },
         ];
@@ -455,12 +478,16 @@ mod test {
         let date_times_eet = [
             DateTime { year: -2901, month: 2, month_day: 1, hour: 14, minute: 0, second: 0, local_time_type: eet.clone(), unix_time: -93750523200 },
             DateTime { year: -300, month: 1, month_day: 29, hour: 14, minute: 0, second: 0, local_time_type: eet.clone(), unix_time: -11670955200 },
+            DateTime { year: -300, month: 2, month_day: 1, hour: 14, minute: 0, second: 0, local_time_type: eet.clone(), unix_time: -11670868800 },
             DateTime { year: -200, month: 2, month_day: 1, hour: 14, minute: 0, second: 0, local_time_type: eet.clone(), unix_time: -8515195200 },
             DateTime { year: -199, month: 2, month_day: 1, hour: 14, minute: 0, second: 0, local_time_type: eet.clone(), unix_time: -8483659200 },
             DateTime { year: -196, month: 1, month_day: 29, hour: 14, minute: 0, second: 0, local_time_type: eet.clone(), unix_time: -8389051200 },
+            DateTime { year: -196, month: 2, month_day: 1, hour: 14, minute: 0, second: 0, local_time_type: eet.clone(), unix_time: -8388964800 },
             DateTime { year: 100, month: 1, month_day: 29, hour: 14, minute: 0, second: 0, local_time_type: eet.clone(), unix_time: 951825600 },
+            DateTime { year: 100, month: 2, month_day: 1, hour: 14, minute: 0, second: 0, local_time_type: eet.clone(), unix_time: 951912000 },
             DateTime { year: 101, month: 2, month_day: 1, hour: 14, minute: 0, second: 0, local_time_type: eet.clone(), unix_time: 983448000 },
             DateTime { year: 104, month: 1, month_day: 29, hour: 14, minute: 0, second: 0, local_time_type: eet.clone(), unix_time: 1078056000 },
+            DateTime { year: 104, month: 2, month_day: 1, hour: 14, minute: 0, second: 0, local_time_type: eet.clone(), unix_time: 1078142400 },
             DateTime { year: 200, month: 2, month_day: 1, hour: 14, minute: 0, second: 0, local_time_type: eet.clone(), unix_time: 4107585600 },
             DateTime { year: 1101, month: 2, month_day: 1, hour: 14, minute: 0, second: 0, local_time_type: eet, unix_time: 32540356800 },
         ];
