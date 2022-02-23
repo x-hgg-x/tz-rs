@@ -90,6 +90,11 @@ impl<T> NonEmptyVec<T> {
     pub fn one(first: T) -> Self {
         Self { first, tail: Vec::new() }
     }
+
+    /// Returns the length of the vector
+    pub fn len(&self) -> usize {
+        1 + self.tail.len()
+    }
 }
 
 impl<T> Index<usize> for NonEmptyVec<T> {
