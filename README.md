@@ -33,7 +33,7 @@ Since the time zone database files are not included in this crate, non-UNIX user
 The database files can then be read by specifying an absolute path in the `TZ` string:
 
 ```rust
-TimeZone::from_posix_tz(format!("{}/usr/share/zoneinfo/Pacific/Auckland", local_database_dir))?;
+TimeZone::from_posix_tz(format!("{local_database_dir}/usr/share/zoneinfo/Pacific/Auckland"))?;
 ```
 
 Note that the determination of the local time zone is not supported on non-UNIX platforms.
