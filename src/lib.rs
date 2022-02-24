@@ -59,10 +59,11 @@
 //!     use tz::{DateTime, TimeZone, UtcDateTime};
 //!
 //!     // Get the current UTC date time
-//!     let _current_utc_date_time = UtcDateTime::now()?;
+//!     let current_utc_date_time = UtcDateTime::<i64>::now()?;
+//!     let with_nanoseconds = UtcDateTime::<i64>::now()?;
 //!
 //!     // Create a new UTC date time (2000-01-01T00:00:00Z)
-//!     let utc_date_time = UtcDateTime::new(2000, 0, 1, 0, 0, 0)?;
+//!     let utc_date_time = UtcDateTime::new(2000, 0, 1, 0, 0, 0, ())?;
 //!     assert_eq!(utc_date_time.full_year(), 2000);
 //!     assert_eq!(utc_date_time.year(), 100);
 //!     assert_eq!(utc_date_time.month(), 0);
@@ -108,7 +109,8 @@
 //!
 //!     // Get the current date time at the local time zone (UNIX only)
 //!     let time_zone_local = TimeZone::local()?;
-//!     let _date_time = DateTime::now(&time_zone_local)?;
+//!     let date_time = DateTime::<i64>::now(&time_zone_local)?;
+//!     let with_nanoseconds = DateTime::<f64>::now(&time_zone_local)?;
 //! # Ok(())
 //! # }
 //! ```

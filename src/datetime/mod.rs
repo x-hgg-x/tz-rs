@@ -1,14 +1,17 @@
 //! Types related to a date time.
 
+mod unix_time;
+
 use crate::error::*;
 use crate::{LocalTimeType, TimeZone};
+pub use self::unix_time::UnixTime;
 
 use std::cmp::Ordering;
 use std::time::SystemTime;
 
 /// UTC date time exprimed in the [proleptic gregorian calendar](https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar)
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
-pub struct UtcDateTime {
+pub struct UtcDateTime<U: UnixTime = i64> {
     /// Years since 1900
     year: i32,
     /// Month in `[0, 11]`
@@ -21,9 +24,11 @@ pub struct UtcDateTime {
     minute: u8,
     /// Seconds in `[0, 60]`, with a possible leap second
     second: u8,
+    /// Nanoseconds in `[0, 999_999_999]`
+    nanoseconds: U::Nanoseconds,
 }
 
-impl UtcDateTime {
+impl<U: UnixTime> UtcDateTime<U> {
     /// Construct a UTC date time
     ///
     /// ## Inputs
@@ -35,7 +40,7 @@ impl UtcDateTime {
     /// * `minute`: Minutes in `[0, 59]`
     /// * `second`: Seconds in `[0, 60]`, with a possible leap second
     ///
-    pub fn new(full_year: i32, month: u8, month_day: u8, hour: u8, minute: u8, second: u8) -> Result<Self> {
+    pub fn new(full_year: i32, month: u8, month_day: u8, hour: u8, minute: u8, second: u8, nanoseconds: U::Nanoseconds) -> Result<Self> {
         use crate::constants::*;
 
         let year = full_year - 1900;
@@ -55,6 +60,7 @@ impl UtcDateTime {
         if !(0..=60).contains(&second) {
             return Err(TzError::InvalidDateTime("invalid second"));
         }
+        U::validate_nanoseconds(nanoseconds)?;
 
         let leap = is_leap_year(year) as i64;
 
@@ -67,14 +73,15 @@ impl UtcDateTime {
             return Err(TzError::InvalidDateTime("invalid month day"));
         }
 
-        Ok(Self { year, month, month_day, hour, minute, second })
+        Ok(Self { year, month, month_day, hour, minute, second, nanoseconds })
     }
 
     /// Construct a UTC date time from a Unix time in seconds
-    pub fn from_unix_time(unix_time: i64) -> Result<Self> {
+    pub fn from_unix_time(unix_time: U) -> Result<Self> {
         use crate::constants::*;
 
-        let seconds = unix_time - UNIX_OFFSET_SECS;
+        let seconds = unix_time.get_seconds()?.checked_sub(UNIX_OFFSET_SECS).ok_or(TzError::InvalidDateTime("invalid nanoseconds"))?;
+        let nanoseconds = unix_time.get_nanoseconds();
         let mut remaining_days = seconds / SECONDS_PER_DAY;
         let mut remaining_seconds = seconds % SECONDS_PER_DAY;
         if remaining_seconds < 0 {
@@ -127,23 +134,24 @@ impl UtcDateTime {
             hour: hour.try_into()?,
             minute: minute.try_into()?,
             second: second.try_into()?,
+            nanoseconds,
         })
     }
 
     /// Returns the current UTC date time
     pub fn now() -> Result<Self> {
-        Self::from_unix_time(SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs().try_into()?)
+        Self::from_unix_time(U::from_duration(&SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?)?)
     }
 
     /// Project the UTC date time into a time zone.
     ///
     /// Leap seconds are not preserved.
     ///
-    pub fn project(&self, time_zone: &TimeZone) -> Result<DateTime> {
+    pub fn project(&self, time_zone: &TimeZone) -> Result<DateTime<U>> {
         let unix_time = self.unix_time();
-        let local_time_type = time_zone.find_local_time_type(unix_time)?;
+        let local_time_type = time_zone.find_local_time_type(unix_time.get_seconds()?)?;
 
-        let utc_date_time_with_offset = UtcDateTime::from_unix_time(unix_time + local_time_type.ut_offset() as i64)?;
+        let utc_date_time_with_offset = UtcDateTime::from_unix_time(unix_time.add_seconds(local_time_type.ut_offset() as i64)?)?;
 
         Ok(DateTime {
             year: utc_date_time_with_offset.year,
@@ -158,7 +166,7 @@ impl UtcDateTime {
     }
 
     /// Returns the Unix time in seconds associated to the UTC date time
-    pub fn unix_time(&self) -> i64 {
+    pub fn unix_time(&self) -> U {
         use crate::constants::*;
 
         let mut result = days_since_unix_epoch(self.year, self.month.into(), self.month_day.into());
@@ -169,13 +177,13 @@ impl UtcDateTime {
         result *= SECONDS_PER_MINUTE;
         result += self.second as i64;
 
-        result
+        U::from_seconds(result, self.nanoseconds)
     }
 }
 
 /// Date time associated to a local time type, exprimed in the [proleptic gregorian calendar](https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar)
 #[derive(Debug, Clone)]
-pub struct DateTime {
+pub struct DateTime<U: UnixTime = i64> {
     /// Years since 1900
     year: i32,
     /// Month in `[0, 11]`
@@ -191,28 +199,28 @@ pub struct DateTime {
     /// Local time type
     local_time_type: LocalTimeType,
     /// UTC Unix time in seconds
-    unix_time: i64,
+    unix_time: U,
 }
 
-impl PartialEq for DateTime {
+impl<U: UnixTime> PartialEq for DateTime<U> {
     fn eq(&self, other: &Self) -> bool {
         self.unix_time == other.unix_time
     }
 }
 
-impl PartialOrd for DateTime {
+impl<U: UnixTime> PartialOrd for DateTime<U> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.unix_time.partial_cmp(&other.unix_time)
     }
 }
 
-impl DateTime {
+impl<U: UnixTime> DateTime<U> {
     /// Returns the current date time associated to the specified time zone
     pub fn now(time_zone: &TimeZone) -> Result<Self> {
-        let unix_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs().try_into()?;
-        let local_time_type = time_zone.find_local_time_type(unix_time)?;
+        let unix_time = U::from_duration(&SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?)?;
+        let local_time_type = time_zone.find_local_time_type(unix_time.get_seconds()?)?;
 
-        let utc_date_time_with_offset = UtcDateTime::from_unix_time(unix_time + local_time_type.ut_offset() as i64)?;
+        let utc_date_time_with_offset = UtcDateTime::from_unix_time(unix_time.add_seconds(local_time_type.ut_offset() as i64)?)?;
 
         Ok(DateTime {
             year: utc_date_time_with_offset.year,
@@ -231,9 +239,11 @@ impl DateTime {
     /// Leap seconds are not preserved.
     ///
     pub fn project(&self, time_zone: &TimeZone) -> Result<Self> {
-        let local_time_type = time_zone.find_local_time_type(self.unix_time)?;
+        let local_time_type = time_zone.find_local_time_type(self.unix_time.get_seconds()?)?;
 
-        let utc_date_time_with_offset = UtcDateTime::from_unix_time(self.unix_time + local_time_type.ut_offset() as i64)?;
+        let utc_date_time_with_offset = UtcDateTime::from_unix_time(
+            self.unix_time.add_seconds(local_time_type.ut_offset() as i64)?
+        )?;
 
         Ok(DateTime {
             year: utc_date_time_with_offset.year,
@@ -253,15 +263,15 @@ impl DateTime {
     }
 
     /// Returns UTC Unix time in seconds
-    pub fn unix_time(&self) -> i64 {
+    pub fn unix_time(&self) -> U {
         self.unix_time
     }
 }
 
 /// Macro for implementing date time getters
 macro_rules! impl_datetime {
-    ($struct_name:ty) => {
-        impl $struct_name {
+    ($struct_name:ident) => {
+        impl<U: UnixTime> $struct_name::<U> {
             /// Returns year
             pub fn full_year(&self) -> i32 {
                 self.year + 1900
@@ -398,7 +408,7 @@ pub(crate) fn days_since_unix_epoch(year: i32, month: usize, month_day: i64) -> 
 mod test {
     use super::*;
 
-    fn check_equal_date_time(x: &DateTime, y: &DateTime) {
+    fn check_equal_date_time<U: UnixTime>(x: &DateTime<U>, y: &DateTime<U>) {
         assert_eq!(x.year, y.year);
         assert_eq!(x.month, y.month);
         assert_eq!(x.month_day, y.month_day);
@@ -420,9 +430,9 @@ mod test {
         let time_zone_eet = TimeZone::fixed(7200);
         let eet = LocalTimeType::with_ut_offset(7200);
 
-        assert_eq!(DateTime::now(&time_zone_utc)?.local_time_type().ut_offset(), 0);
-        assert_eq!(DateTime::now(&time_zone_cet)?.local_time_type().ut_offset(), 3600);
-        assert_eq!(DateTime::now(&time_zone_eet)?.local_time_type().ut_offset(), 7200);
+        assert_eq!(DateTime::<i64>::now(&time_zone_utc)?.local_time_type().ut_offset(), 0);
+        assert_eq!(DateTime::<i64>::now(&time_zone_cet)?.local_time_type().ut_offset(), 3600);
+        assert_eq!(DateTime::<i64>::now(&time_zone_eet)?.local_time_type().ut_offset(), 7200);
 
         let unix_times = [
             -93750523200,
@@ -533,7 +543,7 @@ mod test {
 
     #[test]
     fn test_date_time_leap_seconds() -> Result<()> {
-        let utc_date_time = UtcDateTime::new(1972, 5, 30, 23, 59, 60)?;
+        let utc_date_time = UtcDateTime::new(1972, 5, 30, 23, 59, 60, ())?;
         let date_time = utc_date_time.project(&TimeZone::fixed(-3600))?;
 
         let date_time_result = DateTime {
@@ -604,14 +614,15 @@ mod test {
     #[test]
     fn test_date_time_sync_and_send() {
         trait AssertSyncSendStatic: Sync + Send + 'static {}
-        impl AssertSyncSendStatic for DateTime {}
+        impl AssertSyncSendStatic for DateTime::<i64> {}
+        impl AssertSyncSendStatic for DateTime::<f64> {}
     }
 
     #[test]
     fn test_utc_date_time_ord() -> Result<()> {
-        let utc_date_time_1 = UtcDateTime::new(1972, 5, 30, 23, 59, 59)?;
-        let utc_date_time_2 = UtcDateTime::new(1972, 5, 30, 23, 59, 60)?;
-        let utc_date_time_3 = UtcDateTime::new(1972, 6, 1, 0, 0, 0)?;
+        let utc_date_time_1 = UtcDateTime::<i64>::new(1972, 5, 30, 23, 59, 59, ())?;
+        let utc_date_time_2 = UtcDateTime::<i64>::new(1972, 5, 30, 23, 59, 60, ())?;
+        let utc_date_time_3 = UtcDateTime::<i64>::new(1972, 6, 1, 0, 0, 0, ())?;
 
         assert_eq!(utc_date_time_1.cmp(&utc_date_time_1), Ordering::Equal);
         assert_eq!(utc_date_time_1.cmp(&utc_date_time_2), Ordering::Less);

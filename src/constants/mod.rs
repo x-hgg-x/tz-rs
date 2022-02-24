@@ -1,5 +1,7 @@
 //! Some useful constants.
 
+/// Number of nanoseconds in one second
+pub const NANOSECONDS_PER_SECOND: i64 = 1_000_000_000;
 /// Number of seconds in one minute
 pub const SECONDS_PER_MINUTE: i64 = 60;
 /// Number of minutes in one hour
