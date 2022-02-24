@@ -4,7 +4,7 @@ mod unix_time;
 
 use crate::error::*;
 use crate::{LocalTimeType, TimeZone};
-pub use self::unix_time::UnixTime;
+pub use self::unix_time::*;
 
 use std::cmp::Ordering;
 use std::time::SystemTime;

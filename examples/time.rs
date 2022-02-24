@@ -44,8 +44,12 @@ fn main() -> Result<()> {
     let current_utc_date_time = UtcDateTime::<i64>::now()?;
     println!("{:?}", current_utc_date_time);
 
-    // Get the current UTC date time (with sub-second times)
+    // Get the current UTC date time (with sub-second times [float])
     let current_utc_date_time = UtcDateTime::<f64>::now()?;
+    println!("{:?}", current_utc_date_time);
+
+    // Get the current UTC date time (with sub-second times [fixed-point])
+    let current_utc_date_time = UtcDateTime::<FixedPoint>::now()?;
     println!("{:?}", current_utc_date_time);
 
     // Create a new UTC date time (2000-01-01T00:00:00Z)
@@ -72,8 +76,9 @@ fn main() -> Result<()> {
 
     // Get the current date time at the local time zone (UNIX only)
     let time_zone_local = TimeZone::local()?;
-    let date_time = DateTime::<i64>::now(&time_zone_local)?;
-    println!("{:#?}", date_time);
+    println!("Local time (integer): {:#?}", DateTime::<i64>::now(&time_zone_local)?);
+    println!("Local time (floating pont): {:#?}", DateTime::<f64>::now(&time_zone_local)?);
+    println!("Local time (fixed point): {:#?}", DateTime::<FixedPoint>::now(&time_zone_local)?);
 
     Ok(())
 }

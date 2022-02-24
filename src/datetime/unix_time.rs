@@ -1,3 +1,4 @@
+use std::ops::Deref;
 use std::time::Duration;
 
 use crate::constants::NANOSECONDS_PER_SECOND;
@@ -93,6 +94,66 @@ impl UnixTime for f64 {
             true => result as u32,
             false => 0_u32,
         }
+    }
+
+    fn validate_nanoseconds(nanos: Self::Nanoseconds) -> Result<()> {
+        match nanos < NANOSECONDS_PER_SECOND as _ {
+            true => Ok(()),
+            false => Err(TzError::InvalidDateTime("invalid nanoseconds")),
+        }
+    }
+}
+
+/// A UnixTime implemented by as a fixed point number with a factor of 1_000_000_000
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct FixedPoint {
+    /// Nanoseconds since 1970-01-01 00:00:00.
+    pub nanoseconds: i128,
+}
+
+impl Deref for FixedPoint {
+    type Target = i128;
+
+    fn deref(&self) -> &Self::Target {
+        &self.nanoseconds
+    }
+}
+
+impl UnixTime for FixedPoint {
+    type Nanoseconds = u32;
+
+    fn from_seconds(secs: i64, nanos: Self::Nanoseconds) -> Self {
+        Self {
+            nanoseconds: secs as i128 * NANOSECONDS_PER_SECOND as i128 + nanos as i128,
+        }
+    }
+
+    fn from_duration(duration: &Duration) -> Result<Self> {
+        Ok(Self {
+            nanoseconds: duration.as_nanos().try_into()?,
+        })
+    }
+
+    fn add_seconds(self, seconds: i64) -> Result<Self> {
+        const MIN: i128 = i64::MIN as i128 * NANOSECONDS_PER_SECOND as i128;
+        const MAX: i128 = i64::MAX as i128 * NANOSECONDS_PER_SECOND as i128;
+
+        let result = match seconds >= 0 {
+            true => self.checked_add(seconds as i128),
+            false => self.checked_sub(-(seconds as i128)),
+        };
+        match result.ok_or(TzError::InvalidDateTime("invalid nanoseconds"))? {
+            nanoseconds @ (MIN..=MAX) => Ok(Self { nanoseconds }),
+            _ => Err(TzError::InvalidDateTime("invalid nanoseconds")),
+        }
+    }
+
+    fn get_seconds(self) -> Result<i64> {
+        Ok((self.nanoseconds / NANOSECONDS_PER_SECOND as i128) as i64)
+    }
+
+    fn get_nanoseconds(self) -> Self::Nanoseconds {
+        (self.nanoseconds % NANOSECONDS_PER_SECOND as i128) as u32
     }
 
     fn validate_nanoseconds(nanos: Self::Nanoseconds) -> Result<()> {
