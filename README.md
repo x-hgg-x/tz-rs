@@ -1,6 +1,7 @@
 # tz-rs
 
 [![version](https://img.shields.io/crates/v/tz-rs?color=blue&style=flat-square)](https://crates.io/crates/tz-rs)
+[![Documentation](https://docs.rs/tz-rs/badge.svg)](https://docs.rs/tz-rs)
 
 A pure Rust reimplementation of libc functions [`localtime`](https://en.cppreference.com/w/c/chrono/localtime), [`gmtime`](https://en.cppreference.com/w/c/chrono/gmtime) and [`mktime`](https://en.cppreference.com/w/c/chrono/mktime).
 
