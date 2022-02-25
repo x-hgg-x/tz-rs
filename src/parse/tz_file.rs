@@ -1,9 +1,9 @@
 //! Functions used for parsing a TZif file.
 
 use super::tz_string::parse_posix_tz;
+use crate::error::{TzError, TzFileError};
 use crate::timezone::*;
 use crate::utils::*;
-use crate::{TzError, TzFileError};
 
 use std::fs::File;
 use std::io;
@@ -154,7 +154,8 @@ impl<'a> DataBlock<'a> {
             transitions.push(Transition::new(unix_leap_time, local_time_type_index));
         }
 
-        let mut local_time_types_iter = self.local_time_types.chunks_exact(6).map(|arr| -> Result<LocalTimeType, TzError> {
+        let mut local_time_types = Vec::with_capacity(header.type_count);
+        for arr in self.local_time_types.chunks_exact(6) {
             let ut_offset = i32::from_be_bytes(arr[0..4].try_into()?);
 
             let is_dst = match arr[4] {
@@ -181,14 +182,8 @@ impl<'a> DataBlock<'a> {
                 }
             };
 
-            LocalTimeType::new(ut_offset, is_dst, time_zone_designation)
-        });
-
-        let local_time_types = match local_time_types_iter.next() {
-            Some(Ok(first)) => NonEmptyVec { first, tail: Result::from_iter(local_time_types_iter)? },
-            Some(Err(error)) => return Err(error),
-            None => return Err(TzFileError::EmptyVectorError.into()),
-        };
+            local_time_types.push(LocalTimeType::new(ut_offset, is_dst, time_zone_designation)?);
+        }
 
         let mut leap_seconds = Vec::with_capacity(header.leap_count);
         for arr in self.leap_seconds.chunks_exact(self.time_size + 4) {
@@ -207,7 +202,7 @@ impl<'a> DataBlock<'a> {
 
         let extra_rule = footer.and_then(|footer| parse_footer(footer, header.version == Version::V3).transpose()).transpose()?;
 
-        TimeZone::new(transitions, local_time_types, leap_seconds, extra_rule)
+        Ok(TimeZone::new(transitions, local_time_types, leap_seconds, extra_rule)?)
     }
 }
 
@@ -276,7 +271,7 @@ mod test {
 
         let time_zone_result = TimeZone::new(
             Vec::new(),
-            NonEmptyVec::one(LocalTimeType::new(0, false, Some("UTC".into()))?),
+            vec![LocalTimeType::new(0, false, Some("UTC".into()))?],
             vec![
                 LeapSecond::new(78796800, 1),
                 LeapSecond::new(94694401, 2),
@@ -330,16 +325,14 @@ mod test {
                 Transition::new(-765376200, 1),
                 Transition::new(-712150200, 5),
             ],
-            NonEmptyVec {
-                first: LocalTimeType::new(-37886, false, Some("LMT".into()))?,
-                tail: vec![
-                    LocalTimeType::new(-37800, false, Some("HST".into()))?,
-                    LocalTimeType::new(-34200, true, Some("HDT".into()))?,
-                    LocalTimeType::new(-34200, true, Some("HWT".into()))?,
-                    LocalTimeType::new(-34200, true, Some("HPT".into()))?,
-                    LocalTimeType::new(-36000, false, Some("HST".into()))?,
-                ],
-            },
+            vec![
+                LocalTimeType::new(-37886, false, Some("LMT".into()))?,
+                LocalTimeType::new(-37800, false, Some("HST".into()))?,
+                LocalTimeType::new(-34200, true, Some("HDT".into()))?,
+                LocalTimeType::new(-34200, true, Some("HWT".into()))?,
+                LocalTimeType::new(-34200, true, Some("HPT".into()))?,
+                LocalTimeType::new(-36000, false, Some("HST".into()))?,
+            ],
             Vec::new(),
             Some(TransitionRule::Fixed(LocalTimeType::new(-36000, false, Some("HST".into()))?)),
         )?;
@@ -360,7 +353,7 @@ mod test {
 
         let time_zone_result = TimeZone::new(
             vec![Transition::new(2145916800, 0)],
-            NonEmptyVec::one(LocalTimeType::new(7200, false, Some("IST".into()))?),
+            vec![LocalTimeType::new(7200, false, Some("IST".into()))?],
             Vec::new(),
             Some(TransitionRule::Alternate(AlternateTime::new(
                 LocalTimeType::new(7200, false, Some("IST".into()))?,

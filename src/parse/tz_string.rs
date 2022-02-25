@@ -1,8 +1,8 @@
 //! Functions used for parsing a TZ string.
 
+use crate::error::{TzError, TzStringError};
 use crate::timezone::*;
 use crate::utils::*;
-use crate::{TzError, TzStringError};
 
 use std::num::ParseIntError;
 use std::str::{self, FromStr};
@@ -80,7 +80,7 @@ fn parse_rule_day(cursor: &mut Cursor) -> Result<RuleDay, TzError> {
     match cursor.remaining().get(0) {
         Some(b'J') => {
             cursor.read_exact(1)?;
-            Ok(RuleDay::Julian1WithoutLeap(parse_int(cursor.read_while(u8::is_ascii_digit)?)?))
+            Ok(RuleDay::Julian1WithoutLeap(Julian1WithoutLeap::new(parse_int(cursor.read_while(u8::is_ascii_digit)?)?)?))
         }
         Some(b'M') => {
             cursor.read_exact(1)?;
@@ -93,7 +93,7 @@ fn parse_rule_day(cursor: &mut Cursor) -> Result<RuleDay, TzError> {
 
             Ok(RuleDay::MonthWeekDay(MonthWeekDay::new(month, week, week_day)?))
         }
-        _ => Ok(RuleDay::Julian0WithLeap(parse_int(cursor.read_while(u8::is_ascii_digit)?)?)),
+        _ => Ok(RuleDay::Julian0WithLeap(Julian0WithLeap::new(parse_int(cursor.read_while(u8::is_ascii_digit)?)?)?)),
     }
 }
 
@@ -219,9 +219,9 @@ mod test {
         let transition_rule_result = TransitionRule::Alternate(AlternateTime::new(
             LocalTimeType::new(-10800, false, Some("-03".into()))?,
             LocalTimeType::new(10800, true, Some("+03".into()))?,
-            RuleDay::Julian1WithoutLeap(1),
+            RuleDay::Julian1WithoutLeap(Julian1WithoutLeap::new(1)?),
             7200,
-            RuleDay::Julian1WithoutLeap(365),
+            RuleDay::Julian1WithoutLeap(Julian1WithoutLeap::new(365)?),
             7200,
         )?);
 
@@ -303,9 +303,9 @@ mod test {
         let transition_rule_result = TransitionRule::Alternate(AlternateTime::new(
             LocalTimeType::new(-18000, false, Some("EST".into()))?,
             LocalTimeType::new(-14400, true, Some("EDT".into()))?,
-            RuleDay::Julian0WithLeap(0),
+            RuleDay::Julian0WithLeap(Julian0WithLeap::new(0)?),
             0,
-            RuleDay::Julian1WithoutLeap(365),
+            RuleDay::Julian1WithoutLeap(Julian1WithoutLeap::new(365)?),
             90000,
         )?);
 

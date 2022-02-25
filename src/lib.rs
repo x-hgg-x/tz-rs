@@ -114,12 +114,22 @@
 //! ```
 
 mod constants;
-mod datetime;
-mod error;
 mod parse;
-mod timezone;
 mod utils;
 
-pub use datetime::*;
-pub use error::*;
-pub use timezone::*;
+pub mod datetime;
+pub mod error;
+pub mod timezone;
+
+pub use datetime::{DateTime, UtcDateTime};
+pub use error::TzError;
+pub use timezone::TimeZone;
+
+/// Types related to a static time zone and a static date time.
+pub mod statics {
+    pub use crate::datetime::statics::*;
+    pub use crate::timezone::statics::*;
+}
+
+/// Alias for [`std::result::Result`] with the crate unified error
+pub type Result<T> = std::result::Result<T, TzError>;

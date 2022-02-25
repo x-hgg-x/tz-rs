@@ -6,7 +6,6 @@ use std::fmt;
 use std::io;
 use std::num::ParseIntError;
 use std::num::TryFromIntError;
-use std::result;
 use std::str::Utf8Error;
 use std::time::SystemTimeError;
 
@@ -27,7 +26,7 @@ pub enum TzStringError {
 }
 
 impl fmt::Display for TzStringError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> result::Result<(), fmt::Error> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         match self {
             Self::Utf8Error(error) => error.fmt(f),
             Self::ParseIntError(error) => error.fmt(f),
@@ -66,8 +65,6 @@ pub enum TzFileError {
     TryFromSliceError(TryFromSliceError),
     /// I/O error
     IoError(io::Error),
-    /// Empty vector error
-    EmptyVectorError,
     /// Unified error for parsing a TZ string
     TzStringError(TzStringError),
     /// Invalid TZif file
@@ -77,11 +74,10 @@ pub enum TzFileError {
 }
 
 impl fmt::Display for TzFileError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> result::Result<(), fmt::Error> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         match self {
             Self::TryFromSliceError(error) => error.fmt(f),
             Self::IoError(error) => error.fmt(f),
-            Self::EmptyVectorError => write!(f, "vector must be non-empty"),
             Self::TzStringError(error) => error.fmt(f),
             Self::InvalidTzFile(error) => write!(f, "invalid TZ file: {}", error),
             Self::UnsupportedTzFile(error) => write!(f, "unsupported TZ file: {}", error),
@@ -109,14 +105,51 @@ impl From<TzStringError> for TzFileError {
     }
 }
 
+macro_rules! create_error {
+    (#[$doc:meta], $name:ident) => {
+        #[$doc]
+        #[derive(Debug)]
+        pub struct $name(
+            /// Error description
+            pub &'static str,
+        );
+
+        impl fmt::Display for $name {
+            fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+                self.0.fmt(f)
+            }
+        }
+
+        impl error::Error for $name {}
+    };
+}
+
+create_error!(#[doc = "Integer conversion error"], ConversionError);
+create_error!(#[doc = "Local time type error"], LocalTimeTypeError);
+create_error!(#[doc = "Transition rule error"], TransitionRuleError);
+create_error!(#[doc = "Time zone error"], TimeZoneError);
+create_error!(#[doc = "Date time error"], DateTimeError);
+create_error!(#[doc = "Local time type search error"], FindLocalTimeTypeError);
+create_error!(#[doc = "Date time projection error"], ProjectDateTimeError);
+
+impl From<ConversionError> for ProjectDateTimeError {
+    fn from(error: ConversionError) -> Self {
+        Self(error.0)
+    }
+}
+
+impl From<FindLocalTimeTypeError> for ProjectDateTimeError {
+    fn from(error: FindLocalTimeTypeError) -> Self {
+        Self(error.0)
+    }
+}
+
 /// Unified error type for everything in the crate
 #[non_exhaustive]
 #[derive(Debug)]
 pub enum TzError {
     /// UTF-8 error
     Utf8Error(Utf8Error),
-    /// Integer conversion error
-    ConversionError(TryFromIntError),
     /// Conversion from slice to array error
     TryFromSliceError(TryFromSliceError),
     /// I/O error
@@ -127,33 +160,38 @@ pub enum TzError {
     TzFileError(TzFileError),
     /// Unified error for parsing a TZ string
     TzStringError(TzStringError),
-    /// Date time is invalid
-    InvalidDateTime(&'static str),
-    /// Local time type is invalid
-    InvalidLocalTimeType(&'static str),
-    /// Transition rule is invalid
-    InvalidTransitionRule(&'static str),
-    /// Time zone is invalid
-    InvalidTimeZone(&'static str),
-    /// No available local time type
-    NoLocalTimeType,
+    /// Integer conversion error
+    ConversionError(ConversionError),
+    /// Local time type error
+    LocalTimeTypeError(LocalTimeTypeError),
+    /// Transition rule error
+    TransitionRuleError(TransitionRuleError),
+    /// Time zone error
+    TimeZoneError(TimeZoneError),
+    /// Date time error
+    DateTimeError(DateTimeError),
+    /// Local time type find error
+    FindLocalTimeTypeError(FindLocalTimeTypeError),
+    /// Date time projection error
+    ProjectDateTimeError(ProjectDateTimeError),
 }
 
 impl fmt::Display for TzError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::Utf8Error(error) => error.fmt(f),
-            Self::ConversionError(error) => error.fmt(f),
             Self::TryFromSliceError(error) => error.fmt(f),
             Self::IoError(error) => error.fmt(f),
             Self::SystemTimeError(error) => error.fmt(f),
             Self::TzFileError(error) => error.fmt(f),
             Self::TzStringError(error) => error.fmt(f),
-            Self::InvalidDateTime(error) => write!(f, "invalid date time: {}", error),
-            Self::InvalidLocalTimeType(error) => write!(f, "invalid local time type: {}", error),
-            Self::InvalidTransitionRule(error) => write!(f, "invalid transition rule: {}", error),
-            Self::InvalidTimeZone(error) => write!(f, "invalid time zone: {}", error),
-            Self::NoLocalTimeType => write!(f, "no local time type is available for the specified timestamp"),
+            Self::ConversionError(error) => error.fmt(f),
+            Self::LocalTimeTypeError(error) => write!(f, "invalid local time type: {}", error),
+            Self::TransitionRuleError(error) => write!(f, "invalid transition rule: {}", error),
+            Self::TimeZoneError(error) => write!(f, "invalid time zone: {}", error),
+            Self::DateTimeError(error) => write!(f, "invalid date time: {}", error),
+            Self::FindLocalTimeTypeError(error) => error.fmt(f),
+            Self::ProjectDateTimeError(error) => error.fmt(f),
         }
     }
 }
@@ -163,12 +201,6 @@ impl error::Error for TzError {}
 impl From<Utf8Error> for TzError {
     fn from(error: Utf8Error) -> Self {
         Self::Utf8Error(error)
-    }
-}
-
-impl From<TryFromIntError> for TzError {
-    fn from(error: TryFromIntError) -> Self {
-        Self::ConversionError(error)
     }
 }
 
@@ -202,5 +234,50 @@ impl From<TzStringError> for TzError {
     }
 }
 
-/// Alias for [`std::result::Result`] with the crate unified error
-pub type Result<T> = result::Result<T, TzError>;
+impl From<ConversionError> for TzError {
+    fn from(error: ConversionError) -> Self {
+        Self::ConversionError(error)
+    }
+}
+
+impl From<TryFromIntError> for TzError {
+    fn from(_: TryFromIntError) -> Self {
+        Self::ConversionError(ConversionError("out of range integer conversion"))
+    }
+}
+
+impl From<LocalTimeTypeError> for TzError {
+    fn from(error: LocalTimeTypeError) -> Self {
+        Self::LocalTimeTypeError(error)
+    }
+}
+
+impl From<TransitionRuleError> for TzError {
+    fn from(error: TransitionRuleError) -> Self {
+        Self::TransitionRuleError(error)
+    }
+}
+
+impl From<TimeZoneError> for TzError {
+    fn from(error: TimeZoneError) -> Self {
+        Self::TimeZoneError(error)
+    }
+}
+
+impl From<DateTimeError> for TzError {
+    fn from(error: DateTimeError) -> Self {
+        Self::DateTimeError(error)
+    }
+}
+
+impl From<FindLocalTimeTypeError> for TzError {
+    fn from(error: FindLocalTimeTypeError) -> Self {
+        Self::FindLocalTimeTypeError(error)
+    }
+}
+
+impl From<ProjectDateTimeError> for TzError {
+    fn from(error: ProjectDateTimeError) -> Self {
+        Self::ProjectDateTimeError(error)
+    }
+}

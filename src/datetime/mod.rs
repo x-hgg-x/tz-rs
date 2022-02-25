@@ -1,9 +1,13 @@
 //! Types related to a date time.
 
+pub(crate) mod statics;
+
 use crate::error::*;
-use crate::{LocalTimeType, TimeZone};
+use crate::timezone::{GenericLocalTimeType, TimeZone};
+use crate::utils::*;
 
 use std::cmp::Ordering;
+use std::sync::Arc;
 use std::time::SystemTime;
 
 /// UTC date time exprimed in the [proleptic gregorian calendar](https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar)
@@ -35,25 +39,25 @@ impl UtcDateTime {
     /// * `minute`: Minutes in `[0, 59]`
     /// * `second`: Seconds in `[0, 60]`, with a possible leap second
     ///
-    pub fn new(full_year: i32, month: u8, month_day: u8, hour: u8, minute: u8, second: u8) -> Result<Self> {
+    pub const fn new(full_year: i32, month: u8, month_day: u8, hour: u8, minute: u8, second: u8) -> Result<Self, DateTimeError> {
         use crate::constants::*;
 
         let year = full_year - 1900;
 
-        if !(0..=11).contains(&month) {
-            return Err(TzError::InvalidDateTime("invalid month"));
+        if month > 11 {
+            return Err(DateTimeError("invalid month"));
         }
-        if !(1..=31).contains(&month_day) {
-            return Err(TzError::InvalidDateTime("invalid month day"));
+        if !(1 <= month_day && month_day <= 31) {
+            return Err(DateTimeError("invalid month day"));
         }
-        if !(0..=23).contains(&hour) {
-            return Err(TzError::InvalidDateTime("invalid hour"));
+        if hour > 23 {
+            return Err(DateTimeError("invalid hour"));
         }
-        if !(0..=59).contains(&minute) {
-            return Err(TzError::InvalidDateTime("invalid minute"));
+        if minute > 59 {
+            return Err(DateTimeError("invalid minute"));
         }
-        if !(0..=60).contains(&second) {
-            return Err(TzError::InvalidDateTime("invalid second"));
+        if second > 60 {
+            return Err(DateTimeError("invalid second"));
         }
 
         let leap = is_leap_year(year) as i64;
@@ -64,14 +68,14 @@ impl UtcDateTime {
         }
 
         if month_day as i64 > day_in_month {
-            return Err(TzError::InvalidDateTime("invalid month day"));
+            return Err(DateTimeError("invalid month day"));
         }
 
         Ok(Self { year, month, month_day, hour, minute, second })
     }
 
     /// Construct a UTC date time from a Unix time in seconds
-    pub fn from_unix_time(unix_time: i64) -> Result<Self> {
+    pub const fn from_unix_time(unix_time: i64) -> Result<Self, ConversionError> {
         use crate::constants::*;
 
         let seconds = unix_time - UNIX_OFFSET_SECS;
@@ -89,28 +93,30 @@ impl UtcDateTime {
             cycles_400_years -= 1;
         }
 
-        let cycles_100_years = (remaining_days / DAYS_PER_100_YEARS).min(3);
+        let cycles_100_years = min(remaining_days / DAYS_PER_100_YEARS, 3);
         remaining_days -= cycles_100_years * DAYS_PER_100_YEARS;
 
-        let cycles_4_years = (remaining_days / DAYS_PER_4_YEARS).min(24);
+        let cycles_4_years = min(remaining_days / DAYS_PER_4_YEARS, 24);
         remaining_days -= cycles_4_years * DAYS_PER_4_YEARS;
 
-        let remaining_years = (remaining_days / DAYS_PER_NORMAL_YEAR).min(3);
+        let remaining_years = min(remaining_days / DAYS_PER_NORMAL_YEAR, 3);
         remaining_days -= remaining_years * DAYS_PER_NORMAL_YEAR;
 
         let mut year = OFFSET_YEARS + remaining_years + cycles_4_years * 4 + cycles_100_years * 100 + cycles_400_years * 400;
 
-        let mut month = 2;
-        for days in DAY_IN_MONTHS_LEAP_YEAR_FROM_MARCH {
+        let mut month = 0;
+        while month < DAY_IN_MONTHS_LEAP_YEAR_FROM_MARCH.len() {
+            let days = DAY_IN_MONTHS_LEAP_YEAR_FROM_MARCH[month];
             if remaining_days < days {
                 break;
             }
             remaining_days -= days;
             month += 1;
         }
+        month += 2;
 
-        if month >= MONTHS_PER_YEAR {
-            month -= MONTHS_PER_YEAR;
+        if month >= MONTHS_PER_YEAR as usize {
+            month -= MONTHS_PER_YEAR as usize;
             year += 1;
         }
 
@@ -120,48 +126,24 @@ impl UtcDateTime {
         let minute = (remaining_seconds / SECONDS_PER_MINUTE) % MINUTES_PER_HOUR;
         let second = remaining_seconds % SECONDS_PER_MINUTE;
 
-        Ok(Self {
-            year: year.try_into()?,
-            month: month.try_into()?,
-            month_day: month_day.try_into()?,
-            hour: hour.try_into()?,
-            minute: minute.try_into()?,
-            second: second.try_into()?,
-        })
+        let year = match try_into_i32(year) {
+            Ok(year) => year,
+            Err(error) => return Err(error),
+        };
+
+        Ok(Self { year, month: month as u8, month_day: month_day as u8, hour: hour as u8, minute: minute as u8, second: second as u8 })
     }
 
     /// Returns the current UTC date time
-    pub fn now() -> Result<Self> {
-        Self::from_unix_time(SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs().try_into()?)
-    }
-
-    /// Project the UTC date time into a time zone.
-    ///
-    /// Leap seconds are not preserved.
-    ///
-    pub fn project(&self, time_zone: &TimeZone) -> Result<DateTime> {
-        let unix_time = self.unix_time();
-        let local_time_type = time_zone.find_local_time_type(unix_time)?;
-
-        let utc_date_time_with_offset = UtcDateTime::from_unix_time(unix_time + local_time_type.ut_offset() as i64)?;
-
-        Ok(DateTime {
-            year: utc_date_time_with_offset.year,
-            month: utc_date_time_with_offset.month,
-            month_day: utc_date_time_with_offset.month_day,
-            hour: utc_date_time_with_offset.hour,
-            minute: utc_date_time_with_offset.minute,
-            second: utc_date_time_with_offset.second,
-            local_time_type: local_time_type.clone(),
-            unix_time,
-        })
+    pub fn now() -> Result<Self, TzError> {
+        Ok(Self::from_unix_time(SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs().try_into()?)?)
     }
 
     /// Returns the Unix time in seconds associated to the UTC date time
-    pub fn unix_time(&self) -> i64 {
+    pub const fn unix_time(&self) -> i64 {
         use crate::constants::*;
 
-        let mut result = days_since_unix_epoch(self.year, self.month.into(), self.month_day.into());
+        let mut result = days_since_unix_epoch(self.year, self.month as usize, self.month_day as i64);
         result *= HOURS_PER_DAY;
         result += self.hour as i64;
         result *= MINUTES_PER_HOUR;
@@ -171,11 +153,24 @@ impl UtcDateTime {
 
         result
     }
+
+    /// Project the UTC date time into a time zone.
+    ///
+    /// Leap seconds are not preserved.
+    ///
+    pub fn project(&self, time_zone: &TimeZone) -> Result<DateTime, ProjectDateTimeError> {
+        let unix_time = self.unix_time();
+        let local_time_type = time_zone.find_local_time_type(unix_time)?.clone();
+
+        let utc_date_time_with_offset = UtcDateTime::from_unix_time(unix_time + local_time_type.ut_offset() as i64)?;
+        let UtcDateTime { year, month, month_day, hour, minute, second } = utc_date_time_with_offset;
+        Ok(DateTime { year, month, month_day, hour, minute, second, local_time_type, unix_time })
+    }
 }
 
-/// Date time associated to a local time type, exprimed in the [proleptic gregorian calendar](https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar)
+/// Generic date time associated to a local time type, exprimed in the [proleptic gregorian calendar](https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar)
 #[derive(Debug, Clone)]
-pub struct DateTime {
+pub struct GenericDateTime<S> {
     /// Years since 1900
     year: i32,
     /// Month in `[0, 11]`
@@ -189,18 +184,21 @@ pub struct DateTime {
     /// Seconds in `[0, 60]`, with a possible leap second
     second: u8,
     /// Local time type
-    local_time_type: LocalTimeType,
+    local_time_type: GenericLocalTimeType<S>,
     /// UTC Unix time in seconds
     unix_time: i64,
 }
 
-impl PartialEq for DateTime {
+/// Date time associated to a local time type, exprimed in the [proleptic gregorian calendar](https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar)
+pub type DateTime = GenericDateTime<Arc<str>>;
+
+impl<S> PartialEq for GenericDateTime<S> {
     fn eq(&self, other: &Self) -> bool {
         self.unix_time == other.unix_time
     }
 }
 
-impl PartialOrd for DateTime {
+impl<S> PartialOrd for GenericDateTime<S> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.unix_time.partial_cmp(&other.unix_time)
     }
@@ -208,110 +206,95 @@ impl PartialOrd for DateTime {
 
 impl DateTime {
     /// Returns the current date time associated to the specified time zone
-    pub fn now(time_zone: &TimeZone) -> Result<Self> {
+    pub fn now(time_zone: &TimeZone) -> Result<Self, TzError> {
         let unix_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs().try_into()?;
-        let local_time_type = time_zone.find_local_time_type(unix_time)?;
-
+        let local_time_type = time_zone.find_local_time_type(unix_time)?.clone();
         let utc_date_time_with_offset = UtcDateTime::from_unix_time(unix_time + local_time_type.ut_offset() as i64)?;
 
-        Ok(DateTime {
-            year: utc_date_time_with_offset.year,
-            month: utc_date_time_with_offset.month,
-            month_day: utc_date_time_with_offset.month_day,
-            hour: utc_date_time_with_offset.hour,
-            minute: utc_date_time_with_offset.minute,
-            second: utc_date_time_with_offset.second,
-            local_time_type: local_time_type.clone(),
-            unix_time,
-        })
+        let UtcDateTime { year, month, month_day, hour, minute, second } = utc_date_time_with_offset;
+        Ok(DateTime { year, month, month_day, hour, minute, second, local_time_type, unix_time })
     }
 
     /// Project the date time into another time zone.
     ///
     /// Leap seconds are not preserved.
     ///
-    pub fn project(&self, time_zone: &TimeZone) -> Result<Self> {
-        let local_time_type = time_zone.find_local_time_type(self.unix_time)?;
-
+    pub fn project(&self, time_zone: &TimeZone) -> Result<Self, ProjectDateTimeError> {
+        let local_time_type = time_zone.find_local_time_type(self.unix_time)?.clone();
         let utc_date_time_with_offset = UtcDateTime::from_unix_time(self.unix_time + local_time_type.ut_offset() as i64)?;
 
-        Ok(DateTime {
-            year: utc_date_time_with_offset.year,
-            month: utc_date_time_with_offset.month,
-            month_day: utc_date_time_with_offset.month_day,
-            hour: utc_date_time_with_offset.hour,
-            minute: utc_date_time_with_offset.minute,
-            second: utc_date_time_with_offset.second,
-            local_time_type: local_time_type.clone(),
-            unix_time: self.unix_time,
-        })
-    }
-
-    /// Returns local time type
-    pub fn local_time_type(&self) -> &LocalTimeType {
-        &self.local_time_type
-    }
-
-    /// Returns UTC Unix time in seconds
-    pub fn unix_time(&self) -> i64 {
-        self.unix_time
+        let UtcDateTime { year, month, month_day, hour, minute, second } = utc_date_time_with_offset;
+        Ok(DateTime { year, month, month_day, hour, minute, second, local_time_type, unix_time: self.unix_time })
     }
 }
 
 /// Macro for implementing date time getters
 macro_rules! impl_datetime {
-    ($struct_name:ty) => {
-        impl $struct_name {
-            /// Returns year
-            pub fn full_year(&self) -> i32 {
-                self.year + 1900
-            }
+    () => {
+        /// Returns year
+        pub const fn full_year(&self) -> i32 {
+            self.year + 1900
+        }
 
-            /// Returns years since 1900
-            pub fn year(&self) -> i32 {
-                self.year
-            }
+        /// Returns years since 1900
+        pub const fn year(&self) -> i32 {
+            self.year
+        }
 
-            /// Returns month in `[0, 11]`
-            pub fn month(&self) -> u8 {
-                self.month
-            }
+        /// Returns month in `[0, 11]`
+        pub const fn month(&self) -> u8 {
+            self.month
+        }
 
-            /// Returns day of the month in `[1, 31]`
-            pub fn month_day(&self) -> u8 {
-                self.month_day
-            }
+        /// Returns day of the month in `[1, 31]`
+        pub const fn month_day(&self) -> u8 {
+            self.month_day
+        }
 
-            /// Returns hours since midnight in `[0, 23]`
-            pub fn hour(&self) -> u8 {
-                self.hour
-            }
+        /// Returns hours since midnight in `[0, 23]`
+        pub const fn hour(&self) -> u8 {
+            self.hour
+        }
 
-            /// Returns minutes in `[0, 59]`
-            pub fn minute(&self) -> u8 {
-                self.minute
-            }
+        /// Returns minutes in `[0, 59]`
+        pub const fn minute(&self) -> u8 {
+            self.minute
+        }
 
-            /// Returns seconds in `[0, 60]`, with a possible leap second
-            pub fn second(&self) -> u8 {
-                self.second
-            }
+        /// Returns seconds in `[0, 60]`, with a possible leap second
+        pub const fn second(&self) -> u8 {
+            self.second
+        }
 
-            /// Returns days since Sunday in `[0, 6]`
-            pub fn week_day(&self) -> u8 {
-                week_day(self.year, self.month.into(), self.month_day.into())
-            }
+        /// Returns days since Sunday in `[0, 6]`
+        pub const fn week_day(&self) -> u8 {
+            week_day(self.year, self.month as usize, self.month_day as i64)
+        }
 
-            /// Returns days since January 1 in `[0, 365]`
-            pub fn year_day(&self) -> u16 {
-                year_day(self.year, self.month.into(), self.month_day.into())
-            }
+        /// Returns days since January 1 in `[0, 365]`
+        pub const fn year_day(&self) -> u16 {
+            year_day(self.year, self.month as usize, self.month_day as i64)
         }
     };
 }
 
-impl_datetime!(UtcDateTime);
-impl_datetime!(DateTime);
+impl UtcDateTime {
+    impl_datetime!();
+}
+
+impl<S> GenericDateTime<S> {
+    impl_datetime!();
+
+    /// Returns local time type
+    pub const fn local_time_type(&self) -> &GenericLocalTimeType<S> {
+        &self.local_time_type
+    }
+
+    /// Returns UTC Unix time in seconds
+    pub const fn unix_time(&self) -> i64 {
+        self.unix_time
+    }
+}
 
 /// Compute the number of days since Sunday in `[0, 6]`
 ///
@@ -321,7 +304,7 @@ impl_datetime!(DateTime);
 /// * `month`: Month in `[0, 11]`
 /// * `month_day`: Day of the month in `[1, 31]`
 ///
-fn week_day(year: i32, month: usize, month_day: i64) -> u8 {
+const fn week_day(year: i32, month: usize, month_day: i64) -> u8 {
     use crate::constants::*;
 
     let days_since_unix_epoch = days_since_unix_epoch(year, month, month_day);
@@ -336,7 +319,7 @@ fn week_day(year: i32, month: usize, month_day: i64) -> u8 {
 /// * `month`: Month in `[0, 11]`
 /// * `month_day`: Day of the month in `[1, 31]`
 ///
-fn year_day(year: i32, month: usize, month_day: i64) -> u16 {
+const fn year_day(year: i32, month: usize, month_day: i64) -> u16 {
     use crate::constants::*;
 
     let leap = (month >= 2 && is_leap_year(year)) as i64;
@@ -349,7 +332,7 @@ fn year_day(year: i32, month: usize, month_day: i64) -> u16 {
 ///
 /// * `year`: Years since 1900
 ///
-pub(crate) fn is_leap_year(year: i32) -> bool {
+pub(crate) const fn is_leap_year(year: i32) -> bool {
     let full_year = 1900 + year;
     full_year % 400 == 0 || (full_year % 4 == 0 && full_year % 100 != 0)
 }
@@ -362,7 +345,7 @@ pub(crate) fn is_leap_year(year: i32) -> bool {
 /// * `month`: Month in `[0, 11]`
 /// * `month_day`: Day of the month in `[1, 31]`
 ///
-pub(crate) fn days_since_unix_epoch(year: i32, month: usize, month_day: i64) -> i64 {
+pub(crate) const fn days_since_unix_epoch(year: i32, month: usize, month_day: i64) -> i64 {
     use crate::constants::*;
 
     let is_leap_year = is_leap_year(year);
@@ -397,8 +380,12 @@ pub(crate) fn days_since_unix_epoch(year: i32, month: usize, month_day: i64) -> 
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::timezone::{LocalTimeType, TimeZone};
+    use crate::Result;
 
-    fn check_equal_date_time(x: &DateTime, y: &DateTime) {
+    use std::fmt::Debug;
+
+    fn check_equal_date_time<S: Debug + PartialEq>(x: &GenericDateTime<S>, y: &GenericDateTime<S>) {
         assert_eq!(x.year, y.year);
         assert_eq!(x.month, y.month);
         assert_eq!(x.month_day, y.month_day);
@@ -604,7 +591,7 @@ mod test {
     #[test]
     fn test_date_time_sync_and_send() {
         trait AssertSyncSendStatic: Sync + Send + 'static {}
-        impl AssertSyncSendStatic for DateTime {}
+        impl<S: Sync + Send + 'static> AssertSyncSendStatic for GenericDateTime<S> {}
     }
 
     #[test]
