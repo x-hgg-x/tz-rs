@@ -67,6 +67,13 @@ mod test {
         };
     }
 
+    macro_rules! to_const {
+        ($x:expr) => {{
+            const TMP: &[StaticLocalTimeType] = $x;
+            TMP
+        }};
+    }
+
     #[test]
     fn test_const() {
         const TIME_ZONE: StaticTimeZone = unwrap!(StaticTimeZone::new(
@@ -79,17 +86,14 @@ mod test {
                 Transition::new(-765376200, 1),
                 Transition::new(-712150200, 5),
             ],
-            {
-                const TMP: &[StaticLocalTimeType] = &[
-                    unwrap!(StaticLocalTimeType::new(-37886, false, Some("LMT"))),
-                    unwrap!(StaticLocalTimeType::new(-37800, false, Some("HST"))),
-                    unwrap!(StaticLocalTimeType::new(-34200, true, Some("HDT"))),
-                    unwrap!(StaticLocalTimeType::new(-34200, true, Some("HWT"))),
-                    unwrap!(StaticLocalTimeType::new(-34200, true, Some("HPT"))),
-                    unwrap!(StaticLocalTimeType::new(-36000, false, Some("HST"))),
-                ];
-                TMP
-            },
+            to_const!(&[
+                unwrap!(StaticLocalTimeType::new(-37886, false, Some("LMT"))),
+                unwrap!(StaticLocalTimeType::new(-37800, false, Some("HST"))),
+                unwrap!(StaticLocalTimeType::new(-34200, true, Some("HDT"))),
+                unwrap!(StaticLocalTimeType::new(-34200, true, Some("HWT"))),
+                unwrap!(StaticLocalTimeType::new(-34200, true, Some("HPT"))),
+                unwrap!(StaticLocalTimeType::new(-36000, false, Some("HST"))),
+            ]),
             &[
                 LeapSecond::new(78796800, 1),
                 LeapSecond::new(94694401, 2),
