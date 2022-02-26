@@ -128,7 +128,7 @@ impl<S> GenericLocalTimeType<S> {
     }
 }
 
-impl LocalTimeType {
+impl GenericLocalTimeType<Arc<str>> {
     /// Construct a local time type
     pub fn new(ut_offset: i32, is_dst: bool, time_zone_designation: Option<Arc<str>>) -> Result<Self, LocalTimeTypeError> {
         match Self::check_inputs(ut_offset, time_zone_designation.as_deref()) {
@@ -342,7 +342,7 @@ pub struct GenericAlternateTime<S> {
 /// Transition rule representing alternate local time types
 pub type AlternateTime = GenericAlternateTime<Arc<str>>;
 
-impl AlternateTime {
+impl GenericAlternateTime<Arc<str>> {
     /// Construct a transition rule representing alternate local time types
     pub fn new(
         std: LocalTimeType,

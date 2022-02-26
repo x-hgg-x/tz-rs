@@ -30,7 +30,7 @@ impl UtcDateTime {
 /// Static date time associated to a local time type, exprimed in the [proleptic gregorian calendar](https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar)
 pub type StaticDateTime = GenericDateTime<&'static str>;
 
-impl StaticDateTime {
+impl GenericDateTime<&'static str> {
     /// Project the date time into another time zone.
     ///
     /// Leap seconds are not preserved.

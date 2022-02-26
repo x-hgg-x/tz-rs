@@ -5,7 +5,7 @@ use super::*;
 /// Static local time type associated to a time zone
 pub type StaticLocalTimeType = GenericLocalTimeType<&'static str>;
 
-impl StaticLocalTimeType {
+impl GenericLocalTimeType<&'static str> {
     /// Construct a static local time type
     pub const fn new(ut_offset: i32, is_dst: bool, time_zone_designation: Option<&'static str>) -> Result<Self, LocalTimeTypeError> {
         match Self::check_inputs(ut_offset, time_zone_designation) {
@@ -31,7 +31,7 @@ impl StaticLocalTimeType {
 /// Static transition rule representing alternate local time types
 pub type StaticAlternateTime = GenericAlternateTime<&'static str>;
 
-impl StaticAlternateTime {
+impl GenericAlternateTime<&'static str> {
     /// Construct a static transition rule representing alternate local time types
     pub const fn new(
         std: StaticLocalTimeType,

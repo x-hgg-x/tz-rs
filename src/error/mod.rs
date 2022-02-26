@@ -170,7 +170,7 @@ pub enum TzError {
     TimeZoneError(TimeZoneError),
     /// Date time error
     DateTimeError(DateTimeError),
-    /// Local time type find error
+    /// Local time type search error
     FindLocalTimeTypeError(FindLocalTimeTypeError),
     /// Date time projection error
     ProjectDateTimeError(ProjectDateTimeError),

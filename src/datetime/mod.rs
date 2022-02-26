@@ -204,7 +204,7 @@ impl<S> PartialOrd for GenericDateTime<S> {
     }
 }
 
-impl DateTime {
+impl GenericDateTime<Arc<str>> {
     /// Returns the current date time associated to the specified time zone
     pub fn now(time_zone: &TimeZone) -> Result<Self, TzError> {
         let unix_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs().try_into()?;
