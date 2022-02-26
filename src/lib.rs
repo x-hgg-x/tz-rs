@@ -139,3 +139,9 @@ pub mod statics {
 
 /// Alias for [`std::result::Result`] with the crate unified error
 pub type Result<T> = std::result::Result<T, TzError>;
+
+/// Trait implemented by time zone types
+pub trait TimeZoneLike {
+    /// Find the local time type associated to the time zone at the specified Unix time in seconds
+    fn find_local_time_type(&self, unix_time: i64) -> std::result::Result<timezone::LocalTimeType, error::FindLocalTimeTypeError>;
+}

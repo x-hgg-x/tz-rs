@@ -124,6 +124,13 @@ impl StaticTimeZone {
     }
 }
 
+impl TimeZoneLike for StaticTimeZone {
+    fn find_local_time_type(&self, unix_time: i64) -> Result<LocalTimeType, FindLocalTimeTypeError> {
+        let &StaticLocalTimeType { ut_offset, is_dst, time_zone_designation } = self.find_local_time_type(unix_time)?;
+        Ok(LocalTimeType { ut_offset, is_dst, time_zone_designation: time_zone_designation.map(Arc::from) })
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;

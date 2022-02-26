@@ -6,7 +6,7 @@ use crate::datetime::{days_since_unix_epoch, is_leap_year};
 use crate::error::*;
 use crate::parse::*;
 use crate::utils::*;
-use crate::UtcDateTime;
+use crate::{TimeZoneLike, UtcDateTime};
 
 use std::cmp::Ordering;
 use std::fs::{self, File};
@@ -793,6 +793,12 @@ impl TimeZone {
     /// Find the local time type associated to the time zone at the specified Unix time in seconds
     pub fn find_local_time_type(&self, unix_time: i64) -> Result<&LocalTimeType, FindLocalTimeTypeError> {
         self.as_ref().find_local_time_type(unix_time)
+    }
+}
+
+impl TimeZoneLike for TimeZone {
+    fn find_local_time_type(&self, unix_time: i64) -> Result<LocalTimeType, FindLocalTimeTypeError> {
+        self.find_local_time_type(unix_time).map(Clone::clone)
     }
 }
 

@@ -3,8 +3,9 @@
 pub(crate) mod statics;
 
 use crate::error::*;
-use crate::timezone::{GenericLocalTimeType, TimeZone};
+use crate::timezone::GenericLocalTimeType;
 use crate::utils::*;
+use crate::TimeZoneLike;
 
 use std::cmp::Ordering;
 use std::sync::Arc;
@@ -179,7 +180,7 @@ impl UtcDateTime {
     ///
     /// Leap seconds are not preserved.
     ///
-    pub fn project(&self, time_zone: &TimeZone) -> Result<DateTime, ProjectDateTimeError> {
+    pub fn project(&self, time_zone: &impl TimeZoneLike) -> Result<DateTime, ProjectDateTimeError> {
         DateTime::from_unix_time(self.unix_time(), time_zone)
     }
 }
@@ -222,8 +223,8 @@ impl<S> PartialOrd for GenericDateTime<S> {
 
 impl GenericDateTime<Arc<str>> {
     /// Construct a date time from a Unix time in seconds and a time zone
-    pub fn from_unix_time(unix_time: i64, time_zone: &TimeZone) -> Result<Self, ProjectDateTimeError> {
-        let local_time_type = time_zone.find_local_time_type(unix_time)?.clone();
+    pub fn from_unix_time(unix_time: i64, time_zone: &impl TimeZoneLike) -> Result<Self, ProjectDateTimeError> {
+        let local_time_type = time_zone.find_local_time_type(unix_time)?;
 
         let unix_time_with_offset = unix_time.checked_add(local_time_type.ut_offset() as i64).ok_or(OutOfRangeError("out of range date time"))?;
 
@@ -232,7 +233,7 @@ impl GenericDateTime<Arc<str>> {
     }
 
     /// Returns the current date time associated to the specified time zone
-    pub fn now(time_zone: &TimeZone) -> Result<Self, TzError> {
+    pub fn now(time_zone: &impl TimeZoneLike) -> Result<Self, TzError> {
         let unix_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs().try_into()?;
         Ok(Self::from_unix_time(unix_time, time_zone)?)
     }
@@ -241,7 +242,7 @@ impl GenericDateTime<Arc<str>> {
     ///
     /// Leap seconds are not preserved.
     ///
-    pub fn project(&self, time_zone: &TimeZone) -> Result<Self, ProjectDateTimeError> {
+    pub fn project(&self, time_zone: &impl TimeZoneLike) -> Result<Self, ProjectDateTimeError> {
         Self::from_unix_time(self.unix_time, time_zone)
     }
 }
