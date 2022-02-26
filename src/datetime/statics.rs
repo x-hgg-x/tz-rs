@@ -10,20 +10,7 @@ impl UtcDateTime {
     /// Leap seconds are not preserved.
     ///
     pub const fn project_const(&self, time_zone: &StaticTimeZone) -> Result<StaticDateTime, ProjectDateTimeError> {
-        let unix_time = self.unix_time();
-
-        let local_time_type = match time_zone.find_local_time_type(unix_time) {
-            Ok(local_time_type) => local_time_type.clone(),
-            Err(FindLocalTimeTypeError(error)) => return Err(ProjectDateTimeError(error)),
-        };
-
-        let utc_date_time_with_offset = match UtcDateTime::from_unix_time(unix_time + local_time_type.ut_offset() as i64) {
-            Ok(utc_date_time_with_offset) => utc_date_time_with_offset,
-            Err(ConversionError(error)) => return Err(ProjectDateTimeError(error)),
-        };
-
-        let UtcDateTime { year, month, month_day, hour, minute, second } = utc_date_time_with_offset;
-        Ok(StaticDateTime { year, month, month_day, hour, minute, second, local_time_type, unix_time })
+        StaticDateTime::from_unix_time(self.unix_time(), time_zone)
     }
 }
 
@@ -31,23 +18,33 @@ impl UtcDateTime {
 pub type StaticDateTime = GenericDateTime<&'static str>;
 
 impl GenericDateTime<&'static str> {
+    /// Construct a static date time from a Unix time in seconds and a static time zone
+    pub const fn from_unix_time(unix_time: i64, time_zone: &StaticTimeZone) -> Result<Self, ProjectDateTimeError> {
+        let local_time_type = match time_zone.find_local_time_type(unix_time) {
+            Ok(local_time_type) => local_time_type.clone(),
+            Err(FindLocalTimeTypeError(error)) => return Err(ProjectDateTimeError(error)),
+        };
+
+        let unix_time_with_offset = match unix_time.checked_add(local_time_type.ut_offset() as i64) {
+            Some(unix_time_with_offset) => unix_time_with_offset,
+            None => return Err(ProjectDateTimeError("out of range date time")),
+        };
+
+        let utc_date_time_with_offset = match UtcDateTime::from_unix_time(unix_time_with_offset) {
+            Ok(utc_date_time_with_offset) => utc_date_time_with_offset,
+            Err(OutOfRangeError(error)) => return Err(ProjectDateTimeError(error)),
+        };
+
+        let UtcDateTime { year, month, month_day, hour, minute, second } = utc_date_time_with_offset;
+        Ok(Self { year, month, month_day, hour, minute, second, local_time_type, unix_time })
+    }
+
     /// Project the date time into another time zone.
     ///
     /// Leap seconds are not preserved.
     ///
     pub const fn project(&self, time_zone: &StaticTimeZone) -> Result<Self, ProjectDateTimeError> {
-        let local_time_type = match time_zone.find_local_time_type(self.unix_time) {
-            Ok(local_time_type) => local_time_type.clone(),
-            Err(FindLocalTimeTypeError(error)) => return Err(ProjectDateTimeError(error)),
-        };
-
-        let utc_date_time_with_offset = match UtcDateTime::from_unix_time(self.unix_time + local_time_type.ut_offset() as i64) {
-            Ok(utc_date_time_with_offset) => utc_date_time_with_offset,
-            Err(ConversionError(error)) => return Err(ProjectDateTimeError(error)),
-        };
-
-        let UtcDateTime { year, month, month_day, hour, minute, second } = utc_date_time_with_offset;
-        Ok(StaticDateTime { year, month, month_day, hour, minute, second, local_time_type, unix_time: self.unix_time })
+        Self::from_unix_time(self.unix_time, time_zone)
     }
 }
 

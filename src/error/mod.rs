@@ -124,7 +124,7 @@ macro_rules! create_error {
     };
 }
 
-create_error!(#[doc = "Integer conversion error"], ConversionError);
+create_error!(#[doc = "Out of range error"], OutOfRangeError);
 create_error!(#[doc = "Local time type error"], LocalTimeTypeError);
 create_error!(#[doc = "Transition rule error"], TransitionRuleError);
 create_error!(#[doc = "Time zone error"], TimeZoneError);
@@ -132,8 +132,8 @@ create_error!(#[doc = "Date time error"], DateTimeError);
 create_error!(#[doc = "Local time type search error"], FindLocalTimeTypeError);
 create_error!(#[doc = "Date time projection error"], ProjectDateTimeError);
 
-impl From<ConversionError> for ProjectDateTimeError {
-    fn from(error: ConversionError) -> Self {
+impl From<OutOfRangeError> for ProjectDateTimeError {
+    fn from(error: OutOfRangeError) -> Self {
         Self(error.0)
     }
 }
@@ -160,8 +160,8 @@ pub enum TzError {
     TzFileError(TzFileError),
     /// Unified error for parsing a TZ string
     TzStringError(TzStringError),
-    /// Integer conversion error
-    ConversionError(ConversionError),
+    /// Out of range error
+    OutOfRangeError(OutOfRangeError),
     /// Local time type error
     LocalTimeTypeError(LocalTimeTypeError),
     /// Transition rule error
@@ -185,7 +185,7 @@ impl fmt::Display for TzError {
             Self::SystemTimeError(error) => error.fmt(f),
             Self::TzFileError(error) => error.fmt(f),
             Self::TzStringError(error) => error.fmt(f),
-            Self::ConversionError(error) => error.fmt(f),
+            Self::OutOfRangeError(error) => error.fmt(f),
             Self::LocalTimeTypeError(error) => write!(f, "invalid local time type: {}", error),
             Self::TransitionRuleError(error) => write!(f, "invalid transition rule: {}", error),
             Self::TimeZoneError(error) => write!(f, "invalid time zone: {}", error),
@@ -234,15 +234,15 @@ impl From<TzStringError> for TzError {
     }
 }
 
-impl From<ConversionError> for TzError {
-    fn from(error: ConversionError) -> Self {
-        Self::ConversionError(error)
+impl From<OutOfRangeError> for TzError {
+    fn from(error: OutOfRangeError) -> Self {
+        Self::OutOfRangeError(error)
     }
 }
 
 impl From<TryFromIntError> for TzError {
     fn from(_: TryFromIntError) -> Self {
-        Self::ConversionError(ConversionError("out of range integer conversion"))
+        Self::OutOfRangeError(OutOfRangeError("out of range integer conversion"))
     }
 }
 

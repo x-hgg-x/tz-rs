@@ -1,6 +1,6 @@
 //! Some useful constant functions.
 
-use crate::error::ConversionError;
+use crate::error::OutOfRangeError;
 use crate::timezone::{LeapSecond, Transition};
 
 use std::cmp::Ordering;
@@ -25,14 +25,14 @@ pub const fn min(a: i64, b: i64) -> i64 {
 }
 
 /// Convert a `i64` value to a `i32` value
-pub const fn try_into_i32(value: i64) -> Result<i32, ConversionError> {
+pub const fn try_into_i32(value: i64) -> Result<i32, OutOfRangeError> {
     let min = i32::MIN as i64;
     let max = i32::MAX as i64;
 
     if min <= value && value <= max {
         Ok(value as i32)
     } else {
-        Err(ConversionError("out of range integer conversion"))
+        Err(OutOfRangeError("out of range integer conversion"))
     }
 }
 

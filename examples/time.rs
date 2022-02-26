@@ -13,7 +13,7 @@ fn main() -> Result<()> {
     println!("{:?}", time_zone_utc.find_local_time_type(unix_time)?);
 
     // Get fixed time zone at GMT-1
-    let time_zone_fixed = TimeZone::fixed(-3600);
+    let time_zone_fixed = TimeZone::fixed(-3600)?;
     println!("{:?}", time_zone_fixed.find_local_time_type(unix_time)?.ut_offset());
 
     // Get local time zone (UNIX only)
@@ -53,12 +53,16 @@ fn main() -> Result<()> {
     println!("{:?}", other_utc_date_time);
 
     // Project the UTC date time to a time zone
-    let date_time = utc_date_time.project(&TimeZone::fixed(-3600))?;
+    let date_time = utc_date_time.project(&TimeZone::fixed(-3600)?)?;
     println!("{:#?}", date_time);
 
     // Project the date time to another time zone
-    let other_date_time = date_time.project(&TimeZone::fixed(3600))?;
+    let other_date_time = date_time.project(&TimeZone::fixed(3600)?)?;
     println!("{:#?}", other_date_time);
+
+    // Create a new date time from a Unix time and a time zone (2000-01-01T00:00:00Z)
+    let another_date_time = DateTime::from_unix_time(946684800, &TimeZone::fixed(86400)?)?;
+    println!("{:#?}", another_date_time);
 
     // Get the corresponding UTC Unix times
     println!("{}", utc_date_time.unix_time());

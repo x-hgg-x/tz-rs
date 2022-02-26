@@ -93,12 +93,16 @@ impl<S> GenericLocalTimeType<S> {
 
     /// Construct the local time type associated to UTC
     pub const fn utc() -> Self {
-        Self::with_ut_offset(0)
+        Self { ut_offset: 0, is_dst: false, time_zone_designation: None }
     }
 
     /// Construct a local time type with the specified UTC offset in seconds
-    pub const fn with_ut_offset(ut_offset: i32) -> Self {
-        Self { ut_offset, is_dst: false, time_zone_designation: None }
+    pub const fn with_ut_offset(ut_offset: i32) -> Result<Self, LocalTimeTypeError> {
+        if ut_offset == i32::MIN {
+            return Err(LocalTimeTypeError("invalid UTC offset"));
+        }
+
+        Ok(Self { ut_offset, is_dst: false, time_zone_designation: None })
     }
 
     /// Check local time type inputs
@@ -394,7 +398,8 @@ impl<S> GenericAlternateTime<S> {
     }
 
     /// Find the local time type associated to the alternate transition rule at the specified Unix time in seconds
-    const fn find_local_time_type(&self, unix_time: i64) -> Result<&GenericLocalTimeType<S>, ConversionError> {
+    const fn find_local_time_type(&self, unix_time: i64) -> Result<&GenericLocalTimeType<S>, OutOfRangeError> {
+        // Overflow is not possible
         let dst_start_time_in_utc = self.dst_start_time as i64 - self.std.ut_offset as i64;
         let dst_end_time_in_utc = self.dst_end_time as i64 - self.dst.ut_offset as i64;
 
@@ -402,6 +407,11 @@ impl<S> GenericAlternateTime<S> {
             Ok(utc_date_time) => utc_date_time.year(),
             Err(error) => return Err(error),
         };
+
+        // Check if the current year is valid for the following computations
+        if !(i32::MIN + 2 <= current_year && current_year <= i32::MAX - 1900 - 2) {
+            return Err(OutOfRangeError("out of range date time"));
+        }
 
         let current_year_dst_start_unix_time = self.dst_start.unix_time(current_year, dst_start_time_in_utc);
         let current_year_dst_end_unix_time = self.dst_end.unix_time(current_year, dst_end_time_in_utc);
@@ -474,7 +484,7 @@ pub type TransitionRule = GenericTransitionRule<Arc<str>>;
 
 impl<S> GenericTransitionRule<S> {
     /// Find the local time type associated to the transition rule at the specified Unix time in seconds
-    const fn find_local_time_type(&self, unix_time: i64) -> Result<&GenericLocalTimeType<S>, ConversionError> {
+    const fn find_local_time_type(&self, unix_time: i64) -> Result<&GenericLocalTimeType<S>, OutOfRangeError> {
         match self {
             Self::Fixed(local_time_type) => Ok(local_time_type),
             Self::Alternate(alternate_time) => alternate_time.find_local_time_type(unix_time),
@@ -588,7 +598,7 @@ impl<'a, S> TimeZoneRef<'a, S> {
 
     /// Find the local time type of the last transition and the corresponding local time type of the extra rule evaluated at the same Unix leap time
     #[allow(clippy::type_complexity)]
-    const fn find_last_local_time_types(&self) -> Result<Option<(&'a GenericLocalTimeType<S>, &'a GenericLocalTimeType<S>)>, ConversionError> {
+    const fn find_last_local_time_types(&self) -> Result<Option<(&'a GenericLocalTimeType<S>, &'a GenericLocalTimeType<S>)>, OutOfRangeError> {
         if let (Some(extra_rule), Some(last_transition)) = (&self.extra_rule, self.transitions.last()) {
             let last_local_time_type = &self.local_time_types[last_transition.local_time_type_index];
 
@@ -632,7 +642,7 @@ impl<'a, S> TimeZoneRef<'a, S> {
 
         match extra_rule.find_local_time_type(unix_time) {
             Ok(local_time_type) => Ok(local_time_type),
-            Err(ConversionError(error)) => Err(FindLocalTimeTypeError(error)),
+            Err(OutOfRangeError(error)) => Err(FindLocalTimeTypeError(error)),
         }
     }
 
@@ -673,7 +683,7 @@ impl<'a> TimeZoneRef<'a, Arc<str>> {
     /// Check extra rule
     fn check_extra_rule(&self) -> Result<(), TimeZoneError> {
         match self.find_last_local_time_types() {
-            Err(ConversionError(error)) => Err(TimeZoneError(error)),
+            Err(OutOfRangeError(error)) => Err(TimeZoneError(error)),
             Ok(None) => Ok(()),
             Ok(Some((last_local_time_type, rule_local_time_type))) => {
                 if last_local_time_type == rule_local_time_type {
@@ -709,12 +719,12 @@ impl TimeZone {
 
     /// Construct the time zone associated to UTC
     pub fn utc() -> Self {
-        Self::fixed(0)
+        Self { transitions: Vec::new(), local_time_types: vec![LocalTimeType::utc()], leap_seconds: Vec::new(), extra_rule: None }
     }
 
     /// Construct a time zone with the specified UTC offset in seconds
-    pub fn fixed(ut_offset: i32) -> Self {
-        Self { transitions: Vec::new(), local_time_types: vec![LocalTimeType::with_ut_offset(ut_offset)], leap_seconds: Vec::new(), extra_rule: None }
+    pub fn fixed(ut_offset: i32) -> Result<Self, LocalTimeTypeError> {
+        Ok(Self { transitions: Vec::new(), local_time_types: vec![LocalTimeType::with_ut_offset(ut_offset)?], leap_seconds: Vec::new(), extra_rule: None })
     }
 
     /// Returns local time zone.
@@ -889,9 +899,35 @@ mod test {
     }
 
     #[test]
+    fn test_transition_rule_overflow() -> Result<()> {
+        let transition_rule_1 = TransitionRule::Alternate(AlternateTime::new(
+            LocalTimeType::new(-1, false, None)?,
+            LocalTimeType::new(-1, true, None)?,
+            RuleDay::Julian1WithoutLeap(Julian1WithoutLeap::new(1)?),
+            0,
+            RuleDay::Julian1WithoutLeap(Julian1WithoutLeap::new(365)?),
+            0,
+        )?);
+
+        let transition_rule_2 = TransitionRule::Alternate(AlternateTime::new(
+            LocalTimeType::new(1, false, None)?,
+            LocalTimeType::new(1, true, None)?,
+            RuleDay::Julian1WithoutLeap(Julian1WithoutLeap::new(365)?),
+            0,
+            RuleDay::Julian1WithoutLeap(Julian1WithoutLeap::new(1)?),
+            0,
+        )?);
+
+        assert!(matches!(transition_rule_1.find_local_time_type(UtcDateTime::MIN_UNIX_TIME + 1), Err(OutOfRangeError(_))));
+        assert!(matches!(transition_rule_2.find_local_time_type(UtcDateTime::MAX_UNIX_TIME - 1), Err(OutOfRangeError(_))));
+
+        Ok(())
+    }
+
+    #[test]
     fn test_time_zone() -> Result<()> {
         let utc = LocalTimeType::utc();
-        let cet = LocalTimeType::with_ut_offset(3600);
+        let cet = LocalTimeType::with_ut_offset(3600)?;
 
         let utc_local_time_types = vec![utc.clone()];
         let fixed_extra_rule = TransitionRule::Fixed(cet.clone());

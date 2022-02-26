@@ -58,7 +58,7 @@ impl<'a> TimeZoneRef<'a, &'static str> {
     /// Check extra rule
     const fn check_extra_rule(&self) -> Result<(), TimeZoneError> {
         match self.find_last_local_time_types() {
-            Err(ConversionError(error)) => Err(TimeZoneError(error)),
+            Err(OutOfRangeError(error)) => Err(TimeZoneError(error)),
             Ok(None) => Ok(()),
             Ok(Some((last_local_time_type, rule_local_time_type))) => {
                 if last_local_time_type.ut_offset == rule_local_time_type.ut_offset

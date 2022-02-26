@@ -28,6 +28,11 @@ pub struct UtcDateTime {
 }
 
 impl UtcDateTime {
+    /// Minimum Unix time allowed for a UTC date time
+    pub const MIN_UNIX_TIME: i64 = -67768040609740800;
+    /// Maximum Unix time allowed for a UTC date time
+    pub const MAX_UNIX_TIME: i64 = 67767976233532799;
+
     /// Construct a UTC date time
     ///
     /// ## Inputs
@@ -42,7 +47,15 @@ impl UtcDateTime {
     pub const fn new(full_year: i32, month: u8, month_day: u8, hour: u8, minute: u8, second: u8) -> Result<Self, DateTimeError> {
         use crate::constants::*;
 
-        let year = full_year - 1900;
+        // Exclude the maximum possible UTC date time with a leap second
+        if full_year == i32::MAX && month == 11 && month_day == 31 && hour == 23 && minute == 59 && second == 60 {
+            return Err(DateTimeError("out of range date time"));
+        }
+
+        let year = match full_year.checked_sub(1900) {
+            Some(year) => year,
+            None => return Err(DateTimeError("invalid year: out of range operation")),
+        };
 
         if month > 11 {
             return Err(DateTimeError("invalid month"));
@@ -75,10 +88,18 @@ impl UtcDateTime {
     }
 
     /// Construct a UTC date time from a Unix time in seconds
-    pub const fn from_unix_time(unix_time: i64) -> Result<Self, ConversionError> {
+    pub const fn from_unix_time(unix_time: i64) -> Result<Self, OutOfRangeError> {
         use crate::constants::*;
 
-        let seconds = unix_time - UNIX_OFFSET_SECS;
+        if !(Self::MIN_UNIX_TIME <= unix_time && unix_time <= Self::MAX_UNIX_TIME) {
+            return Err(OutOfRangeError("out of range date time"));
+        }
+
+        let seconds = match unix_time.checked_sub(UNIX_OFFSET_SECS) {
+            Some(seconds) => seconds,
+            None => return Err(OutOfRangeError("out of range operation")),
+        };
+
         let mut remaining_days = seconds / SECONDS_PER_DAY;
         let mut remaining_seconds = seconds % SECONDS_PER_DAY;
         if remaining_seconds < 0 {
@@ -159,12 +180,7 @@ impl UtcDateTime {
     /// Leap seconds are not preserved.
     ///
     pub fn project(&self, time_zone: &TimeZone) -> Result<DateTime, ProjectDateTimeError> {
-        let unix_time = self.unix_time();
-        let local_time_type = time_zone.find_local_time_type(unix_time)?.clone();
-
-        let utc_date_time_with_offset = UtcDateTime::from_unix_time(unix_time + local_time_type.ut_offset() as i64)?;
-        let UtcDateTime { year, month, month_day, hour, minute, second } = utc_date_time_with_offset;
-        Ok(DateTime { year, month, month_day, hour, minute, second, local_time_type, unix_time })
+        DateTime::from_unix_time(self.unix_time(), time_zone)
     }
 }
 
@@ -205,14 +221,20 @@ impl<S> PartialOrd for GenericDateTime<S> {
 }
 
 impl GenericDateTime<Arc<str>> {
+    /// Construct a date time from a Unix time in seconds and a time zone
+    pub fn from_unix_time(unix_time: i64, time_zone: &TimeZone) -> Result<Self, ProjectDateTimeError> {
+        let local_time_type = time_zone.find_local_time_type(unix_time)?.clone();
+
+        let unix_time_with_offset = unix_time.checked_add(local_time_type.ut_offset() as i64).ok_or(OutOfRangeError("out of range date time"))?;
+
+        let UtcDateTime { year, month, month_day, hour, minute, second } = UtcDateTime::from_unix_time(unix_time_with_offset)?;
+        Ok(Self { year, month, month_day, hour, minute, second, local_time_type, unix_time })
+    }
+
     /// Returns the current date time associated to the specified time zone
     pub fn now(time_zone: &TimeZone) -> Result<Self, TzError> {
         let unix_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs().try_into()?;
-        let local_time_type = time_zone.find_local_time_type(unix_time)?.clone();
-        let utc_date_time_with_offset = UtcDateTime::from_unix_time(unix_time + local_time_type.ut_offset() as i64)?;
-
-        let UtcDateTime { year, month, month_day, hour, minute, second } = utc_date_time_with_offset;
-        Ok(DateTime { year, month, month_day, hour, minute, second, local_time_type, unix_time })
+        Ok(Self::from_unix_time(unix_time, time_zone)?)
     }
 
     /// Project the date time into another time zone.
@@ -220,11 +242,7 @@ impl GenericDateTime<Arc<str>> {
     /// Leap seconds are not preserved.
     ///
     pub fn project(&self, time_zone: &TimeZone) -> Result<Self, ProjectDateTimeError> {
-        let local_time_type = time_zone.find_local_time_type(self.unix_time)?.clone();
-        let utc_date_time_with_offset = UtcDateTime::from_unix_time(self.unix_time + local_time_type.ut_offset() as i64)?;
-
-        let UtcDateTime { year, month, month_day, hour, minute, second } = utc_date_time_with_offset;
-        Ok(DateTime { year, month, month_day, hour, minute, second, local_time_type, unix_time: self.unix_time })
+        Self::from_unix_time(self.unix_time, time_zone)
     }
 }
 
@@ -401,11 +419,11 @@ mod test {
         let time_zone_utc = TimeZone::utc();
         let utc = LocalTimeType::utc();
 
-        let time_zone_cet = TimeZone::fixed(3600);
-        let cet = LocalTimeType::with_ut_offset(3600);
+        let time_zone_cet = TimeZone::fixed(3600)?;
+        let cet = LocalTimeType::with_ut_offset(3600)?;
 
-        let time_zone_eet = TimeZone::fixed(7200);
-        let eet = LocalTimeType::with_ut_offset(7200);
+        let time_zone_eet = TimeZone::fixed(7200)?;
+        let eet = LocalTimeType::with_ut_offset(7200)?;
 
         assert_eq!(DateTime::now(&time_zone_utc)?.local_time_type().ut_offset(), 0);
         assert_eq!(DateTime::now(&time_zone_cet)?.local_time_type().ut_offset(), 3600);
@@ -482,6 +500,8 @@ mod test {
         for (((unix_time, date_time_utc), date_time_cet), date_time_eet) in unix_times.into_iter().zip(date_times_utc).zip(date_times_cet).zip(date_times_eet) {
             let utc_date_time = UtcDateTime::from_unix_time(unix_time)?;
 
+            assert_eq!(UtcDateTime::from_unix_time(utc_date_time.unix_time())?, utc_date_time);
+
             assert_eq!(utc_date_time.full_year(), date_time_utc.full_year());
             assert_eq!(utc_date_time.year(), date_time_utc.year());
             assert_eq!(utc_date_time.month(), date_time_utc.month());
@@ -521,7 +541,10 @@ mod test {
     #[test]
     fn test_date_time_leap_seconds() -> Result<()> {
         let utc_date_time = UtcDateTime::new(1972, 5, 30, 23, 59, 60)?;
-        let date_time = utc_date_time.project(&TimeZone::fixed(-3600))?;
+
+        assert_eq!(UtcDateTime::from_unix_time(utc_date_time.unix_time())?, UtcDateTime::new(1972, 6, 1, 0, 0, 0)?);
+
+        let date_time = utc_date_time.project(&TimeZone::fixed(-3600)?)?;
 
         let date_time_result = DateTime {
             year: 72,
@@ -530,7 +553,7 @@ mod test {
             hour: 23,
             minute: 00,
             second: 00,
-            local_time_type: LocalTimeType::with_ut_offset(-3600),
+            local_time_type: LocalTimeType::with_ut_offset(-3600)?,
             unix_time: 78796800,
         };
 
@@ -542,8 +565,8 @@ mod test {
     #[test]
     fn test_date_time_partial_eq_partial_ord() -> Result<()> {
         let time_zone_utc = TimeZone::utc();
-        let time_zone_cet = TimeZone::fixed(3600);
-        let time_zone_eet = TimeZone::fixed(7200);
+        let time_zone_cet = TimeZone::fixed(3600)?;
+        let time_zone_eet = TimeZone::fixed(7200)?;
 
         let utc_date_time_1 = UtcDateTime::from_unix_time(1)?;
         let utc_date_time_2 = UtcDateTime::from_unix_time(2)?;
@@ -611,6 +634,33 @@ mod test {
         assert_eq!(utc_date_time_3.cmp(&utc_date_time_1), Ordering::Greater);
         assert_eq!(utc_date_time_3.cmp(&utc_date_time_2), Ordering::Greater);
         assert_eq!(utc_date_time_3.cmp(&utc_date_time_3), Ordering::Equal);
+
+        assert_eq!(utc_date_time_1.cmp(&utc_date_time_1), utc_date_time_1.unix_time().cmp(&utc_date_time_1.unix_time()));
+        assert_eq!(utc_date_time_1.cmp(&utc_date_time_2), utc_date_time_1.unix_time().cmp(&utc_date_time_2.unix_time()));
+        assert_eq!(utc_date_time_1.cmp(&utc_date_time_3), utc_date_time_1.unix_time().cmp(&utc_date_time_3.unix_time()));
+
+        assert_eq!(utc_date_time_2.cmp(&utc_date_time_1), utc_date_time_2.unix_time().cmp(&utc_date_time_1.unix_time()));
+        assert_eq!(utc_date_time_2.cmp(&utc_date_time_2), utc_date_time_2.unix_time().cmp(&utc_date_time_2.unix_time()));
+
+        assert_eq!(utc_date_time_3.cmp(&utc_date_time_1), utc_date_time_3.unix_time().cmp(&utc_date_time_1.unix_time()));
+        assert_eq!(utc_date_time_3.cmp(&utc_date_time_3), utc_date_time_3.unix_time().cmp(&utc_date_time_3.unix_time()));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_date_time_overflow() -> Result<()> {
+        assert!(matches!(UtcDateTime::new(i32::MIN, 0, 1, 0, 0, 0), Err(DateTimeError(_))));
+        assert!(matches!(UtcDateTime::new(i32::MAX, 11, 31, 23, 59, 60), Err(DateTimeError(_))));
+
+        assert!(matches!(UtcDateTime::from_unix_time(UtcDateTime::MIN_UNIX_TIME - 1), Err(OutOfRangeError(_))));
+        assert!(matches!(UtcDateTime::from_unix_time(UtcDateTime::MAX_UNIX_TIME + 1), Err(OutOfRangeError(_))));
+
+        assert!(matches!(UtcDateTime::from_unix_time(UtcDateTime::MIN_UNIX_TIME)?.project(&TimeZone::fixed(-1)?), Err(ProjectDateTimeError(_))));
+        assert!(matches!(UtcDateTime::from_unix_time(UtcDateTime::MAX_UNIX_TIME)?.project(&TimeZone::fixed(1)?), Err(ProjectDateTimeError(_))));
+
+        assert!(matches!(DateTime::from_unix_time(i64::MIN, &TimeZone::fixed(-1)?), Err(ProjectDateTimeError(_))));
+        assert!(matches!(DateTime::from_unix_time(i64::MAX, &TimeZone::fixed(1)?), Err(ProjectDateTimeError(_))));
 
         Ok(())
     }
