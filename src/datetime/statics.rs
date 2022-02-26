@@ -54,6 +54,7 @@ mod test {
 
     use crate::timezone::statics::*;
     use crate::timezone::*;
+    use crate::Result;
 
     macro_rules! unwrap {
         ($x:expr) => {
@@ -72,7 +73,7 @@ mod test {
     }
 
     #[test]
-    fn test_const() {
+    fn test_const() -> Result<()> {
         const TIME_ZONE: StaticTimeZone = unwrap!(StaticTimeZone::new(
             &[
                 Transition::new(-2334101314, 1),
@@ -117,7 +118,29 @@ mod test {
         const DATE_TIME_1: StaticDateTime = unwrap!(UTC_DATE_TIME.project_const(&TIME_ZONE));
         const DATE_TIME_2: StaticDateTime = unwrap!(DATE_TIME_1.project(&UTC));
 
+        const LOCAL_TIME_TYPE_1: &StaticLocalTimeType = DATE_TIME_1.local_time_type();
+        const LOCAL_TIME_TYPE_2: &StaticLocalTimeType = DATE_TIME_2.local_time_type();
+
         assert_eq!(UNIX_EPOCH.unix_time(), 0);
         assert_eq!(DATE_TIME_2.unix_time(), UTC_DATE_TIME.unix_time());
+
+        let date_time = UTC_DATE_TIME.project(&TIME_ZONE)?;
+        assert_eq!(date_time.local_time_type().time_zone_designation(), LOCAL_TIME_TYPE_1.time_zone_designation());
+
+        let date_time_1 = DateTime::from_unix_time(UTC_DATE_TIME.unix_time(), &TIME_ZONE)?;
+        let date_time_2 = date_time_1.project(&UTC)?;
+
+        let local_time_type_1 = date_time_1.local_time_type();
+        let local_time_type_2 = date_time_2.local_time_type();
+
+        assert_eq!(local_time_type_1.ut_offset(), LOCAL_TIME_TYPE_1.ut_offset());
+        assert_eq!(local_time_type_1.is_dst(), LOCAL_TIME_TYPE_1.is_dst());
+        assert_eq!(local_time_type_1.time_zone_designation(), LOCAL_TIME_TYPE_1.time_zone_designation());
+
+        assert_eq!(local_time_type_2.ut_offset(), LOCAL_TIME_TYPE_2.ut_offset());
+        assert_eq!(local_time_type_2.is_dst(), LOCAL_TIME_TYPE_2.is_dst());
+        assert_eq!(local_time_type_2.time_zone_designation(), LOCAL_TIME_TYPE_2.time_zone_designation());
+
+        Ok(())
     }
 }
