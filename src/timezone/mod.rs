@@ -129,7 +129,7 @@ impl TzAsciiStr {
 }
 
 impl fmt::Debug for TzAsciiStr {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.as_str().fmt(f)
     }
 }

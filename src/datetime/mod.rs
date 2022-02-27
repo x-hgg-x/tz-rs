@@ -1,11 +1,11 @@
 //! Types related to a date time.
 
 use crate::error::*;
-use crate::timezone::LocalTimeType;
-use crate::timezone::TimeZoneRef;
+use crate::timezone::{LocalTimeType, TimeZoneRef};
 use crate::utils::*;
 
 use std::cmp::Ordering;
+use std::fmt;
 use std::time::SystemTime;
 
 /// UTC date time exprimed in the [proleptic gregorian calendar](https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar)
@@ -25,6 +25,12 @@ pub struct UtcDateTime {
     second: u8,
     /// Nanoseconds in `[0, 999_999_999]`
     nanoseconds: u32,
+}
+
+impl fmt::Display for UtcDateTime {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        format_date_time(f, self.full_year(), self.month + 1, self.month_day, self.hour, self.minute, self.second, self.nanoseconds, 0)
+    }
 }
 
 impl UtcDateTime {
@@ -224,6 +230,13 @@ impl PartialOrd for DateTime {
     }
 }
 
+impl fmt::Display for DateTime {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let ut_offset = self.local_time_type().ut_offset();
+        format_date_time(f, self.full_year(), self.month + 1, self.month_day, self.hour, self.minute, self.second, self.nanoseconds, ut_offset)
+    }
+}
+
 impl DateTime {
     /// Construct a date time from a Unix time in seconds with nanoseconds and a time zone
     pub const fn from_timespec(unix_time: i64, nanoseconds: u32, time_zone_ref: TimeZoneRef) -> Result<Self, ProjectDateTimeError> {
@@ -413,6 +426,56 @@ pub(crate) const fn days_since_unix_epoch(year: i32, month: usize, month_day: i6
     result += CUMUL_DAY_IN_MONTHS_NORMAL_YEAR[month as usize] + month_day - 1;
 
     result
+}
+
+/// Format a date time
+///
+/// ## Inputs
+///
+/// * `f`: Formatter
+/// * `year`: Years since 1900
+/// * `month`: Month in `[0, 11]`
+/// * `month_day`: Day of the month in `[1, 31]`
+/// * `hour`: Hours since midnight in `[0, 23]`
+/// * `minute`: Minutes in `[0, 59]`
+/// * `second`: Seconds in `[0, 60]`, with a possible leap second
+/// * `nanoseconds`: Nanoseconds in `[0, 999_999_999]`
+/// * `ut_offset`: Offset from UTC in seconds
+///
+#[allow(clippy::too_many_arguments)]
+fn format_date_time(
+    f: &mut fmt::Formatter,
+    year: i32,
+    month: u8,
+    month_day: u8,
+    hour: u8,
+    minute: u8,
+    second: u8,
+    nanoseconds: u32,
+    ut_offset: i32,
+) -> fmt::Result {
+    use crate::constants::*;
+
+    write!(f, "{}-{:02}-{:02}T{:02}:{:02}:{:02}.{:09}", year, month, month_day, hour, minute, second, nanoseconds)?;
+
+    if ut_offset != 0 {
+        let ut_offset = ut_offset as i64;
+        let ut_offset_abs = ut_offset.abs();
+
+        let offset_hour = ut_offset / SECONDS_PER_HOUR;
+        let offset_minute = (ut_offset_abs / SECONDS_PER_MINUTE) % MINUTES_PER_HOUR;
+        let offset_second = ut_offset_abs % SECONDS_PER_MINUTE;
+
+        write!(f, "{:+03}:{:02}", offset_hour, offset_minute)?;
+
+        if offset_second != 0 {
+            write!(f, ":{:02}", offset_second)?;
+        }
+    } else {
+        write!(f, "Z")?;
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -697,6 +760,53 @@ mod test {
 
         assert_eq!(utc_date_time_4.cmp(&utc_date_time_1), utc_date_time_4.unix_time().cmp(&utc_date_time_1.unix_time()));
         assert_eq!(utc_date_time_4.cmp(&utc_date_time_4), utc_date_time_4.unix_time().cmp(&utc_date_time_4.unix_time()));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_date_time_format() -> Result<()> {
+        let time_zones = [
+            TimeZone::fixed(-49550)?,
+            TimeZone::fixed(-5400)?,
+            TimeZone::fixed(-3600)?,
+            TimeZone::fixed(0)?,
+            TimeZone::fixed(3600)?,
+            TimeZone::fixed(5400)?,
+            TimeZone::fixed(49550)?,
+        ];
+
+        let utc_date_times = [UtcDateTime::new(2000, 0, 2, 3, 4, 5, 0)?, UtcDateTime::new(2000, 0, 2, 3, 4, 5, 123_456_789)?];
+
+        let utc_date_time_strings = ["2000-01-02T03:04:05.000000000Z", "2000-01-02T03:04:05.123456789Z"];
+
+        let date_time_strings_list = [
+            [
+                "2000-01-01T13:18:15.000000000-13:45:50",
+                "2000-01-02T01:34:05.000000000-01:30",
+                "2000-01-02T02:04:05.000000000-01:00",
+                "2000-01-02T03:04:05.000000000Z",
+                "2000-01-02T04:04:05.000000000+01:00",
+                "2000-01-02T04:34:05.000000000+01:30",
+                "2000-01-02T16:49:55.000000000+13:45:50",
+            ],
+            [
+                "2000-01-01T13:18:15.123456789-13:45:50",
+                "2000-01-02T01:34:05.123456789-01:30",
+                "2000-01-02T02:04:05.123456789-01:00",
+                "2000-01-02T03:04:05.123456789Z",
+                "2000-01-02T04:04:05.123456789+01:00",
+                "2000-01-02T04:34:05.123456789+01:30",
+                "2000-01-02T16:49:55.123456789+13:45:50",
+            ],
+        ];
+
+        for ((utc_date_time, utc_date_time_string), date_time_strings) in utc_date_times.iter().zip(utc_date_time_strings).zip(date_time_strings_list) {
+            for (time_zone, date_time_string) in time_zones.iter().zip(date_time_strings) {
+                assert_eq!(utc_date_time.to_string(), utc_date_time_string);
+                assert_eq!(utc_date_time.project(time_zone.as_ref())?.to_string(), date_time_string);
+            }
+        }
 
         Ok(())
     }

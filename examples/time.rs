@@ -44,31 +44,36 @@ fn main() -> Result<()> {
     let current_utc_date_time = UtcDateTime::now()?;
     println!("{:?}", current_utc_date_time);
 
-    // Create a new UTC date time (2000-01-01T00:00:00.123456Z)
-    let utc_date_time = UtcDateTime::new(2000, 0, 1, 0, 0, 0, 123_456_000)?;
+    // Create a new UTC date time (2000-01-01T00:00:00.123456789Z)
+    let utc_date_time = UtcDateTime::new(2000, 0, 1, 0, 0, 0, 123_456_789)?;
+    println!("{}", utc_date_time);
     println!("{:?}", utc_date_time);
 
-    // Create a new UTC date time from a Unix time with nanoseconds (2000-01-01T00:00:00.123456Z)
-    let other_utc_date_time = UtcDateTime::from_timespec(946684800, 123_456_000)?;
+    // Create a new UTC date time from a Unix time with nanoseconds (2000-01-01T00:00:00.123456789Z)
+    let other_utc_date_time = UtcDateTime::from_timespec(946684800, 123_456_789)?;
+    println!("{}", other_utc_date_time);
     println!("{:?}", other_utc_date_time);
 
     // Project the UTC date time to a time zone
     let date_time = utc_date_time.project(TimeZone::fixed(-3600)?.as_ref())?;
+    println!("{}", date_time);
     println!("{:#?}", date_time);
 
     // Project the date time to another time zone
     let other_date_time = date_time.project(TimeZone::fixed(3600)?.as_ref())?;
+    println!("{}", other_date_time);
     println!("{:#?}", other_date_time);
 
-    // Create a new date time from a Unix time with nanoseconds and a time zone (2000-01-01T00:00:00.123456Z)
-    let another_date_time = DateTime::from_timespec(946684800, 123_456_000, TimeZone::fixed(86400)?.as_ref())?;
+    // Create a new date time from a Unix time with nanoseconds and a time zone (2000-01-01T00:00:00.123456789Z)
+    let another_date_time = DateTime::from_timespec(946684800, 123_456_789, TimeZone::fixed(86400)?.as_ref())?;
+    println!("{}", another_date_time);
     println!("{:#?}", another_date_time);
 
-    // Get the corresponding UTC Unix times
-    println!("{}", utc_date_time.unix_time());
-    println!("{}", other_utc_date_time.unix_time());
-    println!("{}", date_time.unix_time());
-    println!("{}", other_date_time.unix_time());
+    // Get the corresponding UTC Unix times with nanoseconds
+    println!("{}.{:09}", utc_date_time.unix_time(), utc_date_time.nanoseconds());
+    println!("{}.{:09}", other_utc_date_time.unix_time(), other_utc_date_time.nanoseconds());
+    println!("{}.{:09}", date_time.unix_time(), date_time.nanoseconds());
+    println!("{}.{:09}", other_date_time.unix_time(), other_date_time.nanoseconds());
 
     // Get the current date time at the local time zone (UNIX only)
     let time_zone_local = TimeZone::local()?;
