@@ -61,10 +61,10 @@
 //! let _current_utc_date_time = UtcDateTime::now()?;
 //!
 //! // Create a new UTC date time (2000-01-01T00:00:00.123456789Z)
-//! let utc_date_time = UtcDateTime::new(2000, 0, 1, 0, 0, 0, 123_456_789)?;
+//! let utc_date_time = UtcDateTime::new(2000, 1, 1, 0, 0, 0, 123_456_789)?;
 //! assert_eq!(utc_date_time.full_year(), 2000);
 //! assert_eq!(utc_date_time.year(), 100);
-//! assert_eq!(utc_date_time.month(), 0);
+//! assert_eq!(utc_date_time.month(), 1);
 //! assert_eq!(utc_date_time.month_day(), 1);
 //! assert_eq!(utc_date_time.hour(), 0);
 //! assert_eq!(utc_date_time.minute(), 0);
@@ -83,7 +83,7 @@
 //! let date_time = utc_date_time.project(TimeZone::fixed(-3600)?.as_ref())?;
 //! assert_eq!(date_time.full_year(), 1999);
 //! assert_eq!(date_time.year(), 99);
-//! assert_eq!(date_time.month(), 11);
+//! assert_eq!(date_time.month(), 12);
 //! assert_eq!(date_time.month_day(), 31);
 //! assert_eq!(date_time.hour(), 23);
 //! assert_eq!(date_time.minute(), 0);
@@ -99,7 +99,7 @@
 //! let other_date_time = date_time.project(TimeZone::fixed(3600)?.as_ref())?;
 //! assert_eq!(other_date_time.full_year(), 2000);
 //! assert_eq!(other_date_time.year(), 100);
-//! assert_eq!(other_date_time.month(), 0);
+//! assert_eq!(other_date_time.month(), 1);
 //! assert_eq!(other_date_time.month_day(), 1);
 //! assert_eq!(other_date_time.hour(), 1);
 //! assert_eq!(other_date_time.minute(), 0);

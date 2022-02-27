@@ -45,7 +45,7 @@ fn main() -> Result<()> {
     println!("{:?}", current_utc_date_time);
 
     // Create a new UTC date time (2000-01-01T00:00:00.123456789Z)
-    let utc_date_time = UtcDateTime::new(2000, 0, 1, 0, 0, 0, 123_456_789)?;
+    let utc_date_time = UtcDateTime::new(2000, 1, 1, 0, 0, 0, 123_456_789)?;
     println!("{}", utc_date_time);
     println!("{:?}", utc_date_time);
 

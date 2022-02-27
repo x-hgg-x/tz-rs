@@ -63,7 +63,7 @@ const TIME_ZONE_REF: TimeZoneRef = unwrap!(TimeZoneRef::new(
 const UTC: TimeZoneRef = TimeZoneRef::utc();
 
 const UNIX_EPOCH: UtcDateTime = unwrap!(UtcDateTime::from_timespec(0, 0));
-const UTC_DATE_TIME: UtcDateTime = unwrap!(UtcDateTime::new(2000, 0, 1, 0, 0, 0, 1000));
+const UTC_DATE_TIME: UtcDateTime = unwrap!(UtcDateTime::new(2000, 1, 1, 0, 0, 0, 1000));
 
 const DATE_TIME_1: DateTime = unwrap!(UTC_DATE_TIME.project(TIME_ZONE_REF));
 const DATE_TIME_2: DateTime = unwrap!(DATE_TIME_1.project(UTC));

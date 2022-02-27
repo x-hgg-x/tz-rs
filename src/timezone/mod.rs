@@ -306,7 +306,7 @@ impl RuleDay {
     ///
     /// ## Outputs
     ///
-    /// * `month`: Month in `[0, 11]`
+    /// * `month`: Month in `[1, 12]`
     /// * `month_day`: Day of the month in `[1, 31]`
     ///
     const fn transition_date(&self, year: i32) -> (usize, i64) {
@@ -317,11 +317,11 @@ impl RuleDay {
                 let year_day = year_day as i64;
 
                 let month = match binary_search_i64(&CUMUL_DAY_IN_MONTHS_NORMAL_YEAR, year_day - 1) {
-                    Ok(x) => x,
-                    Err(x) => x - 1,
+                    Ok(x) => x + 1,
+                    Err(x) => x,
                 };
 
-                let month_day = year_day - CUMUL_DAY_IN_MONTHS_NORMAL_YEAR[month];
+                let month_day = year_day - CUMUL_DAY_IN_MONTHS_NORMAL_YEAR[month - 1];
 
                 (month, month_day)
             }
@@ -334,21 +334,21 @@ impl RuleDay {
                 let year_day = year_day as i64;
 
                 let month = match binary_search_i64(&cumul_day_in_months, year_day) {
-                    Ok(x) => x,
-                    Err(x) => x - 1,
+                    Ok(x) => x + 1,
+                    Err(x) => x,
                 };
 
-                let month_day = 1 + year_day - cumul_day_in_months[month];
+                let month_day = 1 + year_day - cumul_day_in_months[month - 1];
 
                 (month, month_day)
             }
             Self::MonthWeekDay(MonthWeekDay { month: rule_month, week, week_day }) => {
                 let leap = is_leap_year(year) as i64;
 
-                let month = rule_month as usize - 1;
+                let month = rule_month as usize;
 
-                let mut day_in_month = DAY_IN_MONTHS_NORMAL_YEAR[month];
-                if month == 1 {
+                let mut day_in_month = DAY_IN_MONTHS_NORMAL_YEAR[month - 1];
+                if month == 2 {
                     day_in_month += leap;
                 }
 
@@ -878,18 +878,18 @@ mod test {
     #[test]
     fn test_rule_day() -> Result<()> {
         let rule_day_j1 = RuleDay::Julian1WithoutLeap(Julian1WithoutLeap::new(60)?);
-        assert_eq!(rule_day_j1.transition_date(100), (2, 1));
-        assert_eq!(rule_day_j1.transition_date(101), (2, 1));
+        assert_eq!(rule_day_j1.transition_date(100), (3, 1));
+        assert_eq!(rule_day_j1.transition_date(101), (3, 1));
         assert_eq!(rule_day_j1.unix_time(100, 43200), 951912000);
 
         let rule_day_j0 = RuleDay::Julian0WithLeap(Julian0WithLeap::new(59)?);
-        assert_eq!(rule_day_j0.transition_date(100), (1, 29));
-        assert_eq!(rule_day_j0.transition_date(101), (2, 1));
+        assert_eq!(rule_day_j0.transition_date(100), (2, 29));
+        assert_eq!(rule_day_j0.transition_date(101), (3, 1));
         assert_eq!(rule_day_j0.unix_time(100, 43200), 951825600);
 
         let rule_day_mwd = RuleDay::MonthWeekDay(MonthWeekDay::new(2, 5, 2)?);
-        assert_eq!(rule_day_mwd.transition_date(100), (1, 29));
-        assert_eq!(rule_day_mwd.transition_date(101), (1, 27));
+        assert_eq!(rule_day_mwd.transition_date(100), (2, 29));
+        assert_eq!(rule_day_mwd.transition_date(101), (2, 27));
         assert_eq!(rule_day_mwd.unix_time(100, 43200), 951825600);
         assert_eq!(rule_day_mwd.unix_time(101, 43200), 983275200);
 
