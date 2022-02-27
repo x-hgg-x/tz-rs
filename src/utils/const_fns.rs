@@ -36,23 +36,6 @@ pub const fn try_into_i32(value: i64) -> Result<i32, OutOfRangeError> {
     }
 }
 
-/// Check if two slices are equal
-pub const fn equal(x: &[u8], y: &[u8]) -> bool {
-    if x.len() != y.len() {
-        return false;
-    }
-
-    let mut i = 0;
-    while i < x.len() {
-        if x[i] != y[i] {
-            return false;
-        }
-        i += 1;
-    }
-
-    true
-}
-
 /// Macro for implementing binary search
 macro_rules! impl_binary_search {
     ($slice:expr, $f:expr, $x:expr) => {{

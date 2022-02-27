@@ -172,10 +172,10 @@ impl<'a> DataBlock<'a> {
             let time_zone_designation = match self.time_zone_designations[char_index..].iter().position(|&c| c == b'\0') {
                 None => return Err(TzFileError::InvalidTzFile("invalid time zone designation char index").into()),
                 Some(position) => {
-                    let time_zone_designation = str::from_utf8(&self.time_zone_designations[char_index..char_index + position])?;
+                    let time_zone_designation = &self.time_zone_designations[char_index..char_index + position];
 
                     if !time_zone_designation.is_empty() {
-                        Some(time_zone_designation.into())
+                        Some(time_zone_designation)
                     } else {
                         None
                     }
@@ -271,7 +271,7 @@ mod test {
 
         let time_zone_result = TimeZone::new(
             Vec::new(),
-            vec![LocalTimeType::new(0, false, Some("UTC".into()))?],
+            vec![LocalTimeType::new(0, false, Some(b"UTC"))?],
             vec![
                 LeapSecond::new(78796800, 1),
                 LeapSecond::new(94694401, 2),
@@ -326,21 +326,21 @@ mod test {
                 Transition::new(-712150200, 5),
             ],
             vec![
-                LocalTimeType::new(-37886, false, Some("LMT".into()))?,
-                LocalTimeType::new(-37800, false, Some("HST".into()))?,
-                LocalTimeType::new(-34200, true, Some("HDT".into()))?,
-                LocalTimeType::new(-34200, true, Some("HWT".into()))?,
-                LocalTimeType::new(-34200, true, Some("HPT".into()))?,
-                LocalTimeType::new(-36000, false, Some("HST".into()))?,
+                LocalTimeType::new(-37886, false, Some(b"LMT"))?,
+                LocalTimeType::new(-37800, false, Some(b"HST"))?,
+                LocalTimeType::new(-34200, true, Some(b"HDT"))?,
+                LocalTimeType::new(-34200, true, Some(b"HWT"))?,
+                LocalTimeType::new(-34200, true, Some(b"HPT"))?,
+                LocalTimeType::new(-36000, false, Some(b"HST"))?,
             ],
             Vec::new(),
-            Some(TransitionRule::Fixed(LocalTimeType::new(-36000, false, Some("HST".into()))?)),
+            Some(TransitionRule::Fixed(LocalTimeType::new(-36000, false, Some(b"HST"))?)),
         )?;
 
         assert_eq!(time_zone, time_zone_result);
 
-        assert_eq!(*time_zone.find_local_time_type(-1156939200)?, LocalTimeType::new(-34200, true, Some("HDT".into()))?);
-        assert_eq!(*time_zone.find_local_time_type(1546300800)?, LocalTimeType::new(-36000, false, Some("HST".into()))?);
+        assert_eq!(*time_zone.find_local_time_type(-1156939200)?, LocalTimeType::new(-34200, true, Some(b"HDT"))?);
+        assert_eq!(*time_zone.find_local_time_type(1546300800)?, LocalTimeType::new(-36000, false, Some(b"HST"))?);
 
         Ok(())
     }
@@ -353,11 +353,11 @@ mod test {
 
         let time_zone_result = TimeZone::new(
             vec![Transition::new(2145916800, 0)],
-            vec![LocalTimeType::new(7200, false, Some("IST".into()))?],
+            vec![LocalTimeType::new(7200, false, Some(b"IST"))?],
             Vec::new(),
             Some(TransitionRule::Alternate(AlternateTime::new(
-                LocalTimeType::new(7200, false, Some("IST".into()))?,
-                LocalTimeType::new(10800, true, Some("IDT".into()))?,
+                LocalTimeType::new(7200, false, Some(b"IST"))?,
+                LocalTimeType::new(10800, true, Some(b"IDT"))?,
                 RuleDay::MonthWeekDay(MonthWeekDay::new(3, 4, 4)?),
                 93600,
                 RuleDay::MonthWeekDay(MonthWeekDay::new(10, 5, 0)?),

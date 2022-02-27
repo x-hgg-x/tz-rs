@@ -1,4 +1,3 @@
-#![forbid(unsafe_code)]
 #![deny(missing_docs)]
 
 //! This crate provides the `TimeZone` and `DateTime` types, which can be used to determine local time on a given time zone.
@@ -79,7 +78,7 @@
 //! assert_eq!(other_utc_date_time, utc_date_time);
 //!
 //! // Project the UTC date time to a time zone
-//! let date_time = utc_date_time.project(&TimeZone::fixed(-3600)?)?;
+//! let date_time = utc_date_time.project(TimeZone::fixed(-3600)?.as_ref())?;
 //! assert_eq!(date_time.full_year(), 1999);
 //! assert_eq!(date_time.year(), 99);
 //! assert_eq!(date_time.month(), 11);
@@ -93,7 +92,7 @@
 //! assert_eq!(date_time.unix_time(), 946684800);
 //!
 //! // Project the date time to another time zone
-//! let other_date_time = date_time.project(&TimeZone::fixed(3600)?)?;
+//! let other_date_time = date_time.project(TimeZone::fixed(3600)?.as_ref())?;
 //! assert_eq!(other_date_time.full_year(), 2000);
 //! assert_eq!(other_date_time.year(), 100);
 //! assert_eq!(other_date_time.month(), 0);
@@ -107,14 +106,14 @@
 //! assert_eq!(other_date_time.unix_time(), 946684800);
 //!
 //! // Create a new date time from a Unix time and a time zone (2000-01-01T00:00:00Z)
-//! let another_date_time = DateTime::from_unix_time(946684800, &TimeZone::fixed(86400)?)?;
+//! let another_date_time = DateTime::from_unix_time(946684800, TimeZone::fixed(86400)?.as_ref())?;
 //!
 //! // DateTime objects are compared by their Unix time
 //! assert_eq!(another_date_time, other_date_time);
 //!
 //! // Get the current date time at the local time zone (UNIX only)
 //! let time_zone_local = TimeZone::local()?;
-//! let _date_time = DateTime::now(&time_zone_local)?;
+//! let _date_time = DateTime::now(time_zone_local.as_ref())?;
 //! # Ok(())
 //! # }
 //! ```
@@ -129,19 +128,7 @@ pub mod timezone;
 
 pub use datetime::{DateTime, UtcDateTime};
 pub use error::TzError;
-pub use timezone::TimeZone;
-
-/// Types related to a static time zone and a static date time.
-pub mod statics {
-    pub use crate::datetime::statics::*;
-    pub use crate::timezone::statics::*;
-}
+pub use timezone::{TimeZone, TimeZoneRef};
 
 /// Alias for [`std::result::Result`] with the crate unified error
 pub type Result<T> = std::result::Result<T, TzError>;
-
-/// Trait implemented by time zone types
-pub trait TimeZoneLike {
-    /// Find the local time type associated to the time zone at the specified Unix time in seconds
-    fn find_local_time_type(&self, unix_time: i64) -> std::result::Result<timezone::LocalTimeType, error::FindLocalTimeTypeError>;
-}

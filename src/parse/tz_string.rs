@@ -155,14 +155,14 @@ fn parse_rule_block(cursor: &mut Cursor, use_string_extensions: bool) -> Result<
 pub(crate) fn parse_posix_tz(tz_string: &[u8], use_string_extensions: bool) -> Result<TransitionRule, TzError> {
     let mut cursor = Cursor::new(tz_string);
 
-    let std_time_zone = Some(str::from_utf8(parse_time_zone_designation(&mut cursor)?)?.into());
+    let std_time_zone = Some(parse_time_zone_designation(&mut cursor)?);
     let std_offset = parse_offset(&mut cursor)?;
 
     if cursor.is_empty() {
         return Ok(TransitionRule::Fixed(LocalTimeType::new(-std_offset, false, std_time_zone)?));
     }
 
-    let dst_time_zone = Some(str::from_utf8(parse_time_zone_designation(&mut cursor)?)?.into());
+    let dst_time_zone = Some(parse_time_zone_designation(&mut cursor)?);
 
     let dst_offset = match cursor.remaining().get(0) {
         Some(&b',') => std_offset - 3600,
@@ -203,7 +203,7 @@ mod test {
         let tz_string = b"HST10";
 
         let transition_rule = parse_posix_tz(tz_string, false)?;
-        let transition_rule_result = TransitionRule::Fixed(LocalTimeType::new(-36000, false, Some("HST".into()))?);
+        let transition_rule_result = TransitionRule::Fixed(LocalTimeType::new(-36000, false, Some(b"HST"))?);
 
         assert_eq!(transition_rule, transition_rule_result);
 
@@ -217,8 +217,8 @@ mod test {
         let transition_rule = parse_posix_tz(tz_string, false)?;
 
         let transition_rule_result = TransitionRule::Alternate(AlternateTime::new(
-            LocalTimeType::new(-10800, false, Some("-03".into()))?,
-            LocalTimeType::new(10800, true, Some("+03".into()))?,
+            LocalTimeType::new(-10800, false, Some(b"-03"))?,
+            LocalTimeType::new(10800, true, Some(b"+03"))?,
             RuleDay::Julian1WithoutLeap(Julian1WithoutLeap::new(1)?),
             7200,
             RuleDay::Julian1WithoutLeap(Julian1WithoutLeap::new(365)?),
@@ -237,8 +237,8 @@ mod test {
         let transition_rule = parse_posix_tz(tz_string, false)?;
 
         let transition_rule_result = TransitionRule::Alternate(AlternateTime::new(
-            LocalTimeType::new(43200, false, Some("NZST".into()))?,
-            LocalTimeType::new(46800, true, Some("NZDT".into()))?,
+            LocalTimeType::new(43200, false, Some(b"NZST"))?,
+            LocalTimeType::new(46800, true, Some(b"NZDT"))?,
             RuleDay::MonthWeekDay(MonthWeekDay::new(10, 1, 0)?),
             7200,
             RuleDay::MonthWeekDay(MonthWeekDay::new(3, 3, 0)?),
@@ -257,8 +257,8 @@ mod test {
         let transition_rule = parse_posix_tz(tz_string, false)?;
 
         let transition_rule_result = TransitionRule::Alternate(AlternateTime::new(
-            LocalTimeType::new(3600, false, Some("IST".into()))?,
-            LocalTimeType::new(0, true, Some("GMT".into()))?,
+            LocalTimeType::new(3600, false, Some(b"IST"))?,
+            LocalTimeType::new(0, true, Some(b"GMT"))?,
             RuleDay::MonthWeekDay(MonthWeekDay::new(10, 5, 0)?),
             7200,
             RuleDay::MonthWeekDay(MonthWeekDay::new(3, 5, 0)?),
@@ -279,8 +279,8 @@ mod test {
         let transition_rule = parse_posix_tz(tz_string, true)?;
 
         let transition_rule_result = TransitionRule::Alternate(AlternateTime::new(
-            LocalTimeType::new(-10800, false, Some("-03".into()))?,
-            LocalTimeType::new(-7200, true, Some("-02".into()))?,
+            LocalTimeType::new(-10800, false, Some(b"-03"))?,
+            LocalTimeType::new(-7200, true, Some(b"-02"))?,
             RuleDay::MonthWeekDay(MonthWeekDay::new(3, 5, 0)?),
             -7200,
             RuleDay::MonthWeekDay(MonthWeekDay::new(10, 5, 0)?),
@@ -301,8 +301,8 @@ mod test {
         let transition_rule = parse_posix_tz(tz_string, true)?;
 
         let transition_rule_result = TransitionRule::Alternate(AlternateTime::new(
-            LocalTimeType::new(-18000, false, Some("EST".into()))?,
-            LocalTimeType::new(-14400, true, Some("EDT".into()))?,
+            LocalTimeType::new(-18000, false, Some(b"EST"))?,
+            LocalTimeType::new(-14400, true, Some(b"EDT"))?,
             RuleDay::Julian0WithLeap(Julian0WithLeap::new(0)?),
             0,
             RuleDay::Julian1WithoutLeap(Julian1WithoutLeap::new(365)?),

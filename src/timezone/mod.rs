@@ -1,21 +1,20 @@
 //! Types related to a time zone.
 
-pub(crate) mod statics;
-
 use crate::datetime::{days_since_unix_epoch, is_leap_year};
 use crate::error::*;
 use crate::parse::*;
 use crate::utils::*;
-use crate::{TimeZoneLike, UtcDateTime};
+use crate::UtcDateTime;
 
 use std::cmp::Ordering;
+use std::fmt;
 use std::fs::{self, File};
 use std::io::{self, Read};
-use std::sync::Arc;
+use std::str;
 use std::time::SystemTime;
 
 /// Transition of a TZif file
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Transition {
     /// Unix leap time
     unix_leap_time: i64,
@@ -41,7 +40,7 @@ impl Transition {
 }
 
 /// Leap second of a TZif file
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct LeapSecond {
     /// Unix leap time
     unix_leap_time: i64,
@@ -66,29 +65,102 @@ impl LeapSecond {
     }
 }
 
-/// Generic local time type associated to a time zone
+/// ASCII-encoded fixed-capacity string, used for storing time zone designations
+#[derive(Copy, Clone, Eq, PartialEq)]
+struct TzAsciiStr {
+    /// Array buffer
+    bytes: [u8; 8],
+    /// Length of the string
+    len: u8,
+}
+
+impl TzAsciiStr {
+    /// Construct a time zone designation string
+    const fn new(input: &[u8]) -> Result<Self, LocalTimeTypeError> {
+        let len = input.len();
+
+        if !(3 <= len && len <= 8) {
+            return Err(LocalTimeTypeError("time zone designation must have between 3 and 8 characters"));
+        }
+
+        let mut bytes = [0; 8];
+
+        let mut i = 0;
+        while i < len {
+            let b = input[i];
+
+            if !matches!(b, b'0'..=b'9' | b'A'..=b'Z' | b'a'..=b'z' | b'+' | b'-') {
+                return Err(LocalTimeTypeError("invalid characters in time zone designation"));
+            }
+
+            bytes[i] = b;
+
+            i += 1;
+        }
+
+        Ok(Self { bytes, len: len as u8 })
+    }
+
+    /// Returns time zone designation as a byte slice
+    const fn as_bytes(&self) -> &[u8] {
+        match (self.len, &self.bytes as &[u8]) {
+            (3, [head @ .., _, _, _, _, _]) => head,
+            (4, [head @ .., _, _, _, _]) => head,
+            (5, [head @ .., _, _, _]) => head,
+            (6, [head @ .., _, _]) => head,
+            (7, [head @ .., _]) => head,
+            (8, head) => head,
+            _ => unreachable!(),
+        }
+    }
+
+    /// Returns time zone designation as a string
+    const fn as_str(&self) -> &str {
+        // SAFETY: ASCII is valid UTF-8
+        unsafe { str::from_utf8_unchecked(self.as_bytes()) }
+    }
+
+    /// Check if two time zone designations are equal
+    const fn equal(&self, other: &Self) -> bool {
+        // We don't need to compare the string lengths since the array buffers were pre-filled with nul bytes,
+        // which are not valid time zone designation characters.
+        u64::from_ne_bytes(self.bytes) == u64::from_ne_bytes(other.bytes)
+    }
+}
+
+impl fmt::Debug for TzAsciiStr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.as_str().fmt(f)
+    }
+}
+
+/// Local time type associated to a time zone
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct GenericLocalTimeType<S> {
+pub struct LocalTimeType {
     /// Offset from UTC in seconds
     ut_offset: i32,
     /// Daylight Saving Time indicator
     is_dst: bool,
     /// Time zone designation
-    time_zone_designation: Option<S>,
+    time_zone_designation: Option<TzAsciiStr>,
 }
 
-/// Local time type associated to a time zone
-pub type LocalTimeType = GenericLocalTimeType<Arc<str>>;
+impl LocalTimeType {
+    /// Construct a local time type
+    pub const fn new(ut_offset: i32, is_dst: bool, time_zone_designation: Option<&[u8]>) -> Result<Self, LocalTimeTypeError> {
+        if ut_offset == i32::MIN {
+            return Err(LocalTimeTypeError("invalid UTC offset"));
+        }
 
-impl<S> GenericLocalTimeType<S> {
-    /// Returns offset from UTC in seconds
-    pub const fn ut_offset(&self) -> i32 {
-        self.ut_offset
-    }
+        let time_zone_designation = match time_zone_designation {
+            None => None,
+            Some(time_zone_designation) => match TzAsciiStr::new(time_zone_designation) {
+                Err(error) => return Err(error),
+                Ok(time_zone_designation) => Some(time_zone_designation),
+            },
+        };
 
-    /// Returns daylight saving time indicator
-    pub const fn is_dst(&self) -> bool {
-        self.is_dst
+        Ok(Self { ut_offset, is_dst, time_zone_designation })
     }
 
     /// Construct the local time type associated to UTC
@@ -105,45 +177,27 @@ impl<S> GenericLocalTimeType<S> {
         Ok(Self { ut_offset, is_dst: false, time_zone_designation: None })
     }
 
-    /// Check local time type inputs
-    const fn check_inputs(ut_offset: i32, time_zone_designation: Option<&str>) -> Result<(), LocalTimeTypeError> {
-        if ut_offset == i32::MIN {
-            return Err(LocalTimeTypeError("invalid UTC offset"));
-        }
-
-        if let Some(time_zone_designation) = time_zone_designation {
-            let time_zone_designation = time_zone_designation.as_bytes();
-
-            if time_zone_designation.len() < 3 {
-                return Err(LocalTimeTypeError("time zone designation must have at least 3 characters"));
-            }
-
-            let mut i = 0;
-            while i < time_zone_designation.len() {
-                let c = time_zone_designation[i];
-                if !(c.is_ascii_alphanumeric() || c == b'+' || c == b'-') {
-                    return Err(LocalTimeTypeError("invalid characters in time zone designation"));
-                }
-                i += 1;
-            }
-        }
-
-        Ok(())
+    /// Returns offset from UTC in seconds
+    pub const fn ut_offset(&self) -> i32 {
+        self.ut_offset
     }
-}
 
-impl GenericLocalTimeType<Arc<str>> {
-    /// Construct a local time type
-    pub fn new(ut_offset: i32, is_dst: bool, time_zone_designation: Option<Arc<str>>) -> Result<Self, LocalTimeTypeError> {
-        match Self::check_inputs(ut_offset, time_zone_designation.as_deref()) {
-            Ok(_) => Ok(Self { ut_offset, is_dst, time_zone_designation }),
-            Err(error) => Err(error),
-        }
+    /// Returns daylight saving time indicator
+    pub const fn is_dst(&self) -> bool {
+        self.is_dst
     }
 
     /// Returns time zone designation
-    pub fn time_zone_designation(&self) -> &str {
-        self.time_zone_designation.as_deref().unwrap_or_default()
+    pub const fn time_zone_designation(&self) -> &str {
+        match &self.time_zone_designation {
+            Some(s) => s.as_str(),
+            None => "",
+        }
+    }
+
+    /// Returns a copy of the value
+    pub const fn clone(&self) -> Self {
+        Self { ut_offset: self.ut_offset, is_dst: self.is_dst, time_zone_designation: self.time_zone_designation }
     }
 }
 
@@ -326,13 +380,13 @@ impl RuleDay {
     }
 }
 
-/// Generic transition rule representing alternate local time types
+/// Transition rule representing alternate local time types
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct GenericAlternateTime<S> {
+pub struct AlternateTime {
     /// Local time type for standard time
-    std: GenericLocalTimeType<S>,
+    std: LocalTimeType,
     /// Local time type for Daylight Saving Time
-    dst: GenericLocalTimeType<S>,
+    dst: LocalTimeType,
     /// Start day of Daylight Saving Time
     dst_start: RuleDay,
     /// Local start day time of Daylight Saving Time, in seconds
@@ -343,12 +397,9 @@ pub struct GenericAlternateTime<S> {
     dst_end_time: i32,
 }
 
-/// Transition rule representing alternate local time types
-pub type AlternateTime = GenericAlternateTime<Arc<str>>;
-
-impl GenericAlternateTime<Arc<str>> {
+impl AlternateTime {
     /// Construct a transition rule representing alternate local time types
-    pub fn new(
+    pub const fn new(
         std: LocalTimeType,
         dst: LocalTimeType,
         dst_start: RuleDay,
@@ -366,14 +417,14 @@ impl GenericAlternateTime<Arc<str>> {
     }
 }
 
-impl<S> GenericAlternateTime<S> {
+impl AlternateTime {
     /// Returns local time type for standard time
-    pub const fn std(&self) -> &GenericLocalTimeType<S> {
+    pub const fn std(&self) -> &LocalTimeType {
         &self.std
     }
 
     /// Returns local time type for Daylight Saving Time
-    pub const fn dst(&self) -> &GenericLocalTimeType<S> {
+    pub const fn dst(&self) -> &LocalTimeType {
         &self.dst
     }
 
@@ -398,7 +449,7 @@ impl<S> GenericAlternateTime<S> {
     }
 
     /// Find the local time type associated to the alternate transition rule at the specified Unix time in seconds
-    const fn find_local_time_type(&self, unix_time: i64) -> Result<&GenericLocalTimeType<S>, OutOfRangeError> {
+    const fn find_local_time_type(&self, unix_time: i64) -> Result<&LocalTimeType, OutOfRangeError> {
         // Overflow is not possible
         let dst_start_time_in_utc = self.dst_start_time as i64 - self.std.ut_offset as i64;
         let dst_end_time_in_utc = self.dst_end_time as i64 - self.dst.ut_offset as i64;
@@ -470,21 +521,18 @@ impl<S> GenericAlternateTime<S> {
     }
 }
 
-/// Generic transition rule
+/// Transition rule
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub enum GenericTransitionRule<S> {
+pub enum TransitionRule {
     /// Fixed local time type
-    Fixed(GenericLocalTimeType<S>),
+    Fixed(LocalTimeType),
     /// Alternate local time types
-    Alternate(GenericAlternateTime<S>),
+    Alternate(AlternateTime),
 }
 
-/// Transition rule
-pub type TransitionRule = GenericTransitionRule<Arc<str>>;
-
-impl<S> GenericTransitionRule<S> {
+impl TransitionRule {
     /// Find the local time type associated to the transition rule at the specified Unix time in seconds
-    const fn find_local_time_type(&self, unix_time: i64) -> Result<&GenericLocalTimeType<S>, OutOfRangeError> {
+    const fn find_local_time_type(&self, unix_time: i64) -> Result<&LocalTimeType, OutOfRangeError> {
         match self {
             Self::Fixed(local_time_type) => Ok(local_time_type),
             Self::Alternate(alternate_time) => alternate_time.find_local_time_type(unix_time),
@@ -506,26 +554,50 @@ pub struct TimeZone {
 }
 
 /// Reference to a time zone
-#[derive(Debug)]
-pub struct TimeZoneRef<'a, S> {
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct TimeZoneRef<'a> {
     /// List of transitions
     transitions: &'a [Transition],
     /// List of local time types (cannot be empty)
-    local_time_types: &'a [GenericLocalTimeType<S>],
+    local_time_types: &'a [LocalTimeType],
     /// List of leap seconds
     leap_seconds: &'a [LeapSecond],
     /// Extra transition rule applicable after the last transition
-    extra_rule: &'a Option<GenericTransitionRule<S>>,
+    extra_rule: &'a Option<TransitionRule>,
 }
 
-impl<'a, S> TimeZoneRef<'a, S> {
+impl TimeZoneRef<'static> {
+    /// Construct a static time zone
+    pub const fn new(
+        transitions: &'static [Transition],
+        local_time_types: &'static [LocalTimeType],
+        leap_seconds: &'static [LeapSecond],
+        extra_rule: &'static Option<TransitionRule>,
+    ) -> Result<Self, TimeZoneError> {
+        let time_zone_ref = Self::new_unchecked(transitions, local_time_types, leap_seconds, extra_rule);
+
+        if let Err(error) = time_zone_ref.check_inputs() {
+            return Err(error);
+        }
+
+        Ok(time_zone_ref)
+    }
+
+    /// Construct the static time zone associated to UTC
+    pub const fn utc() -> Self {
+        const UTC: LocalTimeType = LocalTimeType::utc();
+        Self { transitions: &[], local_time_types: &[UTC], leap_seconds: &[], extra_rule: &None }
+    }
+}
+
+impl<'a> TimeZoneRef<'a> {
     /// Returns list of transitions
     pub const fn transitions(&self) -> &'a [Transition] {
         self.transitions
     }
 
     /// Returns list of local time types
-    pub const fn local_time_types(&self) -> &'a [GenericLocalTimeType<S>] {
+    pub const fn local_time_types(&self) -> &'a [LocalTimeType] {
         self.local_time_types
     }
 
@@ -535,16 +607,49 @@ impl<'a, S> TimeZoneRef<'a, S> {
     }
 
     /// Returns extra transition rule applicable after the last transition
-    pub const fn extra_rule(&self) -> &'a Option<GenericTransitionRule<S>> {
+    pub const fn extra_rule(&self) -> &'a Option<TransitionRule> {
         self.extra_rule
     }
 
+    /// Find the local time type associated to the time zone at the specified Unix time in seconds
+    pub const fn find_local_time_type(&self, unix_time: i64) -> Result<&'a LocalTimeType, FindLocalTimeTypeError> {
+        let extra_rule = match self.transitions.last() {
+            None => match self.extra_rule {
+                Some(extra_rule) => extra_rule,
+                None => return Ok(&self.local_time_types[0]),
+            },
+            Some(last_transition) => {
+                let unix_leap_time = self.unix_time_to_unix_leap_time(unix_time);
+
+                if unix_leap_time >= last_transition.unix_leap_time {
+                    match self.extra_rule {
+                        Some(extra_rule) => extra_rule,
+                        None => return Err(FindLocalTimeTypeError("no local time type is available for the specified timestamp")),
+                    }
+                } else {
+                    let index = match binary_search_transitions(self.transitions, unix_leap_time) {
+                        Ok(x) => x + 1,
+                        Err(x) => x,
+                    };
+
+                    let local_time_type_index = if index > 0 { self.transitions[index - 1].local_time_type_index } else { 0 };
+                    return Ok(&self.local_time_types[local_time_type_index]);
+                }
+            }
+        };
+
+        match extra_rule.find_local_time_type(unix_time) {
+            Ok(local_time_type) => Ok(local_time_type),
+            Err(OutOfRangeError(error)) => Err(FindLocalTimeTypeError(error)),
+        }
+    }
+
     /// Construct a reference to a time zone
-    const fn new(
+    const fn new_unchecked(
         transitions: &'a [Transition],
-        local_time_types: &'a [GenericLocalTimeType<S>],
+        local_time_types: &'a [LocalTimeType],
         leap_seconds: &'a [LeapSecond],
-        extra_rule: &'a Option<GenericTransitionRule<S>>,
+        extra_rule: &'a Option<TransitionRule>,
     ) -> Self {
         Self { transitions, local_time_types, leap_seconds, extra_rule }
     }
@@ -593,57 +698,29 @@ impl<'a, S> TimeZoneRef<'a, S> {
             i_leap_second += 1;
         }
 
-        Ok(())
-    }
-
-    /// Find the local time type of the last transition and the corresponding local time type of the extra rule evaluated at the same Unix leap time
-    #[allow(clippy::type_complexity)]
-    const fn find_last_local_time_types(&self) -> Result<Option<(&'a GenericLocalTimeType<S>, &'a GenericLocalTimeType<S>)>, OutOfRangeError> {
+        // Check extra rule
         if let (Some(extra_rule), Some(last_transition)) = (&self.extra_rule, self.transitions.last()) {
             let last_local_time_type = &self.local_time_types[last_transition.local_time_type_index];
 
             let rule_local_time_type = match extra_rule.find_local_time_type(self.unix_leap_time_to_unix_time(last_transition.unix_leap_time)) {
                 Ok(rule_local_time_type) => rule_local_time_type,
-                Err(error) => return Err(error),
+                Err(OutOfRangeError(error)) => return Err(TimeZoneError(error)),
             };
 
-            Ok(Some((last_local_time_type, rule_local_time_type)))
-        } else {
-            Ok(None)
-        }
-    }
+            let check = last_local_time_type.ut_offset == rule_local_time_type.ut_offset
+                && last_local_time_type.is_dst == rule_local_time_type.is_dst
+                && match (&last_local_time_type.time_zone_designation, &rule_local_time_type.time_zone_designation) {
+                    (Some(x), Some(y)) => x.equal(y),
+                    (None, None) => true,
+                    _ => false,
+                };
 
-    /// Find the local time type associated to the time zone at the specified Unix time in seconds
-    const fn find_local_time_type(&self, unix_time: i64) -> Result<&'a GenericLocalTimeType<S>, FindLocalTimeTypeError> {
-        let extra_rule = match self.transitions.last() {
-            None => match self.extra_rule {
-                Some(extra_rule) => extra_rule,
-                None => return Ok(&self.local_time_types[0]),
-            },
-            Some(last_transition) => {
-                let unix_leap_time = self.unix_time_to_unix_leap_time(unix_time);
-
-                if unix_leap_time >= last_transition.unix_leap_time {
-                    match self.extra_rule {
-                        Some(extra_rule) => extra_rule,
-                        None => return Err(FindLocalTimeTypeError("no local time type is available for the specified timestamp")),
-                    }
-                } else {
-                    let index = match binary_search_transitions(self.transitions, unix_leap_time) {
-                        Ok(x) => x + 1,
-                        Err(x) => x,
-                    };
-
-                    let local_time_type_index = if index > 0 { self.transitions[index - 1].local_time_type_index } else { 0 };
-                    return Ok(&self.local_time_types[local_time_type_index]);
-                }
+            if !check {
+                return Err(TimeZoneError("extra transition rule is inconsistent with the last transition"));
             }
-        };
-
-        match extra_rule.find_local_time_type(unix_time) {
-            Ok(local_time_type) => Ok(local_time_type),
-            Err(OutOfRangeError(error)) => Err(FindLocalTimeTypeError(error)),
         }
+
+        Ok(())
     }
 
     /// Convert Unix time to Unix leap time, from the list of leap seconds in a time zone
@@ -652,7 +729,7 @@ impl<'a, S> TimeZoneRef<'a, S> {
 
         let mut i = 0;
         while i < self.leap_seconds.len() {
-            let leap_second = self.leap_seconds[i];
+            let leap_second = &self.leap_seconds[i];
 
             if unix_leap_time < leap_second.unix_leap_time {
                 break;
@@ -679,23 +756,6 @@ impl<'a, S> TimeZoneRef<'a, S> {
     }
 }
 
-impl<'a> TimeZoneRef<'a, Arc<str>> {
-    /// Check extra rule
-    fn check_extra_rule(&self) -> Result<(), TimeZoneError> {
-        match self.find_last_local_time_types() {
-            Err(OutOfRangeError(error)) => Err(TimeZoneError(error)),
-            Ok(None) => Ok(()),
-            Ok(Some((last_local_time_type, rule_local_time_type))) => {
-                if last_local_time_type == rule_local_time_type {
-                    Ok(())
-                } else {
-                    Err(TimeZoneError("extra transition rule is inconsistent with the last transition"))
-                }
-            }
-        }
-    }
-}
-
 impl TimeZone {
     /// Construct a time zone
     pub fn new(
@@ -704,17 +764,13 @@ impl TimeZone {
         leap_seconds: Vec<LeapSecond>,
         extra_rule: Option<TransitionRule>,
     ) -> Result<Self, TimeZoneError> {
-        let time_zone_ref = TimeZoneRef::new(&transitions, &local_time_types, &leap_seconds, &extra_rule);
-
-        time_zone_ref.check_inputs()?;
-        time_zone_ref.check_extra_rule()?;
-
+        TimeZoneRef::new_unchecked(&transitions, &local_time_types, &leap_seconds, &extra_rule).check_inputs()?;
         Ok(Self { transitions, local_time_types, leap_seconds, extra_rule })
     }
 
     /// Returns a reference to the time zone
-    pub fn as_ref(&self) -> TimeZoneRef<Arc<str>> {
-        TimeZoneRef::new(&self.transitions, &self.local_time_types, &self.leap_seconds, &self.extra_rule)
+    pub fn as_ref(&self) -> TimeZoneRef {
+        TimeZoneRef::new_unchecked(&self.transitions, &self.local_time_types, &self.leap_seconds, &self.extra_rule)
     }
 
     /// Construct the time zone associated to UTC
@@ -796,16 +852,28 @@ impl TimeZone {
     }
 }
 
-impl TimeZoneLike for TimeZone {
-    fn find_local_time_type(&self, unix_time: i64) -> Result<LocalTimeType, FindLocalTimeTypeError> {
-        self.find_local_time_type(unix_time).map(Clone::clone)
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
     use crate::Result;
+
+    #[test]
+    fn test_tz_ascii_str() -> Result<()> {
+        assert!(matches!(TzAsciiStr::new(b""), Err(LocalTimeTypeError(_))));
+        assert!(matches!(TzAsciiStr::new(b"1"), Err(LocalTimeTypeError(_))));
+        assert!(matches!(TzAsciiStr::new(b"12"), Err(LocalTimeTypeError(_))));
+        assert_eq!(TzAsciiStr::new(b"123")?.as_bytes(), b"123");
+        assert_eq!(TzAsciiStr::new(b"1234")?.as_bytes(), b"1234");
+        assert_eq!(TzAsciiStr::new(b"12345")?.as_bytes(), b"12345");
+        assert_eq!(TzAsciiStr::new(b"123456")?.as_bytes(), b"123456");
+        assert_eq!(TzAsciiStr::new(b"1234567")?.as_bytes(), b"1234567");
+        assert_eq!(TzAsciiStr::new(b"12345678")?.as_bytes(), b"12345678");
+        assert!(matches!(TzAsciiStr::new(b"123456789"), Err(LocalTimeTypeError(_))));
+
+        assert!(matches!(TzAsciiStr::new(b"123\0\0\0"), Err(LocalTimeTypeError(_))));
+
+        Ok(())
+    }
 
     #[test]
     fn test_rule_day() -> Result<()> {
@@ -834,8 +902,8 @@ mod test {
         assert_eq!(transition_rule_fixed.find_local_time_type(0)?.ut_offset(), -36000);
 
         let transition_rule_dst = TransitionRule::Alternate(AlternateTime::new(
-            LocalTimeType::new(43200, false, Some("NZST".into()))?,
-            LocalTimeType::new(46800, true, Some("NZDT".into()))?,
+            LocalTimeType::new(43200, false, Some(b"NZST"))?,
+            LocalTimeType::new(46800, true, Some(b"NZDT"))?,
             RuleDay::MonthWeekDay(MonthWeekDay::new(10, 1, 0)?),
             7200,
             RuleDay::MonthWeekDay(MonthWeekDay::new(3, 3, 0)?),
@@ -848,8 +916,8 @@ mod test {
         assert_eq!(transition_rule_dst.find_local_time_type(970322400)?.ut_offset(), 46800);
 
         let transition_rule_negative_dst = TransitionRule::Alternate(AlternateTime::new(
-            LocalTimeType::new(3600, false, Some("IST".into()))?,
-            LocalTimeType::new(0, true, Some("GMT".into()))?,
+            LocalTimeType::new(3600, false, Some(b"IST"))?,
+            LocalTimeType::new(0, true, Some(b"GMT"))?,
             RuleDay::MonthWeekDay(MonthWeekDay::new(10, 5, 0)?),
             7200,
             RuleDay::MonthWeekDay(MonthWeekDay::new(3, 5, 0)?),
@@ -876,8 +944,8 @@ mod test {
         assert!(transition_rule_negative_time_1.find_local_time_type(8640000)?.is_dst());
 
         let transition_rule_negative_time_2 = TransitionRule::Alternate(AlternateTime::new(
-            LocalTimeType::new(-10800, false, Some("-03".into()))?,
-            LocalTimeType::new(-7200, true, Some("-02".into()))?,
+            LocalTimeType::new(-10800, false, Some(b"-03"))?,
+            LocalTimeType::new(-7200, true, Some(b"-02"))?,
             RuleDay::MonthWeekDay(MonthWeekDay::new(3, 5, 0)?),
             -7200,
             RuleDay::MonthWeekDay(MonthWeekDay::new(10, 5, 0)?),
@@ -890,8 +958,8 @@ mod test {
         assert_eq!(transition_rule_negative_time_2.find_local_time_type(972781200)?.ut_offset(), -10800);
 
         let transition_rule_all_year_dst = TransitionRule::Alternate(AlternateTime::new(
-            LocalTimeType::new(-18000, false, Some("EST".into()))?,
-            LocalTimeType::new(-14400, true, Some("EDT".into()))?,
+            LocalTimeType::new(-18000, false, Some(b"EST"))?,
+            LocalTimeType::new(-14400, true, Some(b"EDT"))?,
             RuleDay::Julian0WithLeap(Julian0WithLeap::new(0)?),
             0,
             RuleDay::Julian1WithoutLeap(Julian1WithoutLeap::new(365)?),
@@ -993,7 +1061,7 @@ mod test {
     fn test_leap_seconds() -> Result<()> {
         let time_zone = TimeZone::new(
             Vec::new(),
-            vec![LocalTimeType::new(0, false, Some("UTC".into()))?],
+            vec![LocalTimeType::new(0, false, Some(b"UTC"))?],
             vec![
                 LeapSecond::new(78796800, 1),
                 LeapSecond::new(94694401, 2),

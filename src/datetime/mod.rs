@@ -1,14 +1,11 @@
 //! Types related to a date time.
 
-pub(crate) mod statics;
-
 use crate::error::*;
-use crate::timezone::GenericLocalTimeType;
+use crate::timezone::LocalTimeType;
+use crate::timezone::TimeZoneRef;
 use crate::utils::*;
-use crate::TimeZoneLike;
 
 use std::cmp::Ordering;
-use std::sync::Arc;
 use std::time::SystemTime;
 
 /// UTC date time exprimed in the [proleptic gregorian calendar](https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar)
@@ -180,14 +177,14 @@ impl UtcDateTime {
     ///
     /// Leap seconds are not preserved.
     ///
-    pub fn project(&self, time_zone: &impl TimeZoneLike) -> Result<DateTime, ProjectDateTimeError> {
-        DateTime::from_unix_time(self.unix_time(), time_zone)
+    pub const fn project(&self, time_zone_ref: TimeZoneRef) -> Result<DateTime, ProjectDateTimeError> {
+        DateTime::from_unix_time(self.unix_time(), time_zone_ref)
     }
 }
 
-/// Generic date time associated to a local time type, exprimed in the [proleptic gregorian calendar](https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar)
+/// Date time associated to a local time type, exprimed in the [proleptic gregorian calendar](https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar)
 #[derive(Debug, Clone)]
-pub struct GenericDateTime<S> {
+pub struct DateTime {
     /// Years since 1900
     year: i32,
     /// Month in `[0, 11]`
@@ -201,49 +198,57 @@ pub struct GenericDateTime<S> {
     /// Seconds in `[0, 60]`, with a possible leap second
     second: u8,
     /// Local time type
-    local_time_type: GenericLocalTimeType<S>,
+    local_time_type: LocalTimeType,
     /// UTC Unix time in seconds
     unix_time: i64,
 }
 
-/// Date time associated to a local time type, exprimed in the [proleptic gregorian calendar](https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar)
-pub type DateTime = GenericDateTime<Arc<str>>;
-
-impl<S> PartialEq for GenericDateTime<S> {
+impl PartialEq for DateTime {
     fn eq(&self, other: &Self) -> bool {
         self.unix_time == other.unix_time
     }
 }
 
-impl<S> PartialOrd for GenericDateTime<S> {
+impl PartialOrd for DateTime {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.unix_time.partial_cmp(&other.unix_time)
     }
 }
 
-impl GenericDateTime<Arc<str>> {
+impl DateTime {
     /// Construct a date time from a Unix time in seconds and a time zone
-    pub fn from_unix_time(unix_time: i64, time_zone: &impl TimeZoneLike) -> Result<Self, ProjectDateTimeError> {
-        let local_time_type = time_zone.find_local_time_type(unix_time)?;
+    pub const fn from_unix_time(unix_time: i64, time_zone_ref: TimeZoneRef) -> Result<Self, ProjectDateTimeError> {
+        let local_time_type = match time_zone_ref.find_local_time_type(unix_time) {
+            Ok(local_time_type) => local_time_type.clone(),
+            Err(FindLocalTimeTypeError(error)) => return Err(ProjectDateTimeError(error)),
+        };
 
-        let unix_time_with_offset = unix_time.checked_add(local_time_type.ut_offset() as i64).ok_or(OutOfRangeError("out of range date time"))?;
+        let unix_time_with_offset = match unix_time.checked_add(local_time_type.ut_offset() as i64) {
+            Some(unix_time_with_offset) => unix_time_with_offset,
+            None => return Err(ProjectDateTimeError("out of range date time")),
+        };
 
-        let UtcDateTime { year, month, month_day, hour, minute, second } = UtcDateTime::from_unix_time(unix_time_with_offset)?;
+        let utc_date_time_with_offset = match UtcDateTime::from_unix_time(unix_time_with_offset) {
+            Ok(utc_date_time_with_offset) => utc_date_time_with_offset,
+            Err(OutOfRangeError(error)) => return Err(ProjectDateTimeError(error)),
+        };
+
+        let UtcDateTime { year, month, month_day, hour, minute, second } = utc_date_time_with_offset;
         Ok(Self { year, month, month_day, hour, minute, second, local_time_type, unix_time })
     }
 
     /// Returns the current date time associated to the specified time zone
-    pub fn now(time_zone: &impl TimeZoneLike) -> Result<Self, TzError> {
+    pub fn now(time_zone_ref: TimeZoneRef) -> Result<Self, TzError> {
         let unix_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs().try_into()?;
-        Ok(Self::from_unix_time(unix_time, time_zone)?)
+        Ok(Self::from_unix_time(unix_time, time_zone_ref)?)
     }
 
     /// Project the date time into another time zone.
     ///
     /// Leap seconds are not preserved.
     ///
-    pub fn project(&self, time_zone: &impl TimeZoneLike) -> Result<Self, ProjectDateTimeError> {
-        Self::from_unix_time(self.unix_time, time_zone)
+    pub const fn project(&self, time_zone_ref: TimeZoneRef) -> Result<Self, ProjectDateTimeError> {
+        Self::from_unix_time(self.unix_time, time_zone_ref)
     }
 }
 
@@ -301,11 +306,11 @@ impl UtcDateTime {
     impl_datetime!();
 }
 
-impl<S> GenericDateTime<S> {
+impl DateTime {
     impl_datetime!();
 
     /// Returns local time type
-    pub const fn local_time_type(&self) -> &GenericLocalTimeType<S> {
+    pub const fn local_time_type(&self) -> &LocalTimeType {
         &self.local_time_type
     }
 
@@ -399,12 +404,10 @@ pub(crate) const fn days_since_unix_epoch(year: i32, month: usize, month_day: i6
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::timezone::{LocalTimeType, TimeZone};
+    use crate::timezone::*;
     use crate::Result;
 
-    use std::fmt::Debug;
-
-    fn check_equal_date_time<S: Debug + PartialEq>(x: &GenericDateTime<S>, y: &GenericDateTime<S>) {
+    fn check_equal_date_time(x: &DateTime, y: &DateTime) {
         assert_eq!(x.year, y.year);
         assert_eq!(x.month, y.month);
         assert_eq!(x.month_day, y.month_day);
@@ -426,9 +429,9 @@ mod test {
         let time_zone_eet = TimeZone::fixed(7200)?;
         let eet = LocalTimeType::with_ut_offset(7200)?;
 
-        assert_eq!(DateTime::now(&time_zone_utc)?.local_time_type().ut_offset(), 0);
-        assert_eq!(DateTime::now(&time_zone_cet)?.local_time_type().ut_offset(), 3600);
-        assert_eq!(DateTime::now(&time_zone_eet)?.local_time_type().ut_offset(), 7200);
+        assert_eq!(DateTime::now(time_zone_utc.as_ref())?.local_time_type().ut_offset(), 0);
+        assert_eq!(DateTime::now(time_zone_cet.as_ref())?.local_time_type().ut_offset(), 3600);
+        assert_eq!(DateTime::now(time_zone_eet.as_ref())?.local_time_type().ut_offset(), 7200);
 
         let unix_times = [
             -93750523200,
@@ -519,21 +522,21 @@ mod test {
             assert_eq!(date_time_utc, date_time_cet);
             assert_eq!(date_time_utc, date_time_eet);
 
-            check_equal_date_time(&utc_date_time.project(&time_zone_utc)?, &date_time_utc);
-            check_equal_date_time(&utc_date_time.project(&time_zone_cet)?, &date_time_cet);
-            check_equal_date_time(&utc_date_time.project(&time_zone_eet)?, &date_time_eet);
+            check_equal_date_time(&utc_date_time.project(time_zone_utc.as_ref())?, &date_time_utc);
+            check_equal_date_time(&utc_date_time.project(time_zone_cet.as_ref())?, &date_time_cet);
+            check_equal_date_time(&utc_date_time.project(time_zone_eet.as_ref())?, &date_time_eet);
 
-            check_equal_date_time(&date_time_utc.project(&time_zone_utc)?, &date_time_utc);
-            check_equal_date_time(&date_time_cet.project(&time_zone_utc)?, &date_time_utc);
-            check_equal_date_time(&date_time_eet.project(&time_zone_utc)?, &date_time_utc);
+            check_equal_date_time(&date_time_utc.project(time_zone_utc.as_ref())?, &date_time_utc);
+            check_equal_date_time(&date_time_cet.project(time_zone_utc.as_ref())?, &date_time_utc);
+            check_equal_date_time(&date_time_eet.project(time_zone_utc.as_ref())?, &date_time_utc);
 
-            check_equal_date_time(&date_time_utc.project(&time_zone_cet)?, &date_time_cet);
-            check_equal_date_time(&date_time_cet.project(&time_zone_cet)?, &date_time_cet);
-            check_equal_date_time(&date_time_eet.project(&time_zone_cet)?, &date_time_cet);
+            check_equal_date_time(&date_time_utc.project(time_zone_cet.as_ref())?, &date_time_cet);
+            check_equal_date_time(&date_time_cet.project(time_zone_cet.as_ref())?, &date_time_cet);
+            check_equal_date_time(&date_time_eet.project(time_zone_cet.as_ref())?, &date_time_cet);
 
-            check_equal_date_time(&date_time_utc.project(&time_zone_eet)?, &date_time_eet);
-            check_equal_date_time(&date_time_cet.project(&time_zone_eet)?, &date_time_eet);
-            check_equal_date_time(&date_time_eet.project(&time_zone_eet)?, &date_time_eet);
+            check_equal_date_time(&date_time_utc.project(time_zone_eet.as_ref())?, &date_time_eet);
+            check_equal_date_time(&date_time_cet.project(time_zone_eet.as_ref())?, &date_time_eet);
+            check_equal_date_time(&date_time_eet.project(time_zone_eet.as_ref())?, &date_time_eet);
         }
 
         Ok(())
@@ -545,7 +548,7 @@ mod test {
 
         assert_eq!(UtcDateTime::from_unix_time(utc_date_time.unix_time())?, UtcDateTime::new(1972, 6, 1, 0, 0, 0)?);
 
-        let date_time = utc_date_time.project(&TimeZone::fixed(-3600)?)?;
+        let date_time = utc_date_time.project(TimeZone::fixed(-3600)?.as_ref())?;
 
         let date_time_result = DateTime {
             year: 72,
@@ -573,17 +576,17 @@ mod test {
         let utc_date_time_2 = UtcDateTime::from_unix_time(2)?;
         let utc_date_time_3 = UtcDateTime::from_unix_time(3)?;
 
-        let date_time_utc_1 = utc_date_time_1.project(&time_zone_utc)?;
-        let date_time_utc_2 = utc_date_time_2.project(&time_zone_utc)?;
-        let date_time_utc_3 = utc_date_time_3.project(&time_zone_utc)?;
+        let date_time_utc_1 = utc_date_time_1.project(time_zone_utc.as_ref())?;
+        let date_time_utc_2 = utc_date_time_2.project(time_zone_utc.as_ref())?;
+        let date_time_utc_3 = utc_date_time_3.project(time_zone_utc.as_ref())?;
 
-        let date_time_cet_1 = utc_date_time_1.project(&time_zone_cet)?;
-        let date_time_cet_2 = utc_date_time_2.project(&time_zone_cet)?;
-        let date_time_cet_3 = utc_date_time_3.project(&time_zone_cet)?;
+        let date_time_cet_1 = utc_date_time_1.project(time_zone_cet.as_ref())?;
+        let date_time_cet_2 = utc_date_time_2.project(time_zone_cet.as_ref())?;
+        let date_time_cet_3 = utc_date_time_3.project(time_zone_cet.as_ref())?;
 
-        let date_time_eet_1 = utc_date_time_1.project(&time_zone_eet)?;
-        let date_time_eet_2 = utc_date_time_2.project(&time_zone_eet)?;
-        let date_time_eet_3 = utc_date_time_3.project(&time_zone_eet)?;
+        let date_time_eet_1 = utc_date_time_1.project(time_zone_eet.as_ref())?;
+        let date_time_eet_2 = utc_date_time_2.project(time_zone_eet.as_ref())?;
+        let date_time_eet_3 = utc_date_time_3.project(time_zone_eet.as_ref())?;
 
         assert_eq!(date_time_utc_1, date_time_cet_1);
         assert_eq!(date_time_utc_1, date_time_eet_1);
@@ -615,7 +618,7 @@ mod test {
     #[test]
     fn test_date_time_sync_and_send() {
         trait AssertSyncSendStatic: Sync + Send + 'static {}
-        impl<S: Sync + Send + 'static> AssertSyncSendStatic for GenericDateTime<S> {}
+        impl AssertSyncSendStatic for DateTime {}
     }
 
     #[test]
@@ -657,11 +660,11 @@ mod test {
         assert!(matches!(UtcDateTime::from_unix_time(UtcDateTime::MIN_UNIX_TIME - 1), Err(OutOfRangeError(_))));
         assert!(matches!(UtcDateTime::from_unix_time(UtcDateTime::MAX_UNIX_TIME + 1), Err(OutOfRangeError(_))));
 
-        assert!(matches!(UtcDateTime::from_unix_time(UtcDateTime::MIN_UNIX_TIME)?.project(&TimeZone::fixed(-1)?), Err(ProjectDateTimeError(_))));
-        assert!(matches!(UtcDateTime::from_unix_time(UtcDateTime::MAX_UNIX_TIME)?.project(&TimeZone::fixed(1)?), Err(ProjectDateTimeError(_))));
+        assert!(matches!(UtcDateTime::from_unix_time(UtcDateTime::MIN_UNIX_TIME)?.project(TimeZone::fixed(-1)?.as_ref()), Err(ProjectDateTimeError(_))));
+        assert!(matches!(UtcDateTime::from_unix_time(UtcDateTime::MAX_UNIX_TIME)?.project(TimeZone::fixed(1)?.as_ref()), Err(ProjectDateTimeError(_))));
 
-        assert!(matches!(DateTime::from_unix_time(i64::MIN, &TimeZone::fixed(-1)?), Err(ProjectDateTimeError(_))));
-        assert!(matches!(DateTime::from_unix_time(i64::MAX, &TimeZone::fixed(1)?), Err(ProjectDateTimeError(_))));
+        assert!(matches!(DateTime::from_unix_time(i64::MIN, TimeZone::fixed(-1)?.as_ref()), Err(ProjectDateTimeError(_))));
+        assert!(matches!(DateTime::from_unix_time(i64::MAX, TimeZone::fixed(1)?.as_ref()), Err(ProjectDateTimeError(_))));
 
         Ok(())
     }
@@ -721,5 +724,99 @@ mod test {
         assert_eq!(days_since_unix_epoch(104, 1, 29), 12477);
         assert_eq!(days_since_unix_epoch(200, 2, 1), 47541);
         assert_eq!(days_since_unix_epoch(1101, 2, 1), 376624);
+    }
+
+    #[test]
+    fn test_const() -> Result<()> {
+        macro_rules! unwrap {
+            ($x:expr) => {
+                match $x {
+                    Ok(x) => x,
+                    Err(error) => panic!("{}", error.0),
+                }
+            };
+        }
+
+        macro_rules! to_const {
+            ($type:ty, $x:expr) => {{
+                const TMP: $type = $x;
+                TMP
+            }};
+        }
+
+        const TIME_ZONE_REF: TimeZoneRef = unwrap!(TimeZoneRef::new(
+            &[
+                Transition::new(-2334101314, 1),
+                Transition::new(-1157283000, 2),
+                Transition::new(-1155436200, 1),
+                Transition::new(-880198200, 3),
+                Transition::new(-769395600, 4),
+                Transition::new(-765376200, 1),
+                Transition::new(-712150200, 5),
+            ],
+            to_const!(
+                &[LocalTimeType],
+                &[
+                    unwrap!(LocalTimeType::new(-37886, false, Some(b"LMT"))),
+                    unwrap!(LocalTimeType::new(-37800, false, Some(b"HST"))),
+                    unwrap!(LocalTimeType::new(-34200, true, Some(b"HDT"))),
+                    unwrap!(LocalTimeType::new(-34200, true, Some(b"HWT"))),
+                    unwrap!(LocalTimeType::new(-34200, true, Some(b"HPT"))),
+                    unwrap!(LocalTimeType::new(-36000, false, Some(b"HST"))),
+                ]
+            ),
+            &[
+                LeapSecond::new(78796800, 1),
+                LeapSecond::new(94694401, 2),
+                LeapSecond::new(126230402, 3),
+                LeapSecond::new(157766403, 4),
+                LeapSecond::new(189302404, 5),
+                LeapSecond::new(220924805, 6),
+            ],
+            to_const!(
+                &Option<TransitionRule>,
+                &Some(TransitionRule::Alternate(unwrap!(AlternateTime::new(
+                    unwrap!(LocalTimeType::new(-36000, false, Some(b"HST"))),
+                    unwrap!(LocalTimeType::new(-34200, true, Some(b"HPT"))),
+                    RuleDay::MonthWeekDay(unwrap!(MonthWeekDay::new(10, 5, 0))),
+                    93600,
+                    RuleDay::MonthWeekDay(unwrap!(MonthWeekDay::new(3, 4, 4))),
+                    7200,
+                ))))
+            ),
+        ));
+
+        const UTC: TimeZoneRef = TimeZoneRef::utc();
+
+        const UNIX_EPOCH: UtcDateTime = unwrap!(UtcDateTime::from_unix_time(0));
+        const UTC_DATE_TIME: UtcDateTime = unwrap!(UtcDateTime::new(2000, 0, 1, 0, 0, 0));
+
+        const DATE_TIME_1: DateTime = unwrap!(UTC_DATE_TIME.project(TIME_ZONE_REF));
+        const DATE_TIME_2: DateTime = unwrap!(DATE_TIME_1.project(UTC));
+
+        const LOCAL_TIME_TYPE_1: &LocalTimeType = DATE_TIME_1.local_time_type();
+        const LOCAL_TIME_TYPE_2: &LocalTimeType = DATE_TIME_2.local_time_type();
+
+        assert_eq!(UNIX_EPOCH.unix_time(), 0);
+        assert_eq!(DATE_TIME_2.unix_time(), UTC_DATE_TIME.unix_time());
+
+        let date_time = UTC_DATE_TIME.project(TIME_ZONE_REF)?;
+        assert_eq!(date_time.local_time_type().time_zone_designation(), LOCAL_TIME_TYPE_1.time_zone_designation());
+
+        let date_time_1 = DateTime::from_unix_time(UTC_DATE_TIME.unix_time(), TIME_ZONE_REF)?;
+        let date_time_2 = date_time_1.project(UTC)?;
+
+        let local_time_type_1 = date_time_1.local_time_type();
+        let local_time_type_2 = date_time_2.local_time_type();
+
+        assert_eq!(local_time_type_1.ut_offset(), LOCAL_TIME_TYPE_1.ut_offset());
+        assert_eq!(local_time_type_1.is_dst(), LOCAL_TIME_TYPE_1.is_dst());
+        assert_eq!(local_time_type_1.time_zone_designation(), LOCAL_TIME_TYPE_1.time_zone_designation());
+
+        assert_eq!(local_time_type_2.ut_offset(), LOCAL_TIME_TYPE_2.ut_offset());
+        assert_eq!(local_time_type_2.is_dst(), LOCAL_TIME_TYPE_2.is_dst());
+        assert_eq!(local_time_type_2.time_zone_designation(), LOCAL_TIME_TYPE_2.time_zone_designation());
+
+        Ok(())
     }
 }
