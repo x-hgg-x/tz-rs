@@ -36,7 +36,7 @@ pub const CUMUL_DAY_IN_MONTHS_NORMAL_YEAR: [i64; 12] = [0, 31, 59, 90, 120, 151,
 
 /// Unix time at `2000-03-01T00:00:00Z` (Wednesday)
 pub const UNIX_OFFSET_SECS: i64 = 951868800;
-/// Number of years between `2000` and `1900`
-pub const OFFSET_YEARS: i64 = 100;
+/// Offset year
+pub const OFFSET_YEAR: i64 = 2000;
 /// Month days in a leap year from March
 pub const DAY_IN_MONTHS_LEAP_YEAR_FROM_MARCH: [i64; 12] = [31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29];

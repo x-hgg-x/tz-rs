@@ -300,10 +300,6 @@ pub enum RuleDay {
 impl RuleDay {
     /// Get the transition date for the provided year
     ///
-    /// ## Inputs
-    ///
-    /// * `year`: Years since 1900
-    ///
     /// ## Outputs
     ///
     /// * `month`: Month in `[1, 12]`
@@ -366,12 +362,6 @@ impl RuleDay {
     }
 
     /// Returns the UTC Unix time in seconds associated to the transition date for the provided year
-    ///
-    /// ## Inputs
-    ///
-    /// * `year`: Years since 1900
-    /// * `day_time_in_utc`: UTC day time in seconds
-    ///
     const fn unix_time(&self, year: i32, day_time_in_utc: i64) -> i64 {
         use crate::constants::*;
 
@@ -460,7 +450,7 @@ impl AlternateTime {
         };
 
         // Check if the current year is valid for the following computations
-        if !(i32::MIN + 2 <= current_year && current_year <= i32::MAX - 1900 - 2) {
+        if !(i32::MIN + 2 <= current_year && current_year <= i32::MAX - 2) {
             return Err(OutOfRangeError("out of range date time"));
         }
 
@@ -878,20 +868,20 @@ mod test {
     #[test]
     fn test_rule_day() -> Result<()> {
         let rule_day_j1 = RuleDay::Julian1WithoutLeap(Julian1WithoutLeap::new(60)?);
-        assert_eq!(rule_day_j1.transition_date(100), (3, 1));
-        assert_eq!(rule_day_j1.transition_date(101), (3, 1));
-        assert_eq!(rule_day_j1.unix_time(100, 43200), 951912000);
+        assert_eq!(rule_day_j1.transition_date(2000), (3, 1));
+        assert_eq!(rule_day_j1.transition_date(2001), (3, 1));
+        assert_eq!(rule_day_j1.unix_time(2000, 43200), 951912000);
 
         let rule_day_j0 = RuleDay::Julian0WithLeap(Julian0WithLeap::new(59)?);
-        assert_eq!(rule_day_j0.transition_date(100), (2, 29));
-        assert_eq!(rule_day_j0.transition_date(101), (3, 1));
-        assert_eq!(rule_day_j0.unix_time(100, 43200), 951825600);
+        assert_eq!(rule_day_j0.transition_date(2000), (2, 29));
+        assert_eq!(rule_day_j0.transition_date(2001), (3, 1));
+        assert_eq!(rule_day_j0.unix_time(2000, 43200), 951825600);
 
         let rule_day_mwd = RuleDay::MonthWeekDay(MonthWeekDay::new(2, 5, 2)?);
-        assert_eq!(rule_day_mwd.transition_date(100), (2, 29));
-        assert_eq!(rule_day_mwd.transition_date(101), (2, 27));
-        assert_eq!(rule_day_mwd.unix_time(100, 43200), 951825600);
-        assert_eq!(rule_day_mwd.unix_time(101, 43200), 983275200);
+        assert_eq!(rule_day_mwd.transition_date(2000), (2, 29));
+        assert_eq!(rule_day_mwd.transition_date(2001), (2, 27));
+        assert_eq!(rule_day_mwd.unix_time(2000, 43200), 951825600);
+        assert_eq!(rule_day_mwd.unix_time(2001, 43200), 983275200);
 
         Ok(())
     }
@@ -977,9 +967,9 @@ mod test {
         let transition_rule_1 = TransitionRule::Alternate(AlternateTime::new(
             LocalTimeType::new(-1, false, None)?,
             LocalTimeType::new(-1, true, None)?,
-            RuleDay::Julian1WithoutLeap(Julian1WithoutLeap::new(1)?),
-            0,
             RuleDay::Julian1WithoutLeap(Julian1WithoutLeap::new(365)?),
+            0,
+            RuleDay::Julian1WithoutLeap(Julian1WithoutLeap::new(1)?),
             0,
         )?);
 
@@ -992,8 +982,11 @@ mod test {
             0,
         )?);
 
-        assert!(matches!(transition_rule_1.find_local_time_type(UtcDateTime::MIN_UNIX_TIME + 1), Err(OutOfRangeError(_))));
-        assert!(matches!(transition_rule_2.find_local_time_type(UtcDateTime::MAX_UNIX_TIME - 1), Err(OutOfRangeError(_))));
+        let min_unix_time = -67768100567971200;
+        let max_unix_time = 67767976233532799;
+
+        assert!(matches!(transition_rule_1.find_local_time_type(min_unix_time), Err(OutOfRangeError(_))));
+        assert!(matches!(transition_rule_2.find_local_time_type(max_unix_time), Err(OutOfRangeError(_))));
 
         Ok(())
     }
