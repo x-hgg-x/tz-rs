@@ -422,15 +422,15 @@ mod test {
     use crate::Result;
 
     fn check_equal_date_time(x: &DateTime, y: &DateTime) {
-        assert_eq!(x.year, y.year);
-        assert_eq!(x.month, y.month);
-        assert_eq!(x.month_day, y.month_day);
-        assert_eq!(x.hour, y.hour);
-        assert_eq!(x.minute, y.minute);
-        assert_eq!(x.second, y.second);
-        assert_eq!(x.local_time_type, y.local_time_type);
-        assert_eq!(x.unix_time, y.unix_time);
-        assert_eq!(x.nanoseconds, y.nanoseconds);
+        assert_eq!(x.year(), y.year());
+        assert_eq!(x.month(), y.month());
+        assert_eq!(x.month_day(), y.month_day());
+        assert_eq!(x.hour(), y.hour());
+        assert_eq!(x.minute(), y.minute());
+        assert_eq!(x.second(), y.second());
+        assert_eq!(x.local_time_type(), y.local_time_type());
+        assert_eq!(x.unix_time(), y.unix_time());
+        assert_eq!(x.nanoseconds(), y.nanoseconds());
     }
 
     #[test]
