@@ -70,10 +70,15 @@ fn main() -> Result<()> {
     println!("{:#?}", another_date_time);
 
     // Get the corresponding UTC Unix times with nanoseconds
-    println!("{}.{:09}", utc_date_time.unix_time(), utc_date_time.nanoseconds());
-    println!("{}.{:09}", other_utc_date_time.unix_time(), other_utc_date_time.nanoseconds());
-    println!("{}.{:09}", date_time.unix_time(), date_time.nanoseconds());
-    println!("{}.{:09}", other_date_time.unix_time(), other_date_time.nanoseconds());
+    println!("{:?}", (utc_date_time.unix_time(), utc_date_time.nanoseconds()));
+    println!("{:?}", (other_utc_date_time.unix_time(), other_utc_date_time.nanoseconds()));
+    println!("{:?}", (date_time.unix_time(), date_time.nanoseconds()));
+    println!("{:?}", (other_date_time.unix_time(), other_date_time.nanoseconds()));
+
+    // Nanoseconds are always added towards the future
+    let neg_utc_date_time = UtcDateTime::from_timespec(-1, 123_456_789)?;
+    println!("{}", neg_utc_date_time);
+    println!("{}", neg_utc_date_time.total_nanoseconds());
 
     // Get the current date time at the local time zone (UNIX only)
     let time_zone_local = TimeZone::local()?;

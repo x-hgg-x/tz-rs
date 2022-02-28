@@ -308,6 +308,11 @@ macro_rules! impl_datetime {
         pub const fn year_day(&self) -> u16 {
             year_day(self.year, self.month as usize, self.month_day as i64)
         }
+
+        /// Returns total nanoseconds since Unix epoch (`1970-01-01T00:00:00Z`)
+        pub const fn total_nanoseconds(&self) -> i128 {
+            nanoseconds_since_unix_epoch(self.unix_time(), self.nanoseconds)
+        }
     };
 }
 
@@ -402,6 +407,14 @@ pub(crate) const fn days_since_unix_epoch(year: i32, month: usize, month_day: i6
     result += CUMUL_DAY_IN_MONTHS_NORMAL_YEAR[month - 1] + month_day - 1;
 
     result
+}
+
+/// Compute the number of nanoseconds since Unix epoch (`1970-01-01T00:00:00Z`)
+const fn nanoseconds_since_unix_epoch(unix_time: i64, nanoseconds: u32) -> i128 {
+    use crate::constants::*;
+
+    // Overflow is not possible
+    unix_time as i128 * NANOSECONDS_PER_SECOND as i128 + nanoseconds as i128
 }
 
 /// Format a date time
@@ -869,6 +882,14 @@ mod test {
         assert_eq!(days_since_unix_epoch(2004, 2, 29), 12477);
         assert_eq!(days_since_unix_epoch(2100, 3, 1), 47541);
         assert_eq!(days_since_unix_epoch(3001, 3, 1), 376624);
+    }
+
+    #[test]
+    fn test_nanoseconds_since_unix_epoch() {
+        assert_eq!(nanoseconds_since_unix_epoch(1, 1000), 1_000_001_000);
+        assert_eq!(nanoseconds_since_unix_epoch(0, 1000), 1000);
+        assert_eq!(nanoseconds_since_unix_epoch(-1, 1000), -999_999_000);
+        assert_eq!(nanoseconds_since_unix_epoch(-2, 1000), -1_999_999_000);
     }
 
     #[test]
