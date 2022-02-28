@@ -196,7 +196,25 @@ impl fmt::Display for TzError {
     }
 }
 
-impl error::Error for TzError {}
+impl error::Error for TzError {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        match self {
+            TzError::Utf8Error(err) => Some(err),
+            TzError::TryFromSliceError(err) => Some(err),
+            TzError::IoError(err) => Some(err),
+            TzError::SystemTimeError(err) => Some(err),
+            TzError::TzFileError(err) => Some(err),
+            TzError::TzStringError(err) => Some(err),
+            TzError::OutOfRangeError(err) => Some(err),
+            TzError::LocalTimeTypeError(err) => Some(err),
+            TzError::TransitionRuleError(err) => Some(err),
+            TzError::TimeZoneError(err) => Some(err),
+            TzError::DateTimeError(err) => Some(err),
+            TzError::FindLocalTimeTypeError(err) => Some(err),
+            TzError::ProjectDateTimeError(err) => Some(err),
+        }
+    }
+}
 
 impl From<Utf8Error> for TzError {
     fn from(error: Utf8Error) -> Self {
