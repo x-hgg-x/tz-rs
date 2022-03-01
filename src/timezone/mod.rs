@@ -68,10 +68,8 @@ impl LeapSecond {
 /// ASCII-encoded fixed-capacity string, used for storing time zone designations
 #[derive(Copy, Clone, Eq, PartialEq)]
 struct TzAsciiStr {
-    /// Array buffer
+    /// a Pascal string
     bytes: [u8; 8],
-    /// Length of the string
-    len: u8,
 }
 
 impl TzAsciiStr {
@@ -79,12 +77,14 @@ impl TzAsciiStr {
     const fn new(input: &[u8]) -> Result<Self, LocalTimeTypeError> {
         let len = input.len();
 
-        if !(3 <= len && len <= 8) {
+        if !(3 <= len && len <= 7) {
             return Err(LocalTimeTypeError("time zone designation must have between 3 and 8 characters"));
         }
 
         let mut bytes = [0; 8];
+        bytes[0] = input.len() as u8;
 
+        // rationale: using for() is not allows in const fn()
         let mut i = 0;
         while i < len {
             let b = input[i];
@@ -93,23 +93,22 @@ impl TzAsciiStr {
                 return Err(LocalTimeTypeError("invalid characters in time zone designation"));
             }
 
-            bytes[i] = b;
+            bytes[i + 1] = b;
 
             i += 1;
         }
 
-        Ok(Self { bytes, len: len as u8 })
+        Ok(Self { bytes })
     }
 
     /// Returns time zone designation as a byte slice
     const fn as_bytes(&self) -> &[u8] {
-        match (self.len, &self.bytes as &[u8]) {
-            (3, [head @ .., _, _, _, _, _]) => head,
-            (4, [head @ .., _, _, _, _]) => head,
-            (5, [head @ .., _, _, _]) => head,
-            (6, [head @ .., _, _]) => head,
-            (7, [head @ .., _]) => head,
-            (8, head) => head,
+        match &self.bytes {
+            [3, head @ .., _, _, _, _] => head,
+            [4, head @ .., _, _, _] => head,
+            [5, head @ .., _, _] => head,
+            [6, head @ .., _] => head,
+            [7, head @ ..] => head,
             _ => unreachable!(),
         }
     }
@@ -857,8 +856,9 @@ mod test {
         assert_eq!(TzAsciiStr::new(b"12345")?.as_bytes(), b"12345");
         assert_eq!(TzAsciiStr::new(b"123456")?.as_bytes(), b"123456");
         assert_eq!(TzAsciiStr::new(b"1234567")?.as_bytes(), b"1234567");
-        assert_eq!(TzAsciiStr::new(b"12345678")?.as_bytes(), b"12345678");
+        assert!(matches!(TzAsciiStr::new(b"12345678"), Err(LocalTimeTypeError(_))));
         assert!(matches!(TzAsciiStr::new(b"123456789"), Err(LocalTimeTypeError(_))));
+        assert!(matches!(TzAsciiStr::new(b"1234567890"), Err(LocalTimeTypeError(_))));
 
         assert!(matches!(TzAsciiStr::new(b"123\0\0\0"), Err(LocalTimeTypeError(_))));
 
