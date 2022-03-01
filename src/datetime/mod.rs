@@ -9,7 +9,7 @@ use std::fmt;
 use std::time::SystemTime;
 
 /// UTC date time exprimed in the [proleptic gregorian calendar](https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar)
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub struct UtcDateTime {
     /// Year
     year: i32,
@@ -183,7 +183,7 @@ impl UtcDateTime {
 }
 
 /// Date time associated to a local time type, exprimed in the [proleptic gregorian calendar](https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar)
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct DateTime {
     /// Year
     year: i32,

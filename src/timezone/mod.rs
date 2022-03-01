@@ -135,7 +135,7 @@ impl fmt::Debug for TzAsciiStr {
 }
 
 /// Local time type associated to a time zone
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct LocalTimeType {
     /// Offset from UTC in seconds
     ut_offset: i32,
