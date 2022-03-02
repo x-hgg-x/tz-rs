@@ -606,7 +606,10 @@ impl<'a> TimeZoneRef<'a> {
                 None => return Ok(&self.local_time_types[0]),
             },
             Some(last_transition) => {
-                let unix_leap_time = self.unix_time_to_unix_leap_time(unix_time);
+                let unix_leap_time = match self.unix_time_to_unix_leap_time(unix_time) {
+                    Ok(unix_leap_time) => unix_leap_time,
+                    Err(OutOfRangeError(error)) => return Err(FindLocalTimeTypeError(error)),
+                };
 
                 if unix_leap_time >= last_transition.unix_leap_time {
                     match self.extra_rule {
@@ -692,7 +695,12 @@ impl<'a> TimeZoneRef<'a> {
         if let (Some(extra_rule), Some(last_transition)) = (&self.extra_rule, self.transitions.last()) {
             let last_local_time_type = &self.local_time_types[last_transition.local_time_type_index];
 
-            let rule_local_time_type = match extra_rule.find_local_time_type(self.unix_leap_time_to_unix_time(last_transition.unix_leap_time)) {
+            let unix_time = match self.unix_leap_time_to_unix_time(last_transition.unix_leap_time) {
+                Ok(unix_time) => unix_time,
+                Err(OutOfRangeError(error)) => return Err(TimeZoneError(error)),
+            };
+
+            let rule_local_time_type = match extra_rule.find_local_time_type(unix_time) {
                 Ok(rule_local_time_type) => rule_local_time_type,
                 Err(OutOfRangeError(error)) => return Err(TimeZoneError(error)),
             };
@@ -714,7 +722,7 @@ impl<'a> TimeZoneRef<'a> {
     }
 
     /// Convert Unix time to Unix leap time, from the list of leap seconds in a time zone
-    const fn unix_time_to_unix_leap_time(&self, unix_time: i64) -> i64 {
+    const fn unix_time_to_unix_leap_time(&self, unix_time: i64) -> Result<i64, OutOfRangeError> {
         let mut unix_leap_time = unix_time;
 
         let mut i = 0;
@@ -725,16 +733,23 @@ impl<'a> TimeZoneRef<'a> {
                 break;
             }
 
-            unix_leap_time = unix_time + leap_second.correction as i64;
+            unix_leap_time = match unix_time.checked_add(leap_second.correction as i64) {
+                Some(unix_leap_time) => unix_leap_time,
+                None => return Err(OutOfRangeError("out of range operation")),
+            };
 
             i += 1;
         }
 
-        unix_leap_time
+        Ok(unix_leap_time)
     }
 
     /// Convert Unix leap time to Unix time, from the list of leap seconds in a time zone
-    const fn unix_leap_time_to_unix_time(&self, unix_leap_time: i64) -> i64 {
+    const fn unix_leap_time_to_unix_time(&self, unix_leap_time: i64) -> Result<i64, OutOfRangeError> {
+        if unix_leap_time == i64::MIN {
+            return Err(OutOfRangeError("out of range operation"));
+        }
+
         let index = match binary_search_leap_seconds(self.leap_seconds, unix_leap_time - 1) {
             Ok(x) => x + 1,
             Err(x) => x,
@@ -742,7 +757,10 @@ impl<'a> TimeZoneRef<'a> {
 
         let correction = if index > 0 { self.leap_seconds[index - 1].correction } else { 0 };
 
-        unix_leap_time - correction as i64
+        match unix_leap_time.checked_sub(correction as i64) {
+            Some(unix_time) => Ok(unix_time),
+            None => Err(OutOfRangeError("out of range operation")),
+        }
     }
 }
 
@@ -1090,14 +1108,30 @@ mod test {
 
         let time_zone_ref = time_zone.as_ref();
 
-        assert_eq!(time_zone_ref.unix_leap_time_to_unix_time(1136073621), 1136073599);
-        assert_eq!(time_zone_ref.unix_leap_time_to_unix_time(1136073622), 1136073600);
-        assert_eq!(time_zone_ref.unix_leap_time_to_unix_time(1136073623), 1136073600);
-        assert_eq!(time_zone_ref.unix_leap_time_to_unix_time(1136073624), 1136073601);
+        assert!(matches!(time_zone_ref.unix_leap_time_to_unix_time(1136073621), Ok(1136073599)));
+        assert!(matches!(time_zone_ref.unix_leap_time_to_unix_time(1136073622), Ok(1136073600)));
+        assert!(matches!(time_zone_ref.unix_leap_time_to_unix_time(1136073623), Ok(1136073600)));
+        assert!(matches!(time_zone_ref.unix_leap_time_to_unix_time(1136073624), Ok(1136073601)));
 
-        assert_eq!(time_zone_ref.unix_time_to_unix_leap_time(1136073599), 1136073621);
-        assert_eq!(time_zone_ref.unix_time_to_unix_leap_time(1136073600), 1136073623);
-        assert_eq!(time_zone_ref.unix_time_to_unix_leap_time(1136073601), 1136073624);
+        assert!(matches!(time_zone_ref.unix_time_to_unix_leap_time(1136073599), Ok(1136073621)));
+        assert!(matches!(time_zone_ref.unix_time_to_unix_leap_time(1136073600), Ok(1136073623)));
+        assert!(matches!(time_zone_ref.unix_time_to_unix_leap_time(1136073601), Ok(1136073624)));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_leap_seconds_overflow() -> Result<()> {
+        let time_zone_err = TimeZone::new(
+            vec![Transition::new(i64::MIN, 0)],
+            vec![LocalTimeType::utc()],
+            vec![LeapSecond::new(0, 1)],
+            Some(TransitionRule::Fixed(LocalTimeType::utc())),
+        );
+        assert!(time_zone_err.is_err());
+
+        let time_zone = TimeZone::new(vec![Transition::new(i64::MAX, 0)], vec![LocalTimeType::utc()], vec![LeapSecond::new(0, 1)], None)?;
+        assert!(matches!(time_zone.find_local_time_type(i64::MAX), Err(FindLocalTimeTypeError(_))));
 
         Ok(())
     }
