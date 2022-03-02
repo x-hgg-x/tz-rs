@@ -395,7 +395,8 @@ impl AlternateTime {
     ) -> Result<Self, TransitionRuleError> {
         use crate::constants::*;
 
-        if !((dst_start_time.abs() as i64) < SECONDS_PER_WEEK && (dst_end_time.abs() as i64) < SECONDS_PER_WEEK) {
+        // Overflow is not possible
+        if !((dst_start_time as i64).abs() < SECONDS_PER_WEEK && (dst_end_time as i64).abs() < SECONDS_PER_WEEK) {
             return Err(TransitionRuleError("invalid DST start or end time"));
         }
 
@@ -665,7 +666,7 @@ impl<'a> TimeZoneRef<'a> {
         }
 
         // Check leap seconds
-        if !(self.leap_seconds.is_empty() || self.leap_seconds[0].unix_leap_time >= 0 && self.leap_seconds[0].correction.abs() == 1) {
+        if !(self.leap_seconds.is_empty() || self.leap_seconds[0].unix_leap_time >= 0 && self.leap_seconds[0].correction.saturating_abs() == 1) {
             return Err(TimeZoneError("invalid leap second"));
         }
 
@@ -677,7 +678,10 @@ impl<'a> TimeZoneRef<'a> {
                 let x0 = &self.leap_seconds[i_leap_second];
                 let x1 = &self.leap_seconds[i_leap_second + 1];
 
-                if !(x1.unix_leap_time >= x0.unix_leap_time + min_interval && (x1.correction - x0.correction).abs() == 1) {
+                let diff_unix_leap_time = x1.unix_leap_time.saturating_sub(x0.unix_leap_time);
+                let abs_diff_correction = x1.correction.saturating_sub(x0.correction).saturating_abs();
+
+                if !(diff_unix_leap_time >= min_interval && abs_diff_correction == 1) {
                     return Err(TimeZoneError("invalid leap second"));
                 }
             }
