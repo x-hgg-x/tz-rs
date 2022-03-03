@@ -553,13 +553,13 @@ pub struct TimeZoneRef<'a> {
     extra_rule: &'a Option<TransitionRule>,
 }
 
-impl TimeZoneRef<'static> {
+impl<'a> TimeZoneRef<'a> {
     /// Construct a static time zone
     pub const fn new(
-        transitions: &'static [Transition],
-        local_time_types: &'static [LocalTimeType],
-        leap_seconds: &'static [LeapSecond],
-        extra_rule: &'static Option<TransitionRule>,
+        transitions: &'a [Transition],
+        local_time_types: &'a [LocalTimeType],
+        leap_seconds: &'a [LeapSecond],
+        extra_rule: &'a Option<TransitionRule>,
     ) -> Result<Self, TimeZoneError> {
         let time_zone_ref = Self::new_unchecked(transitions, local_time_types, leap_seconds, extra_rule);
 
@@ -569,7 +569,9 @@ impl TimeZoneRef<'static> {
 
         Ok(time_zone_ref)
     }
+}
 
+impl TimeZoneRef<'static> {
     /// Construct the static time zone associated to UTC
     pub const fn utc() -> Self {
         const UTC: LocalTimeType = LocalTimeType::utc();
