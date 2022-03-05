@@ -108,7 +108,7 @@ impl From<TzStringError> for TzFileError {
 macro_rules! create_error {
     (#[$doc:meta], $name:ident) => {
         #[$doc]
-        #[derive(Debug)]
+        #[derive(Debug, Clone, Copy, PartialEq)]
         pub struct $name(
             /// Error description
             pub &'static str,

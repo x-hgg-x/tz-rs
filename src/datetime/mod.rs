@@ -5,8 +5,8 @@ use crate::timezone::{LocalTimeType, TimeZoneRef};
 use crate::utils::*;
 
 use std::cmp::Ordering;
-use std::fmt;
-use std::time::SystemTime;
+use std::{fmt, ops};
+use std::time::{Duration, SystemTime};
 
 /// UTC date time exprimed in the [proleptic gregorian calendar](https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar)
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
@@ -179,6 +179,115 @@ impl UtcDateTime {
     ///
     pub const fn project(&self, time_zone_ref: TimeZoneRef) -> Result<DateTime, ProjectDateTimeError> {
         DateTime::from_timespec(self.unix_time(), self.nanoseconds, time_zone_ref)
+    }
+
+    /// Construct a UTC date time of the total number of nanoseconds
+    ///
+    /// This is essentially the reverse operation to [UtcDateTime::total_nanoseconds()].
+    ///
+    pub const fn from_nanoseconds(nanoseconds: i128) -> Result<Self, OutOfRangeError> {
+        use crate::constants::*;
+
+        match nanoseconds.div_euclid(NANOSECONDS_PER_SECOND as i128) {
+            secs if secs >= i64::MIN as i128 && secs <= i64::MAX as i128 => Self::from_timespec(
+                secs as i64,
+                nanoseconds.rem_euclid(NANOSECONDS_PER_SECOND as i128) as u32,
+            ),
+            _ => Err(OutOfRangeError("out of range")),
+        }
+    }
+
+    /// Add a duration to the UtcDateTime
+    pub const fn checked_add(self, duration: Duration) -> Option<Self> {
+        use crate::constants::*;
+
+        let mut unix_time = self.unix_time() as i128 + duration.as_secs() as i128;
+        let mut nanoseconds = self.nanoseconds() as i32 + duration.subsec_nanos() as i32;
+        if nanoseconds >= NANOSECONDS_PER_SECOND as i32 {
+            nanoseconds -= NANOSECONDS_PER_SECOND as i32;
+            unix_time += 1;
+        }
+        if unix_time < i64::MIN as _ || unix_time > i64::MAX as _ {
+            return None;
+        }
+        match Self::from_timespec(unix_time as _, nanoseconds as _) {
+            Ok(result) => Some(result),
+            Err(_) => None,
+        }
+    }
+
+    /// Subtract a duration from the UtcDateTime
+    pub const fn checked_sub(self, duration: Duration) -> Option<Self> {
+        use crate::constants::*;
+
+        let mut unix_time = self.unix_time() as i128 - duration.as_secs() as i128;
+        let mut nanoseconds = self.nanoseconds() as i32 - duration.subsec_nanos() as i32;
+        if nanoseconds < 0 {
+            nanoseconds += NANOSECONDS_PER_SECOND as i32;
+            unix_time -= 1;
+        }
+        if unix_time < i64::MIN as _ || unix_time > i64::MAX as _ {
+            return None;
+        }
+        match Self::from_timespec(unix_time as _, nanoseconds as _) {
+            Ok(result) => Some(result),
+            Err(_) => None,
+        }
+    }
+
+    /// Subtract another UtcDateTime
+    ///
+    /// The argument must be greater than or equal to self, i.e. later or the same point in time.
+    pub const fn sub_datetime(self, rhs: UtcDateTime) -> Result<Duration, OutOfRangeError> {
+        use crate::constants::*;
+
+        let total_nanoseconds = match self.total_nanoseconds().checked_sub(rhs.total_nanoseconds()) {
+            None => return Err(OutOfRangeError("UtcDateTimes too far apart")), // impossible
+            Some(total_nanoseconds) if total_nanoseconds >= 0 => total_nanoseconds as u128,
+            _ => return Err(OutOfRangeError("rhs was less than self")),
+        };
+        let secs = match total_nanoseconds.div_euclid(NANOSECONDS_PER_SECOND as _) {
+            secs if secs <= u64::MAX as _ => secs as _,
+            _ => return Err(OutOfRangeError("UtcDateTimes too far apart")), // impossible
+        };
+        let nanos = Duration::from_nanos(total_nanoseconds.rem_euclid(NANOSECONDS_PER_SECOND as _) as _);
+        match Duration::from_secs(secs).checked_add(nanos) {
+            Some(result) => Ok(result),
+            None => Err(OutOfRangeError("UtcDateTimes too far apart")), // impossible
+        }
+    }
+}
+
+impl ops::Sub<UtcDateTime> for UtcDateTime {
+    type Output = Duration;
+
+    fn sub(self, rhs: UtcDateTime) -> Self::Output {
+        match self.sub_datetime(rhs) {
+            Ok(result) => result,
+            Err(err) => panic!("illegal subtration: {}", err),
+        }
+    }
+}
+
+impl ops::Add<Duration> for UtcDateTime {
+    type Output = UtcDateTime;
+
+    fn add(self, rhs: Duration) -> Self::Output {
+        match self.checked_add(rhs) {
+            Some(result) => result,
+            None => panic!("illegal addition: UtcDateTime + Duration"),
+        }
+    }
+}
+
+impl ops::Sub<Duration> for UtcDateTime {
+    type Output = UtcDateTime;
+
+    fn sub(self, rhs: Duration) -> Self::Output {
+        match self.checked_sub(rhs) {
+            Some(result) => result,
+            None => panic!("illegal subtraction: UtcDateTime - Duration"),
+        }
     }
 }
 
@@ -989,5 +1098,110 @@ mod test {
         assert_eq!(local_time_type_2.time_zone_designation(), LOCAL_TIME_TYPE_2.time_zone_designation());
 
         Ok(())
+    }
+
+    #[test]
+    fn test_utc_date_time_arithmetic() {
+        let y2001 = UtcDateTime::new(2001, 1, 1, 0, 0, 0, 0).unwrap();
+        let y2002 = UtcDateTime::new(2002, 1, 1, 0, 0, 0, 0).unwrap();
+        let start = UtcDateTime::new(i32::MIN, 1, 1, 0, 0, 0, 0).unwrap();
+        let end = UtcDateTime::new(i32::MAX, 12, 31, 23, 59, 59, 999_999_999).unwrap();
+
+        assert_eq!(UtcDateTime::from_nanoseconds(y2001.total_nanoseconds()).unwrap(), y2001);
+        assert_eq!(UtcDateTime::from_nanoseconds(y2002.total_nanoseconds()).unwrap(), y2002);
+        assert_eq!(UtcDateTime::from_nanoseconds(start.total_nanoseconds()).unwrap(), start);
+        assert_eq!(UtcDateTime::from_nanoseconds(end.total_nanoseconds()).unwrap(), end);
+
+        assert_eq!(y2001.sub_datetime(y2001).unwrap(), Duration::from_secs(0));
+        assert_eq!(y2002.sub_datetime(y2002).unwrap(), Duration::from_secs(0));
+        assert_eq!(y2002.sub_datetime(y2001).unwrap(), Duration::from_secs(365_u64 * 24 * 60 * 60));
+        assert_eq!(y2001.sub_datetime(y2002).unwrap_err(), OutOfRangeError("rhs was less than self"));
+
+        assert_eq!(start.sub_datetime(start).unwrap(), Duration::from_secs(0));
+        assert_eq!(end.sub_datetime(end).unwrap(), Duration::from_secs(0));
+        assert_eq!(
+            end.sub_datetime(start).unwrap(),
+            Duration::from_secs((end.unix_time() - start.unix_time()) as _) + Duration::from_nanos(999_999_999),
+        );
+        assert_eq!(start.sub_datetime(end).unwrap_err(), OutOfRangeError("rhs was less than self"));
+
+        assert_eq!(y2001.checked_add(Duration::from_secs(365_u64 * 24 * 60 * 60)), Some(y2002));
+        assert_eq!(y2002.checked_sub(Duration::from_secs(365_u64 * 24 * 60 * 60)), Some(y2001));
+        assert_eq!(
+            y2002.checked_sub(Duration::from_nanos(1)).unwrap(),
+            UtcDateTime::new(2001, 12, 31, 23, 59, 59, 999_999_999).unwrap(),
+        );
+        assert_eq!(
+            UtcDateTime::new(2001, 12, 31, 23, 59, 59, 999_999_999).unwrap().checked_add(Duration::from_nanos(2)).unwrap(),
+            UtcDateTime::new(2002, 1, 1, 0, 0, 0, 1).unwrap(),
+        );
+
+        assert_eq!(start.checked_add(Duration::from_nanos(1)), Some(UtcDateTime::new(i32::MIN, 1, 1, 0, 0, 0, 1).unwrap()));
+        assert_eq!(end.checked_sub(Duration::from_nanos(1)), Some(UtcDateTime::new(i32::MAX, 12, 31, 23, 59, 59, 999_999_998).unwrap()));
+        assert_eq!(start.checked_sub(Duration::from_nanos(1)), None);
+        assert_eq!(end.checked_add(Duration::from_nanos(1)), None);
+    }
+
+    #[test]
+    fn test_utc_date_time_arithmetic_good() {
+        let y2001 = UtcDateTime::new(2001, 1, 1, 0, 0, 0, 0).unwrap();
+        let y2002 = UtcDateTime::new(2002, 1, 1, 0, 0, 0, 0).unwrap();
+        let start = UtcDateTime::new(i32::MIN, 1, 1, 0, 0, 0, 0).unwrap();
+        let end = UtcDateTime::new(i32::MAX, 12, 31, 23, 59, 59, 999_999_999).unwrap();
+
+        assert_eq!(y2001 - y2001, Duration::from_secs(0));
+        assert_eq!(y2002 - y2002, Duration::from_secs(0));
+        assert_eq!(y2002 - y2001, Duration::from_secs(365_u64 * 24 * 60 * 60));
+
+        assert_eq!(start - start, Duration::from_secs(0));
+        assert_eq!(end - end, Duration::from_secs(0));
+        assert_eq!(
+            end - start,
+            Duration::from_secs((end.unix_time() - start.unix_time()) as _) + Duration::from_nanos(999_999_999),
+        );
+
+        assert_eq!(y2001 + Duration::from_secs(365_u64 * 24 * 60 * 60), y2002);
+        assert_eq!(y2002 - Duration::from_secs(365_u64 * 24 * 60 * 60), y2001);
+        assert_eq!(
+            y2002 - Duration::from_nanos(1),
+            UtcDateTime::new(2001, 12, 31, 23, 59, 59, 999_999_999).unwrap(),
+        );
+        assert_eq!(
+            UtcDateTime::new(2001, 12, 31, 23, 59, 59, 999_999_999).unwrap() + Duration::from_nanos(2),
+            UtcDateTime::new(2002, 1, 1, 0, 0, 0, 1).unwrap(),
+        );
+
+        assert_eq!(start + Duration::from_nanos(1), UtcDateTime::new(i32::MIN, 1, 1, 0, 0, 0, 1).unwrap());
+        assert_eq!(end - Duration::from_nanos(1), UtcDateTime::new(i32::MAX, 12, 31, 23, 59, 59, 999_999_998).unwrap());
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_utc_date_time_arithmetic_bad_1() {
+        let y2001 = UtcDateTime::new(2001, 1, 1, 0, 0, 0, 0).unwrap();
+        let y2002 = UtcDateTime::new(2002, 1, 1, 0, 0, 0, 0).unwrap();
+        let _ = y2001 - y2002;
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_utc_date_time_arithmetic_bad_2() {
+        let start = UtcDateTime::new(i32::MIN, 1, 1, 0, 0, 0, 0).unwrap();
+        let end = UtcDateTime::new(i32::MAX, 12, 31, 23, 59, 59, 999_999_999).unwrap();
+        let _ = start - end;
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_utc_date_time_arithmetic_bad_3() {
+        let start = UtcDateTime::new(i32::MIN, 1, 1, 0, 0, 0, 0).unwrap();
+        let _ = start - Duration::from_nanos(1);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_utc_date_time_arithmetic_bad_4() {
+        let end = UtcDateTime::new(i32::MAX, 12, 31, 23, 59, 59, 999_999_999).unwrap();
+        let _ = end + Duration::from_nanos(1);
     }
 }
