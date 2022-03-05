@@ -152,6 +152,14 @@ impl UtcDateTime {
         Ok(Self { year, month: month as u8, month_day: month_day as u8, hour: hour as u8, minute: minute as u8, second: second as u8, nanoseconds })
     }
 
+    /// Construct a UTC date time from total nanoseconds since Unix epoch (`1970-01-01T00:00:00Z`)
+    pub const fn from_total_nanoseconds(total_nanoseconds: i128) -> Result<Self, OutOfRangeError> {
+        match total_nanoseconds_to_timespec(total_nanoseconds) {
+            Ok((unix_time, nanoseconds)) => Self::from_timespec(unix_time, nanoseconds),
+            Err(error) => Err(error),
+        }
+    }
+
     /// Returns the current UTC date time
     pub fn now() -> Result<Self, TzError> {
         let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?;
@@ -244,6 +252,14 @@ impl DateTime {
 
         let UtcDateTime { year, month, month_day, hour, minute, second, nanoseconds } = utc_date_time_with_offset;
         Ok(Self { year, month, month_day, hour, minute, second, local_time_type, unix_time, nanoseconds })
+    }
+
+    /// Construct a date time from total nanoseconds since Unix epoch (`1970-01-01T00:00:00Z`) and a time zone
+    pub const fn from_total_nanoseconds(total_nanoseconds: i128, time_zone_ref: TimeZoneRef) -> Result<Self, ProjectDateTimeError> {
+        match total_nanoseconds_to_timespec(total_nanoseconds) {
+            Ok((unix_time, nanoseconds)) => Self::from_timespec(unix_time, nanoseconds, time_zone_ref),
+            Err(OutOfRangeError(error)) => Err(ProjectDateTimeError(error)),
+        }
     }
 
     /// Returns the current date time associated to the specified time zone
@@ -415,6 +431,26 @@ const fn nanoseconds_since_unix_epoch(unix_time: i64, nanoseconds: u32) -> i128 
 
     // Overflow is not possible
     unix_time as i128 * NANOSECONDS_PER_SECOND as i128 + nanoseconds as i128
+}
+
+/// Compute Unix time in seconds with nanoseconds from total nanoseconds since Unix epoch (`1970-01-01T00:00:00Z`)
+///
+/// ## Outputs
+///
+/// * `unix_time`: Unix time in seconds
+/// * `nanoseconds`: Nanoseconds in `[0, 999_999_999]`
+///
+const fn total_nanoseconds_to_timespec(total_nanoseconds: i128) -> Result<(i64, u32), OutOfRangeError> {
+    use crate::constants::*;
+
+    let unix_time = match try_into_i64(total_nanoseconds.div_euclid(NANOSECONDS_PER_SECOND as i128)) {
+        Ok(unix_time) => unix_time,
+        Err(error) => return Err(error),
+    };
+
+    let nanoseconds = total_nanoseconds.rem_euclid(NANOSECONDS_PER_SECOND as i128) as u32;
+
+    Ok((unix_time, nanoseconds))
 }
 
 /// Format a date time
@@ -890,6 +926,28 @@ mod test {
         assert_eq!(nanoseconds_since_unix_epoch(0, 1000), 1000);
         assert_eq!(nanoseconds_since_unix_epoch(-1, 1000), -999_999_000);
         assert_eq!(nanoseconds_since_unix_epoch(-2, 1000), -1_999_999_000);
+    }
+
+    #[test]
+    fn test_total_nanoseconds_to_timespec() -> Result<()> {
+        assert!(matches!(total_nanoseconds_to_timespec(1_000_001_000), Ok((1, 1000))));
+        assert!(matches!(total_nanoseconds_to_timespec(1000), Ok((0, 1000))));
+        assert!(matches!(total_nanoseconds_to_timespec(-999_999_000), Ok((-1, 1000))));
+        assert!(matches!(total_nanoseconds_to_timespec(-1_999_999_000), Ok((-2, 1000))));
+
+        assert!(matches!(total_nanoseconds_to_timespec(i128::MAX), Err(OutOfRangeError(_))));
+        assert!(matches!(total_nanoseconds_to_timespec(i128::MIN), Err(OutOfRangeError(_))));
+
+        let min_total_nanoseconds = -9223372036854775808000000000;
+        let max_total_nanoseconds = 9223372036854775807999999999;
+
+        assert!(matches!(total_nanoseconds_to_timespec(min_total_nanoseconds), Ok((i64::MIN, 0))));
+        assert!(matches!(total_nanoseconds_to_timespec(max_total_nanoseconds), Ok((i64::MAX, 999999999))));
+
+        assert!(matches!(total_nanoseconds_to_timespec(min_total_nanoseconds - 1), Err(OutOfRangeError(_))));
+        assert!(matches!(total_nanoseconds_to_timespec(max_total_nanoseconds + 1), Err(OutOfRangeError(_))));
+
+        Ok(())
     }
 
     #[test]
