@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  workflow_dispatch:
+
+  push:
+    branches: ['master']
+  pull_request:
+    branches: ['master']
+  schedule:
+    - cron: "0 0 * * 0"
+
+jobs:
+  test_old:
+    name: "Test/1.45"
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Install Rust
+        id: actions-rs
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: 1.45
+          override: true
+
+      - name: Test
+        run: cargo test --no-default-features
+
+  check:
+    strategy:
+      matrix:
+        rust:
+          - 1.57
+          - stable
+          - nightly
+
+    name: "Check/${{ matrix.rust }}"
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Install Rust
+        id: actions-rs
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ matrix.rust }}
+          override: true
+          components: rustfmt, clippy
+
+      - name: Fmt
+      - run: cargo fmt --all -- --check
+
+      - name: Lint
+        run: cargo clippy -- -D warnings
+
+      - name: Test
+        run: cargo test
