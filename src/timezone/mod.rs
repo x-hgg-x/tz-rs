@@ -887,9 +887,9 @@ impl TimeZone {
                 // TZ string extensions are not allowed
                 let rule = parse_posix_tz(tz_string.as_bytes(), false)?;
 
-                let local_time_types = match &rule {
-                    TransitionRule::Fixed(local_time_type) => vec![local_time_type.clone()],
-                    TransitionRule::Alternate(AlternateTime { std, dst, .. }) => vec![std.clone(), dst.clone()],
+                let local_time_types = match rule {
+                    TransitionRule::Fixed(local_time_type) => vec![local_time_type],
+                    TransitionRule::Alternate(AlternateTime { std, dst, .. }) => vec![std, dst],
                 };
 
                 Ok(TimeZone::new(vec![], local_time_types, vec![], Some(rule))?)

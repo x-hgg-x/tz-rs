@@ -245,7 +245,7 @@ impl DateTime {
     #[const_fn(feature = "const")]
     pub const fn from_timespec(unix_time: i64, nanoseconds: u32, time_zone_ref: TimeZoneRef) -> Result<Self, ProjectDateTimeError> {
         let local_time_type = match time_zone_ref.find_local_time_type(unix_time) {
-            Ok(local_time_type) => local_time_type.clone(),
+            Ok(&local_time_type) => local_time_type,
             Err(FindLocalTimeTypeError(error)) => return Err(ProjectDateTimeError(error)),
         };
 
