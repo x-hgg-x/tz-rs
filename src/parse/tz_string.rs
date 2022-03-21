@@ -47,7 +47,7 @@ fn parse_hhmmss(cursor: &mut Cursor) -> Result<(i32, i32, i32), TzStringError> {
 /// Parse signed hours, minutes and seconds
 fn parse_signed_hhmmss(cursor: &mut Cursor) -> Result<(i32, i32, i32, i32), TzStringError> {
     let mut sign = 1;
-    if let Some(&c @ (b'+' | b'-')) = cursor.remaining().get(0) {
+    if let Some(&c @ b'+') | Some(&c @ b'-') = cursor.remaining().get(0) {
         cursor.read_exact(1)?;
         if c == b'-' {
             sign = -1;

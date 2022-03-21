@@ -5,8 +5,11 @@ use crate::timezone::{LocalTimeType, TimeZoneRef};
 use crate::utils::*;
 
 use std::cmp::Ordering;
+use std::convert::TryInto;
 use std::fmt;
 use std::time::SystemTime;
+
+use const_fn::const_fn;
 
 /// UTC date time exprimed in the [proleptic gregorian calendar](https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar)
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
@@ -46,6 +49,7 @@ impl UtcDateTime {
     /// * `second`: Seconds in `[0, 60]`, with a possible leap second
     /// * `nanoseconds`: Nanoseconds in `[0, 999_999_999]`
     ///
+    #[const_fn(feature = "const")]
     pub const fn new(year: i32, month: u8, month_day: u8, hour: u8, minute: u8, second: u8, nanoseconds: u32) -> Result<Self, DateTimeError> {
         use crate::constants::*;
 
@@ -88,6 +92,7 @@ impl UtcDateTime {
     }
 
     /// Construct a UTC date time from a Unix time in seconds and nanoseconds
+    #[const_fn(feature = "const")]
     pub const fn from_timespec(unix_time: i64, nanoseconds: u32) -> Result<Self, OutOfRangeError> {
         use crate::constants::*;
 
@@ -153,6 +158,7 @@ impl UtcDateTime {
     }
 
     /// Construct a UTC date time from total nanoseconds since Unix epoch (`1970-01-01T00:00:00Z`)
+    #[const_fn(feature = "const")]
     pub const fn from_total_nanoseconds(total_nanoseconds: i128) -> Result<Self, OutOfRangeError> {
         match total_nanoseconds_to_timespec(total_nanoseconds) {
             Ok((unix_time, nanoseconds)) => Self::from_timespec(unix_time, nanoseconds),
@@ -167,6 +173,7 @@ impl UtcDateTime {
     }
 
     /// Returns the Unix time in seconds associated to the UTC date time
+    #[const_fn(feature = "const")]
     pub const fn unix_time(&self) -> i64 {
         use crate::constants::*;
 
@@ -185,6 +192,7 @@ impl UtcDateTime {
     ///
     /// Leap seconds are not preserved.
     ///
+    #[const_fn(feature = "const")]
     pub const fn project(&self, time_zone_ref: TimeZoneRef) -> Result<DateTime, ProjectDateTimeError> {
         DateTime::from_timespec(self.unix_time(), self.nanoseconds, time_zone_ref)
     }
@@ -234,6 +242,7 @@ impl fmt::Display for DateTime {
 
 impl DateTime {
     /// Construct a date time from a Unix time in seconds with nanoseconds and a time zone
+    #[const_fn(feature = "const")]
     pub const fn from_timespec(unix_time: i64, nanoseconds: u32, time_zone_ref: TimeZoneRef) -> Result<Self, ProjectDateTimeError> {
         let local_time_type = match time_zone_ref.find_local_time_type(unix_time) {
             Ok(local_time_type) => local_time_type.clone(),
@@ -255,6 +264,7 @@ impl DateTime {
     }
 
     /// Construct a date time from total nanoseconds since Unix epoch (`1970-01-01T00:00:00Z`) and a time zone
+    #[const_fn(feature = "const")]
     pub const fn from_total_nanoseconds(total_nanoseconds: i128, time_zone_ref: TimeZoneRef) -> Result<Self, ProjectDateTimeError> {
         match total_nanoseconds_to_timespec(total_nanoseconds) {
             Ok((unix_time, nanoseconds)) => Self::from_timespec(unix_time, nanoseconds, time_zone_ref),
@@ -272,6 +282,7 @@ impl DateTime {
     ///
     /// Leap seconds are not preserved.
     ///
+    #[const_fn(feature = "const")]
     pub const fn project(&self, time_zone_ref: TimeZoneRef) -> Result<Self, ProjectDateTimeError> {
         Self::from_timespec(self.unix_time, self.nanoseconds, time_zone_ref)
     }
@@ -281,51 +292,61 @@ impl DateTime {
 macro_rules! impl_datetime {
     () => {
         /// Returns year
+        #[const_fn(feature = "const")]
         pub const fn year(&self) -> i32 {
             self.year
         }
 
         /// Returns month in `[1, 12]`
+        #[const_fn(feature = "const")]
         pub const fn month(&self) -> u8 {
             self.month
         }
 
         /// Returns day of the month in `[1, 31]`
+        #[const_fn(feature = "const")]
         pub const fn month_day(&self) -> u8 {
             self.month_day
         }
 
         /// Returns hours since midnight in `[0, 23]`
+        #[const_fn(feature = "const")]
         pub const fn hour(&self) -> u8 {
             self.hour
         }
 
         /// Returns minutes in `[0, 59]`
+        #[const_fn(feature = "const")]
         pub const fn minute(&self) -> u8 {
             self.minute
         }
 
         /// Returns seconds in `[0, 60]`, with a possible leap second
+        #[const_fn(feature = "const")]
         pub const fn second(&self) -> u8 {
             self.second
         }
 
         /// Returns nanoseconds in `[0, 999_999_999]`
+        #[const_fn(feature = "const")]
         pub const fn nanoseconds(&self) -> u32 {
             self.nanoseconds
         }
 
         /// Returns days since Sunday in `[0, 6]`
+        #[const_fn(feature = "const")]
         pub const fn week_day(&self) -> u8 {
             week_day(self.year, self.month as usize, self.month_day as i64)
         }
 
         /// Returns days since January 1 in `[0, 365]`
+        #[const_fn(feature = "const")]
         pub const fn year_day(&self) -> u16 {
             year_day(self.year, self.month as usize, self.month_day as i64)
         }
 
         /// Returns total nanoseconds since Unix epoch (`1970-01-01T00:00:00Z`)
+        #[const_fn(feature = "const")]
         pub const fn total_nanoseconds(&self) -> i128 {
             nanoseconds_since_unix_epoch(self.unix_time(), self.nanoseconds)
         }
@@ -340,11 +361,13 @@ impl DateTime {
     impl_datetime!();
 
     /// Returns local time type
+    #[const_fn(feature = "const")]
     pub const fn local_time_type(&self) -> &LocalTimeType {
         &self.local_time_type
     }
 
     /// Returns UTC Unix time in seconds
+    #[const_fn(feature = "const")]
     pub const fn unix_time(&self) -> i64 {
         self.unix_time
     }
@@ -358,6 +381,7 @@ impl DateTime {
 /// * `month`: Month in `[1, 12]`
 /// * `month_day`: Day of the month in `[1, 31]`
 ///
+#[const_fn(feature = "const")]
 const fn week_day(year: i32, month: usize, month_day: i64) -> u8 {
     use crate::constants::*;
 
@@ -373,6 +397,7 @@ const fn week_day(year: i32, month: usize, month_day: i64) -> u8 {
 /// * `month`: Month in `[1, 12]`
 /// * `month_day`: Day of the month in `[1, 31]`
 ///
+#[const_fn(feature = "const")]
 const fn year_day(year: i32, month: usize, month_day: i64) -> u16 {
     use crate::constants::*;
 
@@ -381,6 +406,7 @@ const fn year_day(year: i32, month: usize, month_day: i64) -> u16 {
 }
 
 /// Check if a year is a leap year
+#[const_fn(feature = "const")]
 pub(crate) const fn is_leap_year(year: i32) -> bool {
     year % 400 == 0 || (year % 4 == 0 && year % 100 != 0)
 }
@@ -393,6 +419,7 @@ pub(crate) const fn is_leap_year(year: i32) -> bool {
 /// * `month`: Month in `[1, 12]`
 /// * `month_day`: Day of the month in `[1, 31]`
 ///
+#[const_fn(feature = "const")]
 pub(crate) const fn days_since_unix_epoch(year: i32, month: usize, month_day: i64) -> i64 {
     use crate::constants::*;
 
@@ -426,6 +453,7 @@ pub(crate) const fn days_since_unix_epoch(year: i32, month: usize, month_day: i6
 }
 
 /// Compute the number of nanoseconds since Unix epoch (`1970-01-01T00:00:00Z`)
+#[const_fn(feature = "const")]
 const fn nanoseconds_since_unix_epoch(unix_time: i64, nanoseconds: u32) -> i128 {
     use crate::constants::*;
 
@@ -440,6 +468,7 @@ const fn nanoseconds_since_unix_epoch(unix_time: i64, nanoseconds: u32) -> i128 
 /// * `unix_time`: Unix time in seconds
 /// * `nanoseconds`: Nanoseconds in `[0, 999_999_999]`
 ///
+#[const_fn(feature = "const")]
 const fn total_nanoseconds_to_timespec(total_nanoseconds: i128) -> Result<(i64, u32), OutOfRangeError> {
     use crate::constants::*;
 
@@ -536,7 +565,7 @@ mod test {
         assert_eq!(DateTime::now(time_zone_cet.as_ref())?.local_time_type().ut_offset(), 3600);
         assert_eq!(DateTime::now(time_zone_eet.as_ref())?.local_time_type().ut_offset(), 7200);
 
-        let unix_times = [
+        let unix_times = &[
             -93750523200,
             -11670955200,
             -11670868800,
@@ -553,10 +582,10 @@ mod test {
             32540356800,
         ];
 
-        let nanoseconds_list = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23];
+        let nanoseconds_list = &[10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23];
 
         #[rustfmt::skip]
-        let date_times_utc = [
+        let date_times_utc = &[
             DateTime { year: -1001, month: 3, month_day: 1,  hour: 12, minute: 0, second: 0, local_time_type: utc.clone(), unix_time: -93750523200, nanoseconds: 10 },
             DateTime { year: 1600,  month: 2, month_day: 29, hour: 12, minute: 0, second: 0, local_time_type: utc.clone(), unix_time: -11670955200, nanoseconds: 11 },
             DateTime { year: 1600,  month: 3, month_day: 1,  hour: 12, minute: 0, second: 0, local_time_type: utc.clone(), unix_time: -11670868800, nanoseconds: 12 },
@@ -574,7 +603,7 @@ mod test {
         ];
 
         #[rustfmt::skip]
-         let date_times_cet = [
+         let date_times_cet = &[
             DateTime { year: -1001, month: 3, month_day: 1,  hour: 13, minute: 0, second: 0, local_time_type: cet.clone(), unix_time: -93750523200, nanoseconds: 10 },
             DateTime { year: 1600,  month: 2, month_day: 29, hour: 13, minute: 0, second: 0, local_time_type: cet.clone(), unix_time: -11670955200, nanoseconds: 11 },
             DateTime { year: 1600,  month: 3, month_day: 1,  hour: 13, minute: 0, second: 0, local_time_type: cet.clone(), unix_time: -11670868800, nanoseconds: 12 },
@@ -592,7 +621,7 @@ mod test {
         ];
 
         #[rustfmt::skip]
-         let date_times_eet = [
+         let date_times_eet = &[
             DateTime { year: -1001, month: 3, month_day: 1,  hour: 14, minute: 0, second: 0, local_time_type: eet.clone(), unix_time: -93750523200, nanoseconds: 10 },
             DateTime { year: 1600,  month: 2, month_day: 29, hour: 14, minute: 0, second: 0, local_time_type: eet.clone(), unix_time: -11670955200, nanoseconds: 11 },
             DateTime { year: 1600,  month: 3, month_day: 1,  hour: 14, minute: 0, second: 0, local_time_type: eet.clone(), unix_time: -11670868800, nanoseconds: 12 },
@@ -609,8 +638,8 @@ mod test {
             DateTime { year: 3001,  month: 3, month_day: 1,  hour: 14, minute: 0, second: 0, local_time_type: eet,         unix_time: 32540356800,  nanoseconds: 23 },
         ];
 
-        for ((((unix_time, nanoseconds), date_time_utc), date_time_cet), date_time_eet) in
-            unix_times.into_iter().zip(nanoseconds_list).zip(date_times_utc).zip(date_times_cet).zip(date_times_eet)
+        for ((((&unix_time, &nanoseconds), date_time_utc), date_time_cet), date_time_eet) in
+            unix_times.iter().zip(nanoseconds_list).zip(date_times_utc).zip(date_times_cet).zip(date_times_eet)
         {
             let utc_date_time = UtcDateTime::from_timespec(unix_time, nanoseconds)?;
 
@@ -632,21 +661,21 @@ mod test {
             assert_eq!(date_time_utc, date_time_cet);
             assert_eq!(date_time_utc, date_time_eet);
 
-            check_equal_date_time(&utc_date_time.project(time_zone_utc.as_ref())?, &date_time_utc);
-            check_equal_date_time(&utc_date_time.project(time_zone_cet.as_ref())?, &date_time_cet);
-            check_equal_date_time(&utc_date_time.project(time_zone_eet.as_ref())?, &date_time_eet);
+            check_equal_date_time(&utc_date_time.project(time_zone_utc.as_ref())?, date_time_utc);
+            check_equal_date_time(&utc_date_time.project(time_zone_cet.as_ref())?, date_time_cet);
+            check_equal_date_time(&utc_date_time.project(time_zone_eet.as_ref())?, date_time_eet);
 
-            check_equal_date_time(&date_time_utc.project(time_zone_utc.as_ref())?, &date_time_utc);
-            check_equal_date_time(&date_time_cet.project(time_zone_utc.as_ref())?, &date_time_utc);
-            check_equal_date_time(&date_time_eet.project(time_zone_utc.as_ref())?, &date_time_utc);
+            check_equal_date_time(&date_time_utc.project(time_zone_utc.as_ref())?, date_time_utc);
+            check_equal_date_time(&date_time_cet.project(time_zone_utc.as_ref())?, date_time_utc);
+            check_equal_date_time(&date_time_eet.project(time_zone_utc.as_ref())?, date_time_utc);
 
-            check_equal_date_time(&date_time_utc.project(time_zone_cet.as_ref())?, &date_time_cet);
-            check_equal_date_time(&date_time_cet.project(time_zone_cet.as_ref())?, &date_time_cet);
-            check_equal_date_time(&date_time_eet.project(time_zone_cet.as_ref())?, &date_time_cet);
+            check_equal_date_time(&date_time_utc.project(time_zone_cet.as_ref())?, date_time_cet);
+            check_equal_date_time(&date_time_cet.project(time_zone_cet.as_ref())?, date_time_cet);
+            check_equal_date_time(&date_time_eet.project(time_zone_cet.as_ref())?, date_time_cet);
 
-            check_equal_date_time(&date_time_utc.project(time_zone_eet.as_ref())?, &date_time_eet);
-            check_equal_date_time(&date_time_cet.project(time_zone_eet.as_ref())?, &date_time_eet);
-            check_equal_date_time(&date_time_eet.project(time_zone_eet.as_ref())?, &date_time_eet);
+            check_equal_date_time(&date_time_utc.project(time_zone_eet.as_ref())?, date_time_eet);
+            check_equal_date_time(&date_time_cet.project(time_zone_eet.as_ref())?, date_time_eet);
+            check_equal_date_time(&date_time_eet.project(time_zone_eet.as_ref())?, date_time_eet);
         }
 
         Ok(())
@@ -800,12 +829,12 @@ mod test {
             TimeZone::fixed(49550)?,
         ];
 
-        let utc_date_times = [UtcDateTime::new(2000, 1, 2, 3, 4, 5, 0)?, UtcDateTime::new(2000, 1, 2, 3, 4, 5, 123_456_789)?];
+        let utc_date_times = &[UtcDateTime::new(2000, 1, 2, 3, 4, 5, 0)?, UtcDateTime::new(2000, 1, 2, 3, 4, 5, 123_456_789)?];
 
-        let utc_date_time_strings = ["2000-01-02T03:04:05.000000000Z", "2000-01-02T03:04:05.123456789Z"];
+        let utc_date_time_strings = &["2000-01-02T03:04:05.000000000Z", "2000-01-02T03:04:05.123456789Z"];
 
-        let date_time_strings_list = [
-            [
+        let date_time_strings_list = &[
+            &[
                 "2000-01-01T13:18:15.000000000-13:45:50",
                 "2000-01-02T01:34:05.000000000-01:30",
                 "2000-01-02T02:04:05.000000000-01:00",
@@ -814,7 +843,7 @@ mod test {
                 "2000-01-02T04:34:05.000000000+01:30",
                 "2000-01-02T16:49:55.000000000+13:45:50",
             ],
-            [
+            &[
                 "2000-01-01T13:18:15.123456789-13:45:50",
                 "2000-01-02T01:34:05.123456789-01:30",
                 "2000-01-02T02:04:05.123456789-01:00",
@@ -825,8 +854,8 @@ mod test {
             ],
         ];
 
-        for ((utc_date_time, utc_date_time_string), date_time_strings) in utc_date_times.iter().zip(utc_date_time_strings).zip(date_time_strings_list) {
-            for (time_zone, date_time_string) in time_zones.iter().zip(date_time_strings) {
+        for ((utc_date_time, &utc_date_time_string), &date_time_strings) in utc_date_times.iter().zip(utc_date_time_strings).zip(date_time_strings_list) {
+            for (time_zone, &date_time_string) in time_zones.iter().zip(date_time_strings) {
                 assert_eq!(utc_date_time.to_string(), utc_date_time_string);
                 assert_eq!(utc_date_time.project(time_zone.as_ref())?.to_string(), date_time_string);
             }
@@ -951,6 +980,7 @@ mod test {
     }
 
     #[test]
+    #[cfg(feature = "const")]
     fn test_const() -> Result<()> {
         macro_rules! unwrap {
             ($x:expr) => {

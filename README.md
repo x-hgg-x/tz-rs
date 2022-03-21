@@ -1,6 +1,7 @@
 # tz-rs
 
 [![version](https://img.shields.io/crates/v/tz-rs?color=blue&style=flat-square)](https://crates.io/crates/tz-rs)
+![Minimum supported Rust version](https://img.shields.io/badge/rustc-1.45+-important?logo=rust "Minimum Supported Rust Version")
 [![Documentation](https://docs.rs/tz-rs/badge.svg)](https://docs.rs/tz-rs)
 
 A pure Rust reimplementation of libc functions [`localtime`](https://en.cppreference.com/w/c/chrono/localtime), [`gmtime`](https://en.cppreference.com/w/c/chrono/gmtime) and [`mktime`](https://en.cppreference.com/w/c/chrono/mktime).
@@ -40,6 +41,10 @@ TimeZone::from_posix_tz(format!("{local_database_dir}/usr/share/zoneinfo/Pacific
 Note that the determination of the local time zone with this crate is not supported on non-UNIX platforms.
 
 Alternatively, a crate like [tzdb](https://github.com/Kijewski/tzdb) can be used, which statically provides existing time zone definitions for this crate, and supports finding the local time zone for all [Tier 1](https://doc.rust-lang.org/nightly/rustc/platform-support.html) platforms.
+
+## Compiler support
+
+Requires `rustc 1.45+` when building with no default features, or `rustc 1.57+` otherwise.
 
 ## License
 

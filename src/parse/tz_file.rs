@@ -5,6 +5,7 @@ use crate::error::{TzError, TzFileError};
 use crate::timezone::*;
 use crate::utils::*;
 
+use std::convert::TryInto;
 use std::fs::File;
 use std::io;
 use std::iter;
@@ -249,7 +250,7 @@ pub(crate) fn get_tz_file(tz_string: &str) -> Result<File, TzFileError> {
         if tz_string.starts_with('/') {
             Ok(File::open(tz_string)?)
         } else {
-            for folder in ZONE_INFO_DIRECTORIES {
+            for folder in &ZONE_INFO_DIRECTORIES {
                 if let Ok(file) = File::open(format!("{}/{}", folder, tz_string)) {
                     return Ok(file);
                 }

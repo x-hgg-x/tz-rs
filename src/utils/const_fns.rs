@@ -5,7 +5,10 @@ use crate::timezone::{LeapSecond, Transition};
 
 use std::cmp::Ordering;
 
+use const_fn::const_fn;
+
 /// Compare two values
+#[const_fn(feature = "const")]
 pub const fn cmp(a: i64, b: i64) -> Ordering {
     if a < b {
         Ordering::Less
@@ -17,6 +20,7 @@ pub const fn cmp(a: i64, b: i64) -> Ordering {
 }
 
 /// Returns the minimum of two values
+#[const_fn(feature = "const")]
 pub const fn min(a: i64, b: i64) -> i64 {
     match cmp(a, b) {
         Ordering::Less | Ordering::Equal => a,
@@ -39,11 +43,13 @@ macro_rules! impl_try_into_integer {
 }
 
 /// Convert a `i64` value to a `i32` value
+#[const_fn(feature = "const")]
 pub const fn try_into_i32(value: i64) -> Result<i32, OutOfRangeError> {
     impl_try_into_integer!(i64, i32, value)
 }
 
 /// Convert a `i128` value to a `i64` value
+#[const_fn(feature = "const")]
 pub const fn try_into_i64(value: i128) -> Result<i64, OutOfRangeError> {
     impl_try_into_integer!(i128, i64, value)
 }
@@ -73,21 +79,25 @@ macro_rules! impl_binary_search {
 }
 
 /// Copy the input value
+#[const_fn(feature = "const")]
 const fn copied(x: &i64) -> i64 {
     *x
 }
 
 /// Binary searches a sorted `i64` slice for the given element
+#[const_fn(feature = "const")]
 pub const fn binary_search_i64(slice: &[i64], x: i64) -> Result<usize, usize> {
     impl_binary_search!(slice, copied, x)
 }
 
 /// Binary searches a sorted `Transition` slice for the given element
+#[const_fn(feature = "const")]
 pub const fn binary_search_transitions(slice: &[Transition], x: i64) -> Result<usize, usize> {
     impl_binary_search!(slice, Transition::unix_leap_time, x)
 }
 
 /// Binary searches a sorted `LeapSecond` slice for the given element
+#[const_fn(feature = "const")]
 pub const fn binary_search_leap_seconds(slice: &[LeapSecond], x: i64) -> Result<usize, usize> {
     impl_binary_search!(slice, LeapSecond::unix_leap_time, x)
 }
