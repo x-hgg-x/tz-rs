@@ -17,7 +17,7 @@ use std::time::SystemTime;
 use const_fn::const_fn;
 
 /// Transition of a TZif file
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Transition {
     /// Unix leap time
     unix_leap_time: i64,
@@ -46,7 +46,7 @@ impl Transition {
 }
 
 /// Leap second of a TZif file
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct LeapSecond {
     /// Unix leap time
     unix_leap_time: i64,
@@ -174,7 +174,6 @@ impl LocalTimeType {
     }
 
     /// Construct the local time type associated to UTC
-    #[const_fn(feature = "const")]
     pub const fn utc() -> Self {
         Self { ut_offset: 0, is_dst: false, time_zone_designation: None }
     }
@@ -208,12 +207,6 @@ impl LocalTimeType {
             Some(s) => s.as_str(),
             None => "",
         }
-    }
-
-    /// Returns a copy of the value
-    #[const_fn(feature = "const")]
-    pub const fn clone(&self) -> Self {
-        Self { ut_offset: self.ut_offset, is_dst: self.is_dst, time_zone_designation: self.time_zone_designation }
     }
 }
 
@@ -397,7 +390,7 @@ impl RuleDay {
 }
 
 /// Transition rule representing alternate local time types
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct AlternateTime {
     /// Local time type for standard time
     std: LocalTimeType,
@@ -547,7 +540,7 @@ impl AlternateTime {
 }
 
 /// Transition rule
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum TransitionRule {
     /// Fixed local time type
     Fixed(LocalTimeType),
@@ -613,7 +606,7 @@ impl<'a> TimeZoneRef<'a> {
     /// Construct the time zone reference associated to UTC
     #[const_fn(feature = "const")]
     pub const fn utc() -> Self {
-        const UTC: LocalTimeType = LocalTimeType { ut_offset: 0, is_dst: false, time_zone_designation: None };
+        const UTC: LocalTimeType = LocalTimeType::utc();
         Self { transitions: &[], local_time_types: &[UTC], leap_seconds: &[], extra_rule: &None }
     }
 
@@ -1063,12 +1056,13 @@ mod test {
         let utc = LocalTimeType::utc();
         let cet = LocalTimeType::with_ut_offset(3600)?;
 
-        let utc_local_time_types = vec![utc.clone()];
-        let fixed_extra_rule = TransitionRule::Fixed(cet.clone());
+        let utc_local_time_types = vec![utc];
+        let fixed_extra_rule = TransitionRule::Fixed(cet);
 
         let time_zone_1 = TimeZone::new(vec![], utc_local_time_types.clone(), vec![], None)?;
-        let time_zone_2 = TimeZone::new(vec![], utc_local_time_types.clone(), vec![], Some(fixed_extra_rule.clone()))?;
+        let time_zone_2 = TimeZone::new(vec![], utc_local_time_types.clone(), vec![], Some(fixed_extra_rule))?;
         let time_zone_3 = TimeZone::new(vec![Transition::new(0, 0)], utc_local_time_types.clone(), vec![], None)?;
+        let time_zone_4 = TimeZone::new(vec![Transition::new(i32::MIN.into(), 0), Transition::new(0, 1)], vec![utc, cet], Vec::new(), Some(fixed_extra_rule))?;
 
         assert_eq!(*time_zone_1.find_local_time_type(0)?, utc);
         assert_eq!(*time_zone_2.find_local_time_type(0)?, cet);
@@ -1076,18 +1070,11 @@ mod test {
         assert_eq!(*time_zone_3.find_local_time_type(-1)?, utc);
         assert!(matches!(time_zone_3.find_local_time_type(0), Err(FindLocalTimeTypeError(_))));
 
-        let time_zone_err = TimeZone::new(vec![Transition::new(0, 0)], utc_local_time_types, vec![], Some(fixed_extra_rule.clone()));
-        assert!(time_zone_err.is_err());
-
-        let time_zone_4 = TimeZone::new(
-            vec![Transition::new(i32::MIN.into(), 0), Transition::new(0, 1)],
-            vec![utc.clone(), cet.clone()],
-            Vec::new(),
-            Some(fixed_extra_rule),
-        )?;
-
         assert_eq!(*time_zone_4.find_local_time_type(-1)?, utc);
         assert_eq!(*time_zone_4.find_local_time_type(0)?, cet);
+
+        let time_zone_err = TimeZone::new(vec![Transition::new(0, 0)], utc_local_time_types, vec![], Some(fixed_extra_rule));
+        assert!(time_zone_err.is_err());
 
         Ok(())
     }
