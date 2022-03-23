@@ -66,7 +66,7 @@ impl<'a> Cursor<'a> {
         }
     }
 
-    /// Read bytes until the provided predicate is false
+    /// Read bytes until the provided predicate is true
     pub fn read_until<F: Fn(&u8) -> bool>(&mut self, f: F) -> Result<&'a [u8], Error> {
         match self.remaining.iter().position(f) {
             None => self.read_exact(self.remaining.len()),
