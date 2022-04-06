@@ -37,6 +37,11 @@ impl fmt::Display for UtcDateTime {
 }
 
 impl UtcDateTime {
+    /// Minimum allowed Unix time in seconds
+    const MIN_UNIX_TIME: i64 = -67768100567971200;
+    /// Maximum allowed Unix time in seconds
+    const MAX_UNIX_TIME: i64 = 67767976233532799;
+
     /// Construct a UTC date time
     ///
     /// ## Inputs
@@ -51,41 +56,13 @@ impl UtcDateTime {
     ///
     #[const_fn(feature = "const")]
     pub const fn new(year: i32, month: u8, month_day: u8, hour: u8, minute: u8, second: u8, nanoseconds: u32) -> Result<Self, DateTimeError> {
-        use crate::constants::*;
-
         // Exclude the maximum possible UTC date time with a leap second
         if year == i32::MAX && month == 12 && month_day == 31 && hour == 23 && minute == 59 && second == 60 {
             return Err(DateTimeError("out of range date time"));
         }
 
-        if !(1 <= month && month <= 12) {
-            return Err(DateTimeError("invalid month"));
-        }
-        if !(1 <= month_day && month_day <= 31) {
-            return Err(DateTimeError("invalid month day"));
-        }
-        if hour > 23 {
-            return Err(DateTimeError("invalid hour"));
-        }
-        if minute > 59 {
-            return Err(DateTimeError("invalid minute"));
-        }
-        if second > 60 {
-            return Err(DateTimeError("invalid second"));
-        }
-        if nanoseconds >= NANOSECONDS_PER_SECOND {
-            return Err(DateTimeError("invalid nanoseconds"));
-        }
-
-        let leap = is_leap_year(year) as i64;
-
-        let mut day_in_month = DAY_IN_MONTHS_NORMAL_YEAR[month as usize - 1];
-        if month == 2 {
-            day_in_month += leap;
-        }
-
-        if month_day as i64 > day_in_month {
-            return Err(DateTimeError("invalid month day"));
+        if let Err(error) = check_date_time_inputs(year, month, month_day, hour, minute, second, nanoseconds) {
+            return Err(error);
         }
 
         Ok(Self { year, month, month_day, hour, minute, second, nanoseconds })
@@ -175,17 +152,7 @@ impl UtcDateTime {
     /// Returns the Unix time in seconds associated to the UTC date time
     #[const_fn(feature = "const")]
     pub const fn unix_time(&self) -> i64 {
-        use crate::constants::*;
-
-        let mut result = days_since_unix_epoch(self.year, self.month as usize, self.month_day as i64);
-        result *= HOURS_PER_DAY;
-        result += self.hour as i64;
-        result *= MINUTES_PER_HOUR;
-        result += self.minute as i64;
-        result *= SECONDS_PER_MINUTE;
-        result += self.second as i64;
-
-        result
+        unix_time(self.year, self.month, self.month_day, self.hour, self.minute, self.second)
     }
 
     /// Project the UTC date time into a time zone.
@@ -241,6 +208,46 @@ impl fmt::Display for DateTime {
 }
 
 impl DateTime {
+    /// Construct a date time
+    ///
+    /// ## Inputs
+    ///
+    /// * `year`: Year
+    /// * `month`: Month in `[1, 12]`
+    /// * `month_day`: Day of the month in `[1, 31]`
+    /// * `hour`: Hours since midnight in `[0, 23]`
+    /// * `minute`: Minutes in `[0, 59]`
+    /// * `second`: Seconds in `[0, 60]`, with a possible leap second
+    /// * `nanoseconds`: Nanoseconds in `[0, 999_999_999]`
+    /// * `local_time_type`: Local time type associated to a time zone
+    ///
+    #[allow(clippy::too_many_arguments)]
+    #[const_fn(feature = "const")]
+    pub const fn new(
+        year: i32,
+        month: u8,
+        month_day: u8,
+        hour: u8,
+        minute: u8,
+        second: u8,
+        nanoseconds: u32,
+        local_time_type: LocalTimeType,
+    ) -> Result<Self, DateTimeError> {
+        if let Err(error) = check_date_time_inputs(year, month, month_day, hour, minute, second, nanoseconds) {
+            return Err(error);
+        }
+
+        // Overflow is not possible
+        let unix_time = unix_time(year, month, month_day, hour, minute, second) - local_time_type.ut_offset() as i64;
+
+        // Check if the associated UTC date time is valid
+        if !(UtcDateTime::MIN_UNIX_TIME <= unix_time && unix_time <= UtcDateTime::MAX_UNIX_TIME) {
+            return Err(DateTimeError("out of range date time"));
+        };
+
+        Ok(Self { year, month, month_day, hour, minute, second, local_time_type, unix_time, nanoseconds })
+    }
+
     /// Construct a date time from a Unix time in seconds with nanoseconds and a time zone
     #[const_fn(feature = "const")]
     pub const fn from_timespec(unix_time: i64, nanoseconds: u32, time_zone_ref: TimeZoneRef) -> Result<Self, ProjectDateTimeError> {
@@ -452,6 +459,32 @@ pub(crate) const fn days_since_unix_epoch(year: i32, month: usize, month_day: i6
     result
 }
 
+/// Compute Unix time in seconds
+///
+/// ## Inputs
+///
+/// * `year`: Year
+/// * `month`: Month in `[1, 12]`
+/// * `month_day`: Day of the month in `[1, 31]`
+/// * `hour`: Hours since midnight in `[0, 23]`
+/// * `minute`: Minutes in `[0, 59]`
+/// * `second`: Seconds in `[0, 60]`, with a possible leap second
+///
+#[const_fn(feature = "const")]
+const fn unix_time(year: i32, month: u8, month_day: u8, hour: u8, minute: u8, second: u8) -> i64 {
+    use crate::constants::*;
+
+    let mut result = days_since_unix_epoch(year, month as usize, month_day as i64);
+    result *= HOURS_PER_DAY;
+    result += hour as i64;
+    result *= MINUTES_PER_HOUR;
+    result += minute as i64;
+    result *= SECONDS_PER_MINUTE;
+    result += second as i64;
+
+    result
+}
+
 /// Compute the number of nanoseconds since Unix epoch (`1970-01-01T00:00:00Z`)
 #[const_fn(feature = "const")]
 const fn nanoseconds_since_unix_epoch(unix_time: i64, nanoseconds: u32) -> i128 {
@@ -480,6 +513,55 @@ const fn total_nanoseconds_to_timespec(total_nanoseconds: i128) -> Result<(i64, 
     let nanoseconds = total_nanoseconds.rem_euclid(NANOSECONDS_PER_SECOND as i128) as u32;
 
     Ok((unix_time, nanoseconds))
+}
+
+/// Check date time inputs
+///
+/// ## Inputs
+///
+/// * `year`: Year
+/// * `month`: Month in `[1, 12]`
+/// * `month_day`: Day of the month in `[1, 31]`
+/// * `hour`: Hours since midnight in `[0, 23]`
+/// * `minute`: Minutes in `[0, 59]`
+/// * `second`: Seconds in `[0, 60]`, with a possible leap second
+/// * `nanoseconds`: Nanoseconds in `[0, 999_999_999]`
+///
+#[const_fn(feature = "const")]
+const fn check_date_time_inputs(year: i32, month: u8, month_day: u8, hour: u8, minute: u8, second: u8, nanoseconds: u32) -> Result<(), DateTimeError> {
+    use crate::constants::*;
+
+    if !(1 <= month && month <= 12) {
+        return Err(DateTimeError("invalid month"));
+    }
+    if !(1 <= month_day && month_day <= 31) {
+        return Err(DateTimeError("invalid month day"));
+    }
+    if hour > 23 {
+        return Err(DateTimeError("invalid hour"));
+    }
+    if minute > 59 {
+        return Err(DateTimeError("invalid minute"));
+    }
+    if second > 60 {
+        return Err(DateTimeError("invalid second"));
+    }
+    if nanoseconds >= NANOSECONDS_PER_SECOND {
+        return Err(DateTimeError("invalid nanoseconds"));
+    }
+
+    let leap = is_leap_year(year) as i64;
+
+    let mut day_in_month = DAY_IN_MONTHS_NORMAL_YEAR[month as usize - 1];
+    if month == 2 {
+        day_in_month += leap;
+    }
+
+    if month_day as i64 > day_in_month {
+        return Err(DateTimeError("invalid month day"));
+    }
+
+    Ok(())
 }
 
 /// Format a date time
@@ -566,76 +648,76 @@ mod test {
         assert_eq!(DateTime::now(time_zone_eet.as_ref())?.local_time_type().ut_offset(), 7200);
 
         let unix_times = &[
-            -93750523200,
-            -11670955200,
-            -11670868800,
-            -8515195200,
-            -8483659200,
-            -8389051200,
-            -8388964800,
-            951825600,
-            951912000,
-            983448000,
-            1078056000,
-            1078142400,
-            4107585600,
-            32540356800,
+            -93750523134,
+            -11670955134,
+            -11670868734,
+            -8515195134,
+            -8483659134,
+            -8389051134,
+            -8388964734,
+            951825666,
+            951912066,
+            983448066,
+            1078056066,
+            1078142466,
+            4107585666,
+            32540356866,
         ];
 
         let nanoseconds_list = &[10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23];
 
         #[rustfmt::skip]
         let date_times_utc = &[
-            DateTime { year: -1001, month: 3, month_day: 1,  hour: 12, minute: 0, second: 0, local_time_type: utc, unix_time: -93750523200, nanoseconds: 10 },
-            DateTime { year: 1600,  month: 2, month_day: 29, hour: 12, minute: 0, second: 0, local_time_type: utc, unix_time: -11670955200, nanoseconds: 11 },
-            DateTime { year: 1600,  month: 3, month_day: 1,  hour: 12, minute: 0, second: 0, local_time_type: utc, unix_time: -11670868800, nanoseconds: 12 },
-            DateTime { year: 1700,  month: 3, month_day: 1,  hour: 12, minute: 0, second: 0, local_time_type: utc, unix_time: -8515195200,  nanoseconds: 13 },
-            DateTime { year: 1701,  month: 3, month_day: 1,  hour: 12, minute: 0, second: 0, local_time_type: utc, unix_time: -8483659200,  nanoseconds: 14 },
-            DateTime { year: 1704,  month: 2, month_day: 29, hour: 12, minute: 0, second: 0, local_time_type: utc, unix_time: -8389051200,  nanoseconds: 15 },
-            DateTime { year: 1704,  month: 3, month_day: 1,  hour: 12, minute: 0, second: 0, local_time_type: utc, unix_time: -8388964800,  nanoseconds: 16 },
-            DateTime { year: 2000,  month: 2, month_day: 29, hour: 12, minute: 0, second: 0, local_time_type: utc, unix_time: 951825600,    nanoseconds: 17 },
-            DateTime { year: 2000,  month: 3, month_day: 1,  hour: 12, minute: 0, second: 0, local_time_type: utc, unix_time: 951912000,    nanoseconds: 18 },
-            DateTime { year: 2001,  month: 3, month_day: 1,  hour: 12, minute: 0, second: 0, local_time_type: utc, unix_time: 983448000,    nanoseconds: 19 },
-            DateTime { year: 2004,  month: 2, month_day: 29, hour: 12, minute: 0, second: 0, local_time_type: utc, unix_time: 1078056000,   nanoseconds: 20 },
-            DateTime { year: 2004,  month: 3, month_day: 1,  hour: 12, minute: 0, second: 0, local_time_type: utc, unix_time: 1078142400,   nanoseconds: 21 },
-            DateTime { year: 2100,  month: 3, month_day: 1,  hour: 12, minute: 0, second: 0, local_time_type: utc, unix_time: 4107585600,   nanoseconds: 22 },
-            DateTime { year: 3001,  month: 3, month_day: 1,  hour: 12, minute: 0, second: 0, local_time_type: utc, unix_time: 32540356800,  nanoseconds: 23 },
+            DateTime { year: -1001, month: 3, month_day: 1,  hour: 12, minute: 1, second: 6, local_time_type: utc, unix_time: -93750523134, nanoseconds: 10 },
+            DateTime { year: 1600,  month: 2, month_day: 29, hour: 12, minute: 1, second: 6, local_time_type: utc, unix_time: -11670955134, nanoseconds: 11 },
+            DateTime { year: 1600,  month: 3, month_day: 1,  hour: 12, minute: 1, second: 6, local_time_type: utc, unix_time: -11670868734, nanoseconds: 12 },
+            DateTime { year: 1700,  month: 3, month_day: 1,  hour: 12, minute: 1, second: 6, local_time_type: utc, unix_time: -8515195134,  nanoseconds: 13 },
+            DateTime { year: 1701,  month: 3, month_day: 1,  hour: 12, minute: 1, second: 6, local_time_type: utc, unix_time: -8483659134,  nanoseconds: 14 },
+            DateTime { year: 1704,  month: 2, month_day: 29, hour: 12, minute: 1, second: 6, local_time_type: utc, unix_time: -8389051134,  nanoseconds: 15 },
+            DateTime { year: 1704,  month: 3, month_day: 1,  hour: 12, minute: 1, second: 6, local_time_type: utc, unix_time: -8388964734,  nanoseconds: 16 },
+            DateTime { year: 2000,  month: 2, month_day: 29, hour: 12, minute: 1, second: 6, local_time_type: utc, unix_time: 951825666,    nanoseconds: 17 },
+            DateTime { year: 2000,  month: 3, month_day: 1,  hour: 12, minute: 1, second: 6, local_time_type: utc, unix_time: 951912066,    nanoseconds: 18 },
+            DateTime { year: 2001,  month: 3, month_day: 1,  hour: 12, minute: 1, second: 6, local_time_type: utc, unix_time: 983448066,    nanoseconds: 19 },
+            DateTime { year: 2004,  month: 2, month_day: 29, hour: 12, minute: 1, second: 6, local_time_type: utc, unix_time: 1078056066,   nanoseconds: 20 },
+            DateTime { year: 2004,  month: 3, month_day: 1,  hour: 12, minute: 1, second: 6, local_time_type: utc, unix_time: 1078142466,   nanoseconds: 21 },
+            DateTime { year: 2100,  month: 3, month_day: 1,  hour: 12, minute: 1, second: 6, local_time_type: utc, unix_time: 4107585666,   nanoseconds: 22 },
+            DateTime { year: 3001,  month: 3, month_day: 1,  hour: 12, minute: 1, second: 6, local_time_type: utc, unix_time: 32540356866,  nanoseconds: 23 },
         ];
 
         #[rustfmt::skip]
          let date_times_cet = &[
-            DateTime { year: -1001, month: 3, month_day: 1,  hour: 13, minute: 0, second: 0, local_time_type: cet, unix_time: -93750523200, nanoseconds: 10 },
-            DateTime { year: 1600,  month: 2, month_day: 29, hour: 13, minute: 0, second: 0, local_time_type: cet, unix_time: -11670955200, nanoseconds: 11 },
-            DateTime { year: 1600,  month: 3, month_day: 1,  hour: 13, minute: 0, second: 0, local_time_type: cet, unix_time: -11670868800, nanoseconds: 12 },
-            DateTime { year: 1700,  month: 3, month_day: 1,  hour: 13, minute: 0, second: 0, local_time_type: cet, unix_time: -8515195200,  nanoseconds: 13 },
-            DateTime { year: 1701,  month: 3, month_day: 1,  hour: 13, minute: 0, second: 0, local_time_type: cet, unix_time: -8483659200,  nanoseconds: 14 },
-            DateTime { year: 1704,  month: 2, month_day: 29, hour: 13, minute: 0, second: 0, local_time_type: cet, unix_time: -8389051200,  nanoseconds: 15 },
-            DateTime { year: 1704,  month: 3, month_day: 1,  hour: 13, minute: 0, second: 0, local_time_type: cet, unix_time: -8388964800,  nanoseconds: 16 },
-            DateTime { year: 2000,  month: 2, month_day: 29, hour: 13, minute: 0, second: 0, local_time_type: cet, unix_time: 951825600,    nanoseconds: 17 },
-            DateTime { year: 2000,  month: 3, month_day: 1,  hour: 13, minute: 0, second: 0, local_time_type: cet, unix_time: 951912000,    nanoseconds: 18 },
-            DateTime { year: 2001,  month: 3, month_day: 1,  hour: 13, minute: 0, second: 0, local_time_type: cet, unix_time: 983448000,    nanoseconds: 19 },
-            DateTime { year: 2004,  month: 2, month_day: 29, hour: 13, minute: 0, second: 0, local_time_type: cet, unix_time: 1078056000,   nanoseconds: 20 },
-            DateTime { year: 2004,  month: 3, month_day: 1,  hour: 13, minute: 0, second: 0, local_time_type: cet, unix_time: 1078142400,   nanoseconds: 21 },
-            DateTime { year: 2100,  month: 3, month_day: 1,  hour: 13, minute: 0, second: 0, local_time_type: cet, unix_time: 4107585600,   nanoseconds: 22 },
-            DateTime { year: 3001,  month: 3, month_day: 1,  hour: 13, minute: 0, second: 0, local_time_type: cet, unix_time: 32540356800,  nanoseconds: 23 },
+            DateTime { year: -1001, month: 3, month_day: 1,  hour: 13, minute: 1, second: 6, local_time_type: cet, unix_time: -93750523134, nanoseconds: 10 },
+            DateTime { year: 1600,  month: 2, month_day: 29, hour: 13, minute: 1, second: 6, local_time_type: cet, unix_time: -11670955134, nanoseconds: 11 },
+            DateTime { year: 1600,  month: 3, month_day: 1,  hour: 13, minute: 1, second: 6, local_time_type: cet, unix_time: -11670868734, nanoseconds: 12 },
+            DateTime { year: 1700,  month: 3, month_day: 1,  hour: 13, minute: 1, second: 6, local_time_type: cet, unix_time: -8515195134,  nanoseconds: 13 },
+            DateTime { year: 1701,  month: 3, month_day: 1,  hour: 13, minute: 1, second: 6, local_time_type: cet, unix_time: -8483659134,  nanoseconds: 14 },
+            DateTime { year: 1704,  month: 2, month_day: 29, hour: 13, minute: 1, second: 6, local_time_type: cet, unix_time: -8389051134,  nanoseconds: 15 },
+            DateTime { year: 1704,  month: 3, month_day: 1,  hour: 13, minute: 1, second: 6, local_time_type: cet, unix_time: -8388964734,  nanoseconds: 16 },
+            DateTime { year: 2000,  month: 2, month_day: 29, hour: 13, minute: 1, second: 6, local_time_type: cet, unix_time: 951825666,    nanoseconds: 17 },
+            DateTime { year: 2000,  month: 3, month_day: 1,  hour: 13, minute: 1, second: 6, local_time_type: cet, unix_time: 951912066,    nanoseconds: 18 },
+            DateTime { year: 2001,  month: 3, month_day: 1,  hour: 13, minute: 1, second: 6, local_time_type: cet, unix_time: 983448066,    nanoseconds: 19 },
+            DateTime { year: 2004,  month: 2, month_day: 29, hour: 13, minute: 1, second: 6, local_time_type: cet, unix_time: 1078056066,   nanoseconds: 20 },
+            DateTime { year: 2004,  month: 3, month_day: 1,  hour: 13, minute: 1, second: 6, local_time_type: cet, unix_time: 1078142466,   nanoseconds: 21 },
+            DateTime { year: 2100,  month: 3, month_day: 1,  hour: 13, minute: 1, second: 6, local_time_type: cet, unix_time: 4107585666,   nanoseconds: 22 },
+            DateTime { year: 3001,  month: 3, month_day: 1,  hour: 13, minute: 1, second: 6, local_time_type: cet, unix_time: 32540356866,  nanoseconds: 23 },
         ];
 
         #[rustfmt::skip]
          let date_times_eet = &[
-            DateTime { year: -1001, month: 3, month_day: 1,  hour: 14, minute: 0, second: 0, local_time_type: eet, unix_time: -93750523200, nanoseconds: 10 },
-            DateTime { year: 1600,  month: 2, month_day: 29, hour: 14, minute: 0, second: 0, local_time_type: eet, unix_time: -11670955200, nanoseconds: 11 },
-            DateTime { year: 1600,  month: 3, month_day: 1,  hour: 14, minute: 0, second: 0, local_time_type: eet, unix_time: -11670868800, nanoseconds: 12 },
-            DateTime { year: 1700,  month: 3, month_day: 1,  hour: 14, minute: 0, second: 0, local_time_type: eet, unix_time: -8515195200,  nanoseconds: 13 },
-            DateTime { year: 1701,  month: 3, month_day: 1,  hour: 14, minute: 0, second: 0, local_time_type: eet, unix_time: -8483659200,  nanoseconds: 14 },
-            DateTime { year: 1704,  month: 2, month_day: 29, hour: 14, minute: 0, second: 0, local_time_type: eet, unix_time: -8389051200,  nanoseconds: 15 },
-            DateTime { year: 1704,  month: 3, month_day: 1,  hour: 14, minute: 0, second: 0, local_time_type: eet, unix_time: -8388964800,  nanoseconds: 16 },
-            DateTime { year: 2000,  month: 2, month_day: 29, hour: 14, minute: 0, second: 0, local_time_type: eet, unix_time: 951825600,    nanoseconds: 17 },
-            DateTime { year: 2000,  month: 3, month_day: 1,  hour: 14, minute: 0, second: 0, local_time_type: eet, unix_time: 951912000,    nanoseconds: 18 },
-            DateTime { year: 2001,  month: 3, month_day: 1,  hour: 14, minute: 0, second: 0, local_time_type: eet, unix_time: 983448000,    nanoseconds: 19 },
-            DateTime { year: 2004,  month: 2, month_day: 29, hour: 14, minute: 0, second: 0, local_time_type: eet, unix_time: 1078056000,   nanoseconds: 20 },
-            DateTime { year: 2004,  month: 3, month_day: 1,  hour: 14, minute: 0, second: 0, local_time_type: eet, unix_time: 1078142400,   nanoseconds: 21 },
-            DateTime { year: 2100,  month: 3, month_day: 1,  hour: 14, minute: 0, second: 0, local_time_type: eet, unix_time: 4107585600,   nanoseconds: 22 },
-            DateTime { year: 3001,  month: 3, month_day: 1,  hour: 14, minute: 0, second: 0, local_time_type: eet, unix_time: 32540356800,  nanoseconds: 23 },
+            DateTime { year: -1001, month: 3, month_day: 1,  hour: 14, minute: 1, second: 6, local_time_type: eet, unix_time: -93750523134, nanoseconds: 10 },
+            DateTime { year: 1600,  month: 2, month_day: 29, hour: 14, minute: 1, second: 6, local_time_type: eet, unix_time: -11670955134, nanoseconds: 11 },
+            DateTime { year: 1600,  month: 3, month_day: 1,  hour: 14, minute: 1, second: 6, local_time_type: eet, unix_time: -11670868734, nanoseconds: 12 },
+            DateTime { year: 1700,  month: 3, month_day: 1,  hour: 14, minute: 1, second: 6, local_time_type: eet, unix_time: -8515195134,  nanoseconds: 13 },
+            DateTime { year: 1701,  month: 3, month_day: 1,  hour: 14, minute: 1, second: 6, local_time_type: eet, unix_time: -8483659134,  nanoseconds: 14 },
+            DateTime { year: 1704,  month: 2, month_day: 29, hour: 14, minute: 1, second: 6, local_time_type: eet, unix_time: -8389051134,  nanoseconds: 15 },
+            DateTime { year: 1704,  month: 3, month_day: 1,  hour: 14, minute: 1, second: 6, local_time_type: eet, unix_time: -8388964734,  nanoseconds: 16 },
+            DateTime { year: 2000,  month: 2, month_day: 29, hour: 14, minute: 1, second: 6, local_time_type: eet, unix_time: 951825666,    nanoseconds: 17 },
+            DateTime { year: 2000,  month: 3, month_day: 1,  hour: 14, minute: 1, second: 6, local_time_type: eet, unix_time: 951912066,    nanoseconds: 18 },
+            DateTime { year: 2001,  month: 3, month_day: 1,  hour: 14, minute: 1, second: 6, local_time_type: eet, unix_time: 983448066,    nanoseconds: 19 },
+            DateTime { year: 2004,  month: 2, month_day: 29, hour: 14, minute: 1, second: 6, local_time_type: eet, unix_time: 1078056066,   nanoseconds: 20 },
+            DateTime { year: 2004,  month: 3, month_day: 1,  hour: 14, minute: 1, second: 6, local_time_type: eet, unix_time: 1078142466,   nanoseconds: 21 },
+            DateTime { year: 2100,  month: 3, month_day: 1,  hour: 14, minute: 1, second: 6, local_time_type: eet, unix_time: 4107585666,   nanoseconds: 22 },
+            DateTime { year: 3001,  month: 3, month_day: 1,  hour: 14, minute: 1, second: 6, local_time_type: eet, unix_time: 32540356866,  nanoseconds: 23 },
         ];
 
         for ((((&unix_time, &nanoseconds), date_time_utc), date_time_cet), date_time_eet) in
@@ -866,25 +948,33 @@ mod test {
 
     #[test]
     fn test_date_time_overflow() -> Result<()> {
-        let min_unix_time = -67768100567971200;
-        let max_unix_time = 67767976233532799;
+        assert!(UtcDateTime::new(i32::MIN, 1, 1, 0, 0, 0, 0).is_ok());
+        assert!(UtcDateTime::new(i32::MAX, 12, 31, 23, 59, 59, 0).is_ok());
+
+        assert!(DateTime::new(i32::MIN, 1, 1, 0, 0, 0, 0, LocalTimeType::utc()).is_ok());
+        assert!(DateTime::new(i32::MAX, 12, 31, 23, 59, 59, 0, LocalTimeType::utc()).is_ok());
+
+        assert!(matches!(DateTime::new(i32::MIN, 1, 1, 0, 0, 0, 0, LocalTimeType::with_ut_offset(1)?), Err(DateTimeError(_))));
+        assert!(matches!(DateTime::new(i32::MAX, 12, 31, 23, 59, 59, 0, LocalTimeType::with_ut_offset(-1)?), Err(DateTimeError(_))));
 
         assert!(matches!(UtcDateTime::new(i32::MAX, 12, 31, 23, 59, 60, 0), Err(DateTimeError(_))));
+        assert!(matches!(DateTime::new(i32::MAX, 12, 31, 23, 59, 60, 0, LocalTimeType::utc()), Err(DateTimeError(_))));
+        assert!(DateTime::new(i32::MAX, 12, 31, 23, 59, 60, 0, LocalTimeType::with_ut_offset(1)?).is_ok());
 
-        assert!(UtcDateTime::from_timespec(min_unix_time, 0).is_ok());
-        assert!(UtcDateTime::from_timespec(max_unix_time, 0).is_ok());
+        assert!(UtcDateTime::from_timespec(UtcDateTime::MIN_UNIX_TIME, 0).is_ok());
+        assert!(UtcDateTime::from_timespec(UtcDateTime::MAX_UNIX_TIME, 0).is_ok());
 
-        assert!(DateTime::from_timespec(min_unix_time, 0, TimeZone::fixed(0)?.as_ref()).is_ok());
-        assert!(DateTime::from_timespec(max_unix_time, 0, TimeZone::fixed(0)?.as_ref()).is_ok());
+        assert!(matches!(UtcDateTime::from_timespec(UtcDateTime::MIN_UNIX_TIME - 1, 0), Err(OutOfRangeError(_))));
+        assert!(matches!(UtcDateTime::from_timespec(UtcDateTime::MAX_UNIX_TIME + 1, 0), Err(OutOfRangeError(_))));
 
-        assert!(matches!(UtcDateTime::from_timespec(min_unix_time - 1, 0), Err(OutOfRangeError(_))));
-        assert!(matches!(UtcDateTime::from_timespec(max_unix_time + 1, 0), Err(OutOfRangeError(_))));
-
-        assert!(matches!(UtcDateTime::from_timespec(min_unix_time, 0)?.project(TimeZone::fixed(-1)?.as_ref()), Err(ProjectDateTimeError(_))));
-        assert!(matches!(UtcDateTime::from_timespec(max_unix_time, 0)?.project(TimeZone::fixed(1)?.as_ref()), Err(ProjectDateTimeError(_))));
+        assert!(matches!(UtcDateTime::from_timespec(UtcDateTime::MIN_UNIX_TIME, 0)?.project(TimeZone::fixed(-1)?.as_ref()), Err(ProjectDateTimeError(_))));
+        assert!(matches!(UtcDateTime::from_timespec(UtcDateTime::MAX_UNIX_TIME, 0)?.project(TimeZone::fixed(1)?.as_ref()), Err(ProjectDateTimeError(_))));
 
         assert!(matches!(UtcDateTime::from_timespec(i64::MIN, 0), Err(OutOfRangeError(_))));
         assert!(matches!(UtcDateTime::from_timespec(i64::MAX, 0), Err(OutOfRangeError(_))));
+
+        assert!(DateTime::from_timespec(UtcDateTime::MIN_UNIX_TIME, 0, TimeZone::fixed(0)?.as_ref()).is_ok());
+        assert!(DateTime::from_timespec(UtcDateTime::MAX_UNIX_TIME, 0, TimeZone::fixed(0)?.as_ref()).is_ok());
 
         assert!(matches!(DateTime::from_timespec(i64::MIN, 0, TimeZone::fixed(-1)?.as_ref()), Err(ProjectDateTimeError(_))));
         assert!(matches!(DateTime::from_timespec(i64::MAX, 0, TimeZone::fixed(1)?.as_ref()), Err(ProjectDateTimeError(_))));
@@ -1045,6 +1135,8 @@ mod test {
         const UNIX_EPOCH: UtcDateTime = unwrap!(UtcDateTime::from_timespec(0, 0));
         const UTC_DATE_TIME: UtcDateTime = unwrap!(UtcDateTime::new(2000, 1, 1, 0, 0, 0, 1000));
 
+        const DATE_TIME: DateTime = unwrap!(DateTime::new(2000, 1, 1, 1, 0, 0, 1000, unwrap!(LocalTimeType::with_ut_offset(3600))));
+
         const DATE_TIME_1: DateTime = unwrap!(UTC_DATE_TIME.project(TIME_ZONE_REF));
         const DATE_TIME_2: DateTime = unwrap!(DATE_TIME_1.project(UTC));
 
@@ -1052,6 +1144,7 @@ mod test {
         const LOCAL_TIME_TYPE_2: &LocalTimeType = DATE_TIME_2.local_time_type();
 
         assert_eq!(UNIX_EPOCH.unix_time(), 0);
+        assert_eq!(DATE_TIME.unix_time(), UTC_DATE_TIME.unix_time());
         assert_eq!(DATE_TIME_2.unix_time(), UTC_DATE_TIME.unix_time());
         assert_eq!(DATE_TIME_2.nanoseconds(), UTC_DATE_TIME.nanoseconds());
 

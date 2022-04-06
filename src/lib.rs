@@ -1,6 +1,6 @@
 #![deny(missing_docs)]
 
-//! This crate provides the `TimeZone` and `DateTime` types, which can be used to determine local time on a given time zone.
+//! This crate provides the [`TimeZone`] and [`DateTime`] types, which can be used to determine local time on a given time zone.
 //!
 //! This allows to convert between an [Unix timestamp](https://en.wikipedia.org/wiki/Unix_time) and a calendar time exprimed in the [proleptic gregorian calendar](https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar) with a provided time zone.
 //!
@@ -55,7 +55,7 @@
 //!
 //! ```rust
 //! # fn main() -> Result<(), tz::TzError> {
-//! use tz::{DateTime, TimeZone, UtcDateTime};
+//! use tz::{DateTime, LocalTimeType, TimeZone, UtcDateTime};
 //!
 //! // Get the current UTC date time
 //! let _current_utc_date_time = UtcDateTime::now()?;
@@ -117,6 +117,20 @@
 //! // Get the current date time at the local time zone (UNIX only)
 //! let time_zone_local = TimeZone::local()?;
 //! let _date_time = DateTime::now(time_zone_local.as_ref())?;
+//!
+//! // Create a new date time with an UTC offset (2000-01-01T01:00:00.123456789+01:00)
+//! let date_time = DateTime::new(2000, 1, 1, 1, 0, 0, 123_456_789, LocalTimeType::with_ut_offset(3600)?)?;
+//! assert_eq!(date_time.year(), 2000);
+//! assert_eq!(date_time.month(), 1);
+//! assert_eq!(date_time.month_day(), 1);
+//! assert_eq!(date_time.hour(), 1);
+//! assert_eq!(date_time.minute(), 0);
+//! assert_eq!(date_time.second(), 0);
+//! assert_eq!(date_time.week_day(), 6);
+//! assert_eq!(date_time.year_day(), 0);
+//! assert_eq!(date_time.unix_time(), 946684800);
+//! assert_eq!(date_time.nanoseconds(), 123_456_789);
+//! assert_eq!(date_time.to_string(), "2000-01-01T01:00:00.123456789+01:00");
 //! # Ok(())
 //! # }
 //! ```
@@ -131,7 +145,7 @@ pub mod timezone;
 
 pub use datetime::{DateTime, UtcDateTime};
 pub use error::TzError;
-pub use timezone::{TimeZone, TimeZoneRef};
+pub use timezone::{LocalTimeType, TimeZone, TimeZoneRef};
 
 /// Alias for [`std::result::Result`] with the crate unified error
 pub type Result<T> = std::result::Result<T, TzError>;

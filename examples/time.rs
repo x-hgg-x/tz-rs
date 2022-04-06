@@ -85,5 +85,9 @@ fn main() -> Result<()> {
     let date_time = DateTime::now(time_zone_local.as_ref())?;
     println!("{:#?}", date_time);
 
+    // Create a new date time with an UTC offset (2000-01-01T01:00:00.123456789+01:00)
+    let date_time = DateTime::new(2000, 1, 1, 1, 0, 0, 123_456_789, LocalTimeType::with_ut_offset(3600)?)?;
+    println!("{:#?}", date_time);
+
     Ok(())
 }
