@@ -315,6 +315,46 @@ mod test {
     }
 
     #[test]
+    fn test_min_dst_offset() -> Result<(), TzError> {
+        let tz_string = b"STD24:59:59DST,J1,J365";
+
+        let transition_rule = parse_posix_tz(tz_string, false)?;
+
+        let transition_rule_result = TransitionRule::Alternate(AlternateTime::new(
+            LocalTimeType::new(-89999, false, Some(b"STD"))?,
+            LocalTimeType::new(-86399, true, Some(b"DST"))?,
+            RuleDay::Julian1WithoutLeap(Julian1WithoutLeap::new(1)?),
+            7200,
+            RuleDay::Julian1WithoutLeap(Julian1WithoutLeap::new(365)?),
+            7200,
+        )?);
+
+        assert_eq!(transition_rule, transition_rule_result);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_max_dst_offset() -> Result<(), TzError> {
+        let tz_string = b"STD-24:59:59DST,J1,J365";
+
+        let transition_rule = parse_posix_tz(tz_string, false)?;
+
+        let transition_rule_result = TransitionRule::Alternate(AlternateTime::new(
+            LocalTimeType::new(89999, false, Some(b"STD"))?,
+            LocalTimeType::new(93599, true, Some(b"DST"))?,
+            RuleDay::Julian1WithoutLeap(Julian1WithoutLeap::new(1)?),
+            7200,
+            RuleDay::Julian1WithoutLeap(Julian1WithoutLeap::new(365)?),
+            7200,
+        )?);
+
+        assert_eq!(transition_rule, transition_rule_result);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_error() -> Result<(), TzError> {
         assert!(matches!(parse_posix_tz(b"IST-1GMT0", false), Err(TzError::TzStringError(TzStringError::UnsupportedTzString(_)))));
         assert!(matches!(parse_posix_tz(b"EET-2EEST", false), Err(TzError::TzStringError(TzStringError::UnsupportedTzString(_)))));
