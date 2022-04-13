@@ -61,7 +61,7 @@ impl FoundDateTimeList {
     }
 }
 
-/// Find the possible date times correponding to a date, a time and a time zone
+/// Find the possible date times corresponding to a date, a time and a time zone
 ///
 /// ## Inputs
 ///

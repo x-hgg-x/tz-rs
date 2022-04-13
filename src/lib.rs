@@ -133,7 +133,7 @@
 //! assert_eq!(date_time.to_string(), "2000-01-01T01:00:00.123456789+01:00");
 //!
 //! //
-//! // Find the possible date times correponding to a date, a time and a time zone
+//! // Find the possible date times corresponding to a date, a time and a time zone
 //! //
 //! let time_zone = TimeZone::from_posix_tz("CET-1CEST,M3.5.0,M10.5.0/3")?;
 //!

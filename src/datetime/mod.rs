@@ -261,7 +261,7 @@ impl DateTime {
         Ok(Self { year, month, month_day, hour, minute, second, local_time_type, unix_time, nanoseconds })
     }
 
-    /// Find the possible date times correponding to a date, a time and a time zone
+    /// Find the possible date times corresponding to a date, a time and a time zone
     ///
     /// ## Inputs
     ///

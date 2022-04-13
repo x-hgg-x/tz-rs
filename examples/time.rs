@@ -90,7 +90,7 @@ fn main() -> Result<()> {
     println!("{:#?}", date_time);
 
     //
-    // Find the possible date times correponding to a date, a time and a time zone
+    // Find the possible date times corresponding to a date, a time and a time zone
     //
     let time_zone = TimeZone::from_posix_tz("CET-1CEST,M3.5.0,M10.5.0/3")?;
 
