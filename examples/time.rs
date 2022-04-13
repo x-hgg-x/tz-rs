@@ -89,5 +89,31 @@ fn main() -> Result<()> {
     let date_time = DateTime::new(2000, 1, 1, 1, 0, 0, 123_456_789, LocalTimeType::with_ut_offset(3600)?)?;
     println!("{:#?}", date_time);
 
+    //
+    // Find the possible date times correponding to a date, a time and a time zone
+    //
+    let time_zone = TimeZone::from_posix_tz("CET-1CEST,M3.5.0,M10.5.0/3")?;
+
+    // Found date time is unique
+    let found_date_times = DateTime::find(2000, 1, 1, 0, 0, 0, 0, time_zone.as_ref())?;
+    println!("{:#?}", found_date_times);
+    println!("{:#?}", found_date_times.unique());
+    println!("{:#?}", found_date_times.earliest());
+    println!("{:#?}", found_date_times.latest());
+
+    // Found date time was skipped by a forward transition
+    let found_date_times = DateTime::find(2000, 3, 26, 2, 30, 0, 0, time_zone.as_ref())?;
+    println!("{:#?}", found_date_times);
+    println!("{:#?}", found_date_times.unique());
+    println!("{:#?}", found_date_times.earliest());
+    println!("{:#?}", found_date_times.latest());
+
+    // Found date time is ambiguous because of a backward transition
+    let found_date_times = DateTime::find(2000, 10, 29, 2, 30, 0, 0, time_zone.as_ref())?;
+    println!("{:#?}", found_date_times);
+    println!("{:#?}", found_date_times.unique());
+    println!("{:#?}", found_date_times.earliest());
+    println!("{:#?}", found_date_times.latest());
+
     Ok(())
 }

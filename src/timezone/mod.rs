@@ -421,7 +421,7 @@ impl<'a> TimeZoneRef<'a> {
 
     /// Convert Unix time to Unix leap time, from the list of leap seconds in a time zone
     #[const_fn(feature = "const")]
-    const fn unix_time_to_unix_leap_time(&self, unix_time: i64) -> Result<i64, OutOfRangeError> {
+    pub(crate) const fn unix_time_to_unix_leap_time(&self, unix_time: i64) -> Result<i64, OutOfRangeError> {
         let mut unix_leap_time = unix_time;
 
         let mut i = 0;
@@ -445,7 +445,7 @@ impl<'a> TimeZoneRef<'a> {
 
     /// Convert Unix leap time to Unix time, from the list of leap seconds in a time zone
     #[const_fn(feature = "const")]
-    const fn unix_leap_time_to_unix_time(&self, unix_leap_time: i64) -> Result<i64, OutOfRangeError> {
+    pub(crate) const fn unix_leap_time_to_unix_time(&self, unix_leap_time: i64) -> Result<i64, OutOfRangeError> {
         if unix_leap_time == i64::MIN {
             return Err(OutOfRangeError("out of range operation"));
         }
@@ -595,7 +595,7 @@ mod test {
         let time_zone_1 = TimeZone::new(vec![], utc_local_time_types.clone(), vec![], None)?;
         let time_zone_2 = TimeZone::new(vec![], utc_local_time_types.clone(), vec![], Some(fixed_extra_rule))?;
         let time_zone_3 = TimeZone::new(vec![Transition::new(0, 0)], utc_local_time_types.clone(), vec![], None)?;
-        let time_zone_4 = TimeZone::new(vec![Transition::new(i32::MIN.into(), 0), Transition::new(0, 1)], vec![utc, cet], Vec::new(), Some(fixed_extra_rule))?;
+        let time_zone_4 = TimeZone::new(vec![Transition::new(i32::MIN.into(), 0), Transition::new(0, 1)], vec![utc, cet], vec![], Some(fixed_extra_rule))?;
 
         assert_eq!(*time_zone_1.find_local_time_type(0)?, utc);
         assert_eq!(*time_zone_2.find_local_time_type(0)?, cet);
@@ -640,7 +640,7 @@ mod test {
     #[test]
     fn test_leap_seconds() -> Result<()> {
         let time_zone = TimeZone::new(
-            Vec::new(),
+            vec![],
             vec![LocalTimeType::new(0, false, Some(b"UTC"))?],
             vec![
                 LeapSecond::new(78796800, 1),

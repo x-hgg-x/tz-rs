@@ -271,7 +271,7 @@ mod test {
         let time_zone = parse_tz_file(bytes)?;
 
         let time_zone_result = TimeZone::new(
-            Vec::new(),
+            vec![],
             vec![LocalTimeType::new(0, false, Some(b"UTC"))?],
             vec![
                 LeapSecond::new(78796800, 1),
@@ -334,7 +334,7 @@ mod test {
                 LocalTimeType::new(-34200, true, Some(b"HPT"))?,
                 LocalTimeType::new(-36000, false, Some(b"HST"))?,
             ],
-            Vec::new(),
+            vec![],
             Some(TransitionRule::Fixed(LocalTimeType::new(-36000, false, Some(b"HST"))?)),
         )?;
 
@@ -355,7 +355,7 @@ mod test {
         let time_zone_result = TimeZone::new(
             vec![Transition::new(2145916800, 0)],
             vec![LocalTimeType::new(7200, false, Some(b"IST"))?],
-            Vec::new(),
+            vec![],
             Some(TransitionRule::Alternate(AlternateTime::new(
                 LocalTimeType::new(7200, false, Some(b"IST"))?,
                 LocalTimeType::new(10800, true, Some(b"IDT"))?,

@@ -1,5 +1,9 @@
 //! Types related to a date time.
 
+mod find;
+
+pub use find::*;
+
 use crate::constants::*;
 use crate::error::*;
 use crate::timezone::{LocalTimeType, TimeZoneRef};
@@ -42,6 +46,16 @@ impl UtcDateTime {
     const MIN_UNIX_TIME: i64 = -67768100567971200;
     /// Maximum allowed Unix time in seconds
     const MAX_UNIX_TIME: i64 = 67767976233532799;
+
+    /// Check if the UTC date time associated to a Unix time in seconds is valid
+    #[const_fn(feature = "const")]
+    const fn check_unix_time(unix_time: i64) -> Result<(), DateTimeError> {
+        if Self::MIN_UNIX_TIME <= unix_time && unix_time <= Self::MAX_UNIX_TIME {
+            Ok(())
+        } else {
+            Err(DateTimeError("out of range date time"))
+        }
+    }
 
     /// Construct a UTC date time
     ///
@@ -240,21 +254,43 @@ impl DateTime {
         let unix_time = unix_time(year, month, month_day, hour, minute, second) - local_time_type.ut_offset() as i64;
 
         // Check if the associated UTC date time is valid
-        if !(UtcDateTime::MIN_UNIX_TIME <= unix_time && unix_time <= UtcDateTime::MAX_UNIX_TIME) {
-            return Err(DateTimeError("out of range date time"));
-        };
+        if let Err(error) = UtcDateTime::check_unix_time(unix_time) {
+            return Err(error);
+        }
 
         Ok(Self { year, month, month_day, hour, minute, second, local_time_type, unix_time, nanoseconds })
     }
 
-    /// Construct a date time from a Unix time in seconds with nanoseconds and a time zone
-    #[const_fn(feature = "const")]
-    pub const fn from_timespec(unix_time: i64, nanoseconds: u32, time_zone_ref: TimeZoneRef) -> Result<Self, ProjectDateTimeError> {
-        let local_time_type = match time_zone_ref.find_local_time_type(unix_time) {
-            Ok(&local_time_type) => local_time_type,
-            Err(FindLocalTimeTypeError(error)) => return Err(ProjectDateTimeError(error)),
-        };
+    /// Find the possible date times correponding to a date, a time and a time zone
+    ///
+    /// ## Inputs
+    ///
+    /// * `year`: Year
+    /// * `month`: Month in `[1, 12]`
+    /// * `month_day`: Day of the month in `[1, 31]`
+    /// * `hour`: Hours since midnight in `[0, 23]`
+    /// * `minute`: Minutes in `[0, 59]`
+    /// * `second`: Seconds in `[0, 60]`, with a possible leap second
+    /// * `nanoseconds`: Nanoseconds in `[0, 999_999_999]`
+    /// * `time_zone_ref`: Reference to a time zone
+    ///
+    #[allow(clippy::too_many_arguments)]
+    pub fn find(
+        year: i32,
+        month: u8,
+        month_day: u8,
+        hour: u8,
+        minute: u8,
+        second: u8,
+        nanoseconds: u32,
+        time_zone_ref: TimeZoneRef,
+    ) -> Result<FoundDateTimeList, TzError> {
+        find_date_time(year, month, month_day, hour, minute, second, nanoseconds, time_zone_ref)
+    }
 
+    /// Construct a date time from a Unix time in seconds with nanoseconds and a local time type
+    #[const_fn(feature = "const")]
+    pub const fn from_timespec_and_local(unix_time: i64, nanoseconds: u32, local_time_type: LocalTimeType) -> Result<Self, ProjectDateTimeError> {
         let unix_time_with_offset = match unix_time.checked_add(local_time_type.ut_offset() as i64) {
             Some(unix_time_with_offset) => unix_time_with_offset,
             None => return Err(ProjectDateTimeError("out of range date time")),
@@ -267,6 +303,26 @@ impl DateTime {
 
         let UtcDateTime { year, month, month_day, hour, minute, second, nanoseconds } = utc_date_time_with_offset;
         Ok(Self { year, month, month_day, hour, minute, second, local_time_type, unix_time, nanoseconds })
+    }
+
+    /// Construct a date time from a Unix time in seconds with nanoseconds and a time zone
+    #[const_fn(feature = "const")]
+    pub const fn from_timespec(unix_time: i64, nanoseconds: u32, time_zone_ref: TimeZoneRef) -> Result<Self, ProjectDateTimeError> {
+        let local_time_type = match time_zone_ref.find_local_time_type(unix_time) {
+            Ok(&local_time_type) => local_time_type,
+            Err(FindLocalTimeTypeError(error)) => return Err(ProjectDateTimeError(error)),
+        };
+
+        Self::from_timespec_and_local(unix_time, nanoseconds, local_time_type)
+    }
+
+    /// Construct a date time from total nanoseconds since Unix epoch (`1970-01-01T00:00:00Z`) and a local time type
+    #[const_fn(feature = "const")]
+    pub const fn from_total_nanoseconds_and_local(total_nanoseconds: i128, local_time_type: LocalTimeType) -> Result<Self, ProjectDateTimeError> {
+        match total_nanoseconds_to_timespec(total_nanoseconds) {
+            Ok((unix_time, nanoseconds)) => Self::from_timespec_and_local(unix_time, nanoseconds, local_time_type),
+            Err(OutOfRangeError(error)) => Err(ProjectDateTimeError(error)),
+        }
     }
 
     /// Construct a date time from total nanoseconds since Unix epoch (`1970-01-01T00:00:00Z`) and a time zone
@@ -605,7 +661,7 @@ mod test {
     use crate::timezone::*;
     use crate::Result;
 
-    fn check_equal_date_time(x: &DateTime, y: &DateTime) {
+    pub(super) fn check_equal_date_time(x: &DateTime, y: &DateTime) {
         assert_eq!(x.year(), y.year());
         assert_eq!(x.month(), y.month());
         assert_eq!(x.month_day(), y.month_day());

@@ -131,6 +131,53 @@
 //! assert_eq!(date_time.unix_time(), 946684800);
 //! assert_eq!(date_time.nanoseconds(), 123_456_789);
 //! assert_eq!(date_time.to_string(), "2000-01-01T01:00:00.123456789+01:00");
+//!
+//! //
+//! // Find the possible date times correponding to a date, a time and a time zone
+//! //
+//! let time_zone = TimeZone::from_posix_tz("CET-1CEST,M3.5.0,M10.5.0/3")?;
+//!
+//! // Found date time is unique
+//! let found_date_times = DateTime::find(2000, 1, 1, 0, 0, 0, 0, time_zone.as_ref())?;
+//! let unique = found_date_times.unique().unwrap();
+//! assert_eq!(unique, found_date_times.earliest().unwrap());
+//! assert_eq!(unique, found_date_times.latest().unwrap());
+//! assert_eq!(unique.local_time_type().ut_offset(), 3600);
+//! assert_eq!(unique.local_time_type().time_zone_designation(), "CET");
+//!
+//! // Found date time was skipped by a forward transition
+//! let found_date_times = DateTime::find(2000, 3, 26, 2, 30, 0, 0, time_zone.as_ref())?;
+//!
+//! assert_eq!(found_date_times.unique(), None);
+//!
+//! let earliest = found_date_times.earliest().unwrap();
+//! assert_eq!(earliest.hour(), 2);
+//! assert_eq!(earliest.minute(), 0);
+//! assert_eq!(earliest.local_time_type().ut_offset(), 3600);
+//! assert_eq!(earliest.local_time_type().time_zone_designation(), "CET");
+//!
+//! let latest = found_date_times.latest().unwrap();
+//! assert_eq!(latest.hour(), 3);
+//! assert_eq!(latest.minute(), 0);
+//! assert_eq!(latest.local_time_type().ut_offset(), 7200);
+//! assert_eq!(latest.local_time_type().time_zone_designation(), "CEST");
+//!
+//! // Found date time is ambiguous because of a backward transition
+//! let found_date_times = DateTime::find(2000, 10, 29, 2, 30, 0, 0, time_zone.as_ref())?;
+//!
+//! assert_eq!(found_date_times.unique(), None);
+//!
+//! let earliest = found_date_times.earliest().unwrap();
+//! assert_eq!(earliest.hour(), 2);
+//! assert_eq!(earliest.minute(), 30);
+//! assert_eq!(earliest.local_time_type().ut_offset(), 7200);
+//! assert_eq!(earliest.local_time_type().time_zone_designation(), "CEST");
+//!
+//! let latest = found_date_times.latest().unwrap();
+//! assert_eq!(latest.hour(), 2);
+//! assert_eq!(latest.minute(), 30);
+//! assert_eq!(latest.local_time_type().ut_offset(), 3600);
+//! assert_eq!(latest.local_time_type().time_zone_designation(), "CET");
 //! # Ok(())
 //! # }
 //! ```

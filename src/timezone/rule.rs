@@ -1,3 +1,5 @@
+//! Types related to a time zone extra transition rule.
+
 use crate::constants::*;
 use crate::timezone::*;
 
@@ -296,7 +298,7 @@ impl RuleDay {
 
     /// Returns the UTC Unix time in seconds associated to the transition date for the provided year
     #[const_fn(feature = "const")]
-    const fn unix_time(&self, year: i32, day_time_in_utc: i64) -> i64 {
+    pub(crate) const fn unix_time(&self, year: i32, day_time_in_utc: i64) -> i64 {
         let (month, month_day) = self.transition_date(year);
         days_since_unix_epoch(year, month, month_day) * SECONDS_PER_DAY + day_time_in_utc
     }
@@ -994,11 +996,8 @@ mod test {
             0,
         )?);
 
-        let min_unix_time = -67768100567971200;
-        let max_unix_time = 67767976233532799;
-
-        assert!(matches!(transition_rule_1.find_local_time_type(min_unix_time), Err(OutOfRangeError(_))));
-        assert!(matches!(transition_rule_2.find_local_time_type(max_unix_time), Err(OutOfRangeError(_))));
+        assert!(matches!(transition_rule_1.find_local_time_type(i64::MIN), Err(OutOfRangeError(_))));
+        assert!(matches!(transition_rule_2.find_local_time_type(i64::MAX), Err(OutOfRangeError(_))));
 
         Ok(())
     }
