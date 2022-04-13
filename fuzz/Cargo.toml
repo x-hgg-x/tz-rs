@@ -1,0 +1,31 @@
+[package]
+name = "tz-rs-fuzz"
+version = "0.0.0"
+authors = ["Automatically generated"]
+publish = false
+edition = "2018"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+
+[dependencies.tz-rs]
+path = ".."
+
+# Prevent this from interfering with workspaces
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "parse_file"
+path = "fuzz_targets/parse_file.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "parse_string"
+path = "fuzz_targets/parse_string.rs"
+test = false
+doc = false
