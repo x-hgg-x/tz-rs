@@ -39,7 +39,7 @@ impl FoundDateTimeList {
 
     /// Returns the earliest found date time if existing
     pub fn earliest(&self) -> Option<DateTime> {
-        // Found date times are computed in ascending order of Unix time
+        // Found date times are computed in ascending order of Unix times
         match *self.0.first()? {
             FoundDateTimeKind::Normal(date_time) => Some(date_time),
             FoundDateTimeKind::Skipped { before_transition, .. } => Some(before_transition),
@@ -48,7 +48,7 @@ impl FoundDateTimeList {
 
     /// Returns the latest found date time if existing
     pub fn latest(&self) -> Option<DateTime> {
-        // Found date times are computed in ascending order of Unix time
+        // Found date times are computed in ascending order of Unix times
         match *self.0.last()? {
             FoundDateTimeKind::Normal(date_time) => Some(date_time),
             FoundDateTimeKind::Skipped { after_transition, .. } => Some(after_transition),
