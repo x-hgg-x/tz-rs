@@ -14,8 +14,6 @@ use std::convert::TryInto;
 use std::fmt;
 use std::time::SystemTime;
 
-use const_fn::const_fn;
-
 /// UTC date time exprimed in the [proleptic gregorian calendar](https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar)
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub struct UtcDateTime {
@@ -48,8 +46,8 @@ impl UtcDateTime {
     const MAX_UNIX_TIME: i64 = 67767976233532799;
 
     /// Check if the UTC date time associated to a Unix time in seconds is valid
-    #[const_fn(feature = "const")]
-    const fn check_unix_time(unix_time: i64) -> Result<(), DateTimeError> {
+    #[cfg_attr(feature = "const", const_fn::const_fn)]
+    fn check_unix_time(unix_time: i64) -> Result<(), DateTimeError> {
         if Self::MIN_UNIX_TIME <= unix_time && unix_time <= Self::MAX_UNIX_TIME {
             Ok(())
         } else {
@@ -69,8 +67,8 @@ impl UtcDateTime {
     /// * `second`: Seconds in `[0, 60]`, with a possible leap second
     /// * `nanoseconds`: Nanoseconds in `[0, 999_999_999]`
     ///
-    #[const_fn(feature = "const")]
-    pub const fn new(year: i32, month: u8, month_day: u8, hour: u8, minute: u8, second: u8, nanoseconds: u32) -> Result<Self, DateTimeError> {
+    #[cfg_attr(feature = "const", const_fn::const_fn)]
+    pub fn new(year: i32, month: u8, month_day: u8, hour: u8, minute: u8, second: u8, nanoseconds: u32) -> Result<Self, DateTimeError> {
         // Exclude the maximum possible UTC date time with a leap second
         if year == i32::MAX && month == 12 && month_day == 31 && hour == 23 && minute == 59 && second == 60 {
             return Err(DateTimeError("out of range date time"));
@@ -84,8 +82,8 @@ impl UtcDateTime {
     }
 
     /// Construct a UTC date time from a Unix time in seconds and nanoseconds
-    #[const_fn(feature = "const")]
-    pub const fn from_timespec(unix_time: i64, nanoseconds: u32) -> Result<Self, OutOfRangeError> {
+    #[cfg_attr(feature = "const", const_fn::const_fn)]
+    pub fn from_timespec(unix_time: i64, nanoseconds: u32) -> Result<Self, OutOfRangeError> {
         let seconds = match unix_time.checked_sub(UNIX_OFFSET_SECS) {
             Some(seconds) => seconds,
             None => return Err(OutOfRangeError("out of range operation")),
@@ -148,8 +146,8 @@ impl UtcDateTime {
     }
 
     /// Construct a UTC date time from total nanoseconds since Unix epoch (`1970-01-01T00:00:00Z`)
-    #[const_fn(feature = "const")]
-    pub const fn from_total_nanoseconds(total_nanoseconds: i128) -> Result<Self, OutOfRangeError> {
+    #[cfg_attr(feature = "const", const_fn::const_fn)]
+    pub fn from_total_nanoseconds(total_nanoseconds: i128) -> Result<Self, OutOfRangeError> {
         match total_nanoseconds_to_timespec(total_nanoseconds) {
             Ok((unix_time, nanoseconds)) => Self::from_timespec(unix_time, nanoseconds),
             Err(error) => Err(error),
@@ -163,8 +161,8 @@ impl UtcDateTime {
     }
 
     /// Returns the Unix time in seconds associated to the UTC date time
-    #[const_fn(feature = "const")]
-    pub const fn unix_time(&self) -> i64 {
+    #[cfg_attr(feature = "const", const_fn::const_fn)]
+    pub fn unix_time(&self) -> i64 {
         unix_time(self.year, self.month, self.month_day, self.hour, self.minute, self.second)
     }
 
@@ -172,8 +170,8 @@ impl UtcDateTime {
     ///
     /// Leap seconds are not preserved.
     ///
-    #[const_fn(feature = "const")]
-    pub const fn project(&self, time_zone_ref: TimeZoneRef) -> Result<DateTime, ProjectDateTimeError> {
+    #[cfg_attr(feature = "const", const_fn::const_fn)]
+    pub fn project(&self, time_zone_ref: TimeZoneRef) -> Result<DateTime, ProjectDateTimeError> {
         DateTime::from_timespec(self.unix_time(), self.nanoseconds, time_zone_ref)
     }
 }
@@ -235,8 +233,8 @@ impl DateTime {
     /// * `local_time_type`: Local time type associated to a time zone
     ///
     #[allow(clippy::too_many_arguments)]
-    #[const_fn(feature = "const")]
-    pub const fn new(
+    #[cfg_attr(feature = "const", const_fn::const_fn)]
+    pub fn new(
         year: i32,
         month: u8,
         month_day: u8,
@@ -289,8 +287,8 @@ impl DateTime {
     }
 
     /// Construct a date time from a Unix time in seconds with nanoseconds and a local time type
-    #[const_fn(feature = "const")]
-    pub const fn from_timespec_and_local(unix_time: i64, nanoseconds: u32, local_time_type: LocalTimeType) -> Result<Self, ProjectDateTimeError> {
+    #[cfg_attr(feature = "const", const_fn::const_fn)]
+    pub fn from_timespec_and_local(unix_time: i64, nanoseconds: u32, local_time_type: LocalTimeType) -> Result<Self, ProjectDateTimeError> {
         let unix_time_with_offset = match unix_time.checked_add(local_time_type.ut_offset() as i64) {
             Some(unix_time_with_offset) => unix_time_with_offset,
             None => return Err(ProjectDateTimeError("out of range date time")),
@@ -306,8 +304,8 @@ impl DateTime {
     }
 
     /// Construct a date time from a Unix time in seconds with nanoseconds and a time zone
-    #[const_fn(feature = "const")]
-    pub const fn from_timespec(unix_time: i64, nanoseconds: u32, time_zone_ref: TimeZoneRef) -> Result<Self, ProjectDateTimeError> {
+    #[cfg_attr(feature = "const", const_fn::const_fn)]
+    pub fn from_timespec(unix_time: i64, nanoseconds: u32, time_zone_ref: TimeZoneRef) -> Result<Self, ProjectDateTimeError> {
         let local_time_type = match time_zone_ref.find_local_time_type(unix_time) {
             Ok(&local_time_type) => local_time_type,
             Err(FindLocalTimeTypeError(error)) => return Err(ProjectDateTimeError(error)),
@@ -317,8 +315,8 @@ impl DateTime {
     }
 
     /// Construct a date time from total nanoseconds since Unix epoch (`1970-01-01T00:00:00Z`) and a local time type
-    #[const_fn(feature = "const")]
-    pub const fn from_total_nanoseconds_and_local(total_nanoseconds: i128, local_time_type: LocalTimeType) -> Result<Self, ProjectDateTimeError> {
+    #[cfg_attr(feature = "const", const_fn::const_fn)]
+    pub fn from_total_nanoseconds_and_local(total_nanoseconds: i128, local_time_type: LocalTimeType) -> Result<Self, ProjectDateTimeError> {
         match total_nanoseconds_to_timespec(total_nanoseconds) {
             Ok((unix_time, nanoseconds)) => Self::from_timespec_and_local(unix_time, nanoseconds, local_time_type),
             Err(OutOfRangeError(error)) => Err(ProjectDateTimeError(error)),
@@ -326,8 +324,8 @@ impl DateTime {
     }
 
     /// Construct a date time from total nanoseconds since Unix epoch (`1970-01-01T00:00:00Z`) and a time zone
-    #[const_fn(feature = "const")]
-    pub const fn from_total_nanoseconds(total_nanoseconds: i128, time_zone_ref: TimeZoneRef) -> Result<Self, ProjectDateTimeError> {
+    #[cfg_attr(feature = "const", const_fn::const_fn)]
+    pub fn from_total_nanoseconds(total_nanoseconds: i128, time_zone_ref: TimeZoneRef) -> Result<Self, ProjectDateTimeError> {
         match total_nanoseconds_to_timespec(total_nanoseconds) {
             Ok((unix_time, nanoseconds)) => Self::from_timespec(unix_time, nanoseconds, time_zone_ref),
             Err(OutOfRangeError(error)) => Err(ProjectDateTimeError(error)),
@@ -344,8 +342,8 @@ impl DateTime {
     ///
     /// Leap seconds are not preserved.
     ///
-    #[const_fn(feature = "const")]
-    pub const fn project(&self, time_zone_ref: TimeZoneRef) -> Result<Self, ProjectDateTimeError> {
+    #[cfg_attr(feature = "const", const_fn::const_fn)]
+    pub fn project(&self, time_zone_ref: TimeZoneRef) -> Result<Self, ProjectDateTimeError> {
         Self::from_timespec(self.unix_time, self.nanoseconds, time_zone_ref)
     }
 }
@@ -354,62 +352,62 @@ impl DateTime {
 macro_rules! impl_datetime {
     () => {
         /// Returns year
-        #[const_fn(feature = "const")]
-        pub const fn year(&self) -> i32 {
+        #[cfg_attr(feature = "const", const_fn::const_fn)]
+        pub fn year(&self) -> i32 {
             self.year
         }
 
         /// Returns month in `[1, 12]`
-        #[const_fn(feature = "const")]
-        pub const fn month(&self) -> u8 {
+        #[cfg_attr(feature = "const", const_fn::const_fn)]
+        pub fn month(&self) -> u8 {
             self.month
         }
 
         /// Returns day of the month in `[1, 31]`
-        #[const_fn(feature = "const")]
-        pub const fn month_day(&self) -> u8 {
+        #[cfg_attr(feature = "const", const_fn::const_fn)]
+        pub fn month_day(&self) -> u8 {
             self.month_day
         }
 
         /// Returns hours since midnight in `[0, 23]`
-        #[const_fn(feature = "const")]
-        pub const fn hour(&self) -> u8 {
+        #[cfg_attr(feature = "const", const_fn::const_fn)]
+        pub fn hour(&self) -> u8 {
             self.hour
         }
 
         /// Returns minutes in `[0, 59]`
-        #[const_fn(feature = "const")]
-        pub const fn minute(&self) -> u8 {
+        #[cfg_attr(feature = "const", const_fn::const_fn)]
+        pub fn minute(&self) -> u8 {
             self.minute
         }
 
         /// Returns seconds in `[0, 60]`, with a possible leap second
-        #[const_fn(feature = "const")]
-        pub const fn second(&self) -> u8 {
+        #[cfg_attr(feature = "const", const_fn::const_fn)]
+        pub fn second(&self) -> u8 {
             self.second
         }
 
         /// Returns nanoseconds in `[0, 999_999_999]`
-        #[const_fn(feature = "const")]
-        pub const fn nanoseconds(&self) -> u32 {
+        #[cfg_attr(feature = "const", const_fn::const_fn)]
+        pub fn nanoseconds(&self) -> u32 {
             self.nanoseconds
         }
 
         /// Returns days since Sunday in `[0, 6]`
-        #[const_fn(feature = "const")]
-        pub const fn week_day(&self) -> u8 {
+        #[cfg_attr(feature = "const", const_fn::const_fn)]
+        pub fn week_day(&self) -> u8 {
             week_day(self.year, self.month as usize, self.month_day as i64)
         }
 
         /// Returns days since January 1 in `[0, 365]`
-        #[const_fn(feature = "const")]
-        pub const fn year_day(&self) -> u16 {
+        #[cfg_attr(feature = "const", const_fn::const_fn)]
+        pub fn year_day(&self) -> u16 {
             year_day(self.year, self.month as usize, self.month_day as i64)
         }
 
         /// Returns total nanoseconds since Unix epoch (`1970-01-01T00:00:00Z`)
-        #[const_fn(feature = "const")]
-        pub const fn total_nanoseconds(&self) -> i128 {
+        #[cfg_attr(feature = "const", const_fn::const_fn)]
+        pub fn total_nanoseconds(&self) -> i128 {
             nanoseconds_since_unix_epoch(self.unix_time(), self.nanoseconds)
         }
     };
@@ -423,14 +421,14 @@ impl DateTime {
     impl_datetime!();
 
     /// Returns local time type
-    #[const_fn(feature = "const")]
-    pub const fn local_time_type(&self) -> &LocalTimeType {
+    #[cfg_attr(feature = "const", const_fn::const_fn)]
+    pub fn local_time_type(&self) -> &LocalTimeType {
         &self.local_time_type
     }
 
     /// Returns UTC Unix time in seconds
-    #[const_fn(feature = "const")]
-    pub const fn unix_time(&self) -> i64 {
+    #[cfg_attr(feature = "const", const_fn::const_fn)]
+    pub fn unix_time(&self) -> i64 {
         self.unix_time
     }
 }
@@ -443,8 +441,8 @@ impl DateTime {
 /// * `month`: Month in `[1, 12]`
 /// * `month_day`: Day of the month in `[1, 31]`
 ///
-#[const_fn(feature = "const")]
-const fn week_day(year: i32, month: usize, month_day: i64) -> u8 {
+#[cfg_attr(feature = "const", const_fn::const_fn)]
+fn week_day(year: i32, month: usize, month_day: i64) -> u8 {
     let days_since_unix_epoch = days_since_unix_epoch(year, month, month_day);
     (4 + days_since_unix_epoch).rem_euclid(DAYS_PER_WEEK) as u8
 }
@@ -457,15 +455,15 @@ const fn week_day(year: i32, month: usize, month_day: i64) -> u8 {
 /// * `month`: Month in `[1, 12]`
 /// * `month_day`: Day of the month in `[1, 31]`
 ///
-#[const_fn(feature = "const")]
-const fn year_day(year: i32, month: usize, month_day: i64) -> u16 {
+#[cfg_attr(feature = "const", const_fn::const_fn)]
+fn year_day(year: i32, month: usize, month_day: i64) -> u16 {
     let leap = (month >= 3 && is_leap_year(year)) as i64;
     (CUMUL_DAYS_IN_MONTHS_NORMAL_YEAR[month - 1] + leap + month_day - 1) as u16
 }
 
 /// Check if a year is a leap year
-#[const_fn(feature = "const")]
-pub(crate) const fn is_leap_year(year: i32) -> bool {
+#[cfg_attr(feature = "const", const_fn::const_fn)]
+pub(crate) fn is_leap_year(year: i32) -> bool {
     year % 400 == 0 || (year % 4 == 0 && year % 100 != 0)
 }
 
@@ -479,8 +477,8 @@ pub(crate) const fn is_leap_year(year: i32) -> bool {
 /// * `month`: Month in `[1, 12]`
 /// * `month_day`: Day of the month in `[1, 32]`
 ///
-#[const_fn(feature = "const")]
-pub(crate) const fn days_since_unix_epoch(year: i32, month: usize, month_day: i64) -> i64 {
+#[cfg_attr(feature = "const", const_fn::const_fn)]
+pub(crate) fn days_since_unix_epoch(year: i32, month: usize, month_day: i64) -> i64 {
     let is_leap_year = is_leap_year(year);
 
     let year = year as i64;
@@ -521,8 +519,8 @@ pub(crate) const fn days_since_unix_epoch(year: i32, month: usize, month_day: i6
 /// * `minute`: Minutes in `[0, 59]`
 /// * `second`: Seconds in `[0, 60]`, with a possible leap second
 ///
-#[const_fn(feature = "const")]
-const fn unix_time(year: i32, month: u8, month_day: u8, hour: u8, minute: u8, second: u8) -> i64 {
+#[cfg_attr(feature = "const", const_fn::const_fn)]
+fn unix_time(year: i32, month: u8, month_day: u8, hour: u8, minute: u8, second: u8) -> i64 {
     let mut result = days_since_unix_epoch(year, month as usize, month_day as i64);
     result *= HOURS_PER_DAY;
     result += hour as i64;
@@ -535,8 +533,8 @@ const fn unix_time(year: i32, month: u8, month_day: u8, hour: u8, minute: u8, se
 }
 
 /// Compute the number of nanoseconds since Unix epoch (`1970-01-01T00:00:00Z`)
-#[const_fn(feature = "const")]
-const fn nanoseconds_since_unix_epoch(unix_time: i64, nanoseconds: u32) -> i128 {
+#[cfg_attr(feature = "const", const_fn::const_fn)]
+fn nanoseconds_since_unix_epoch(unix_time: i64, nanoseconds: u32) -> i128 {
     // Overflow is not possible
     unix_time as i128 * NANOSECONDS_PER_SECOND as i128 + nanoseconds as i128
 }
@@ -548,8 +546,8 @@ const fn nanoseconds_since_unix_epoch(unix_time: i64, nanoseconds: u32) -> i128 
 /// * `unix_time`: Unix time in seconds
 /// * `nanoseconds`: Nanoseconds in `[0, 999_999_999]`
 ///
-#[const_fn(feature = "const")]
-const fn total_nanoseconds_to_timespec(total_nanoseconds: i128) -> Result<(i64, u32), OutOfRangeError> {
+#[cfg_attr(feature = "const", const_fn::const_fn)]
+fn total_nanoseconds_to_timespec(total_nanoseconds: i128) -> Result<(i64, u32), OutOfRangeError> {
     let unix_time = match try_into_i64(total_nanoseconds.div_euclid(NANOSECONDS_PER_SECOND as i128)) {
         Ok(unix_time) => unix_time,
         Err(error) => return Err(error),
@@ -572,8 +570,8 @@ const fn total_nanoseconds_to_timespec(total_nanoseconds: i128) -> Result<(i64, 
 /// * `second`: Seconds in `[0, 60]`, with a possible leap second
 /// * `nanoseconds`: Nanoseconds in `[0, 999_999_999]`
 ///
-#[const_fn(feature = "const")]
-const fn check_date_time_inputs(year: i32, month: u8, month_day: u8, hour: u8, minute: u8, second: u8, nanoseconds: u32) -> Result<(), DateTimeError> {
+#[cfg_attr(feature = "const", const_fn::const_fn)]
+fn check_date_time_inputs(year: i32, month: u8, month_day: u8, hour: u8, minute: u8, second: u8, nanoseconds: u32) -> Result<(), DateTimeError> {
     if !(1 <= month && month <= 12) {
         return Err(DateTimeError("invalid month"));
     }
