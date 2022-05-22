@@ -180,7 +180,7 @@ pub fn find_date_time(
             UtcDateTime::check_unix_time(unix_time_dst)?;
 
             // Check if the year is valid for the following computations
-            if !(i32::MIN + 2 <= year && year <= i32::MAX - 2) {
+            if !(i32::MIN + 2..=i32::MAX - 2).contains(&year) {
                 return Err(OutOfRangeError("out of range date time").into());
             }
 
