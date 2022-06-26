@@ -14,7 +14,7 @@ readme = "README.md"
 name = "tz"
 
 [dependencies]
-const_fn = { version = "0.4", optional = true }
+const_fn = { version = "0.4.4", optional = true }
 
 [features]
 default = ["const"]
