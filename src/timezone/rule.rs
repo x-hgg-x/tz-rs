@@ -685,7 +685,7 @@ fn check_two_month_week_days(month_week_day_1: MonthWeekDay, utc_day_time_1: i64
                         Ordering::Greater => (n + DAYS_PER_WEEK * (3 - week_before), n + DAYS_PER_WEEK * (4 - week_before)),
                     }
                 }
-                _ => unreachable!(),
+                _ => const_panic!(), // unreachable
             }
         } else {
             // month_before != month_after

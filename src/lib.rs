@@ -196,3 +196,16 @@ pub use timezone::{LocalTimeType, TimeZone, TimeZoneRef};
 
 /// Alias for [`std::result::Result`] with the crate unified error
 pub type Result<T> = std::result::Result<T, TzError>;
+
+/// Some useful macros.
+mod macros {
+    /// Macro for panicking in a const context
+    macro_rules! const_panic {
+        () => {{
+            #[allow(unconditional_panic)]
+            let panic = [][0];
+            panic
+        }};
+    }
+    pub(crate) use const_panic;
+}

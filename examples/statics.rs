@@ -8,7 +8,7 @@ fn main() -> tz::Result<()> {
             ($x:expr) => {
                 match $x {
                     Ok(x) => x,
-                    Err(error) => panic!("{}", error.0),
+                    Err(_) => [][0],
                 }
             };
         }

@@ -6,6 +6,7 @@ pub use rule::*;
 
 use crate::datetime::{days_since_unix_epoch, is_leap_year};
 use crate::error::*;
+use crate::macros::const_panic;
 use crate::parse::*;
 use crate::utils::*;
 use crate::UtcDateTime;
@@ -121,7 +122,7 @@ impl TzAsciiStr {
             [5, head @ .., _, _] => head,
             [6, head @ .., _] => head,
             [7, head @ ..] => head,
-            _ => unreachable!(),
+            _ => const_panic!(), // unreachable
         }
     }
 
@@ -302,12 +303,12 @@ impl<'a> TimeZoneRef<'a> {
     /// Find the local time type associated to the time zone at the specified Unix time in seconds
     #[cfg_attr(feature = "const", const_fn::const_fn)]
     pub fn find_local_time_type(&self, unix_time: i64) -> Result<&'a LocalTimeType, FindLocalTimeTypeError> {
-        let extra_rule = match self.transitions.last() {
-            None => match self.extra_rule {
+        let extra_rule = match self.transitions {
+            [] => match self.extra_rule {
                 Some(extra_rule) => extra_rule,
                 None => return Ok(&self.local_time_types[0]),
             },
-            Some(last_transition) => {
+            [.., last_transition] => {
                 let unix_leap_time = match self.unix_time_to_unix_leap_time(unix_time) {
                     Ok(unix_leap_time) => unix_leap_time,
                     Err(OutOfRangeError(error)) => return Err(FindLocalTimeTypeError(error)),
@@ -396,7 +397,7 @@ impl<'a> TimeZoneRef<'a> {
         }
 
         // Check extra rule
-        if let (Some(extra_rule), Some(last_transition)) = (&self.extra_rule, self.transitions.last()) {
+        if let (Some(extra_rule), [.., last_transition]) = (&self.extra_rule, self.transitions) {
             let last_local_time_type = &self.local_time_types[last_transition.local_time_type_index];
 
             let unix_time = match self.unix_leap_time_to_unix_time(last_transition.unix_leap_time) {
