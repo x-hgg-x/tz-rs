@@ -3,6 +3,12 @@
 use crate::constants::*;
 use crate::timezone::*;
 
+macro_rules! unreachable {
+    () => {
+        [][1]
+    };
+}
+
 /// Informations needed for checking DST transition rules consistency, for a Julian day
 #[derive(Debug, PartialEq, Eq)]
 struct JulianDayCheckInfos {

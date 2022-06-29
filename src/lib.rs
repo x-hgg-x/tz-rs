@@ -1,4 +1,5 @@
 #![deny(missing_docs)]
+#![allow(unconditional_panic)]
 
 //! This crate provides the [`TimeZone`] and [`DateTime`] types, which can be used to determine local time on a given time zone.
 //!
