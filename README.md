@@ -44,7 +44,7 @@ Alternatively, a crate like [tzdb](https://github.com/Kijewski/tzdb) can be used
 
 ## Compiler support
 
-Requires `rustc 1.45+` when building with no default features, or `rustc 1.57+` otherwise.
+Requires `rustc 1.45+` when building with no default features, or `rustc 1.55+` otherwise.
 
 ## License
 
