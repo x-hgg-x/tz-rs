@@ -99,3 +99,13 @@ pub fn binary_search_transitions(slice: &[Transition], x: i64) -> Result<usize, 
 pub fn binary_search_leap_seconds(slice: &[LeapSecond], x: i64) -> Result<usize, usize> {
     impl_binary_search!(slice, LeapSecond::unix_leap_time, x)
 }
+
+/// Macro for panicking in a const context
+macro_rules! const_panic {
+    () => {{
+        #[allow(unconditional_panic)]
+        let panic = [][0];
+        panic
+    }};
+}
+pub(crate) use const_panic;

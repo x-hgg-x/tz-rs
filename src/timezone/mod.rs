@@ -6,7 +6,6 @@ pub use rule::*;
 
 use crate::datetime::{days_since_unix_epoch, is_leap_year};
 use crate::error::*;
-use crate::macros::const_panic;
 use crate::parse::*;
 use crate::utils::*;
 use crate::UtcDateTime;

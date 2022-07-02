@@ -1115,7 +1115,7 @@ mod test {
             ($x:expr) => {
                 match $x {
                     Ok(x) => x,
-                    Err(_) => crate::macros::const_panic!(),
+                    Err(_) => const_panic!(),
                 }
             };
         }
