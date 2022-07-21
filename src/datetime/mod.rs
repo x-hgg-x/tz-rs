@@ -9,10 +9,8 @@ use crate::error::*;
 use crate::timezone::{LocalTimeType, TimeZoneRef};
 use crate::utils::*;
 
-use std::cmp::Ordering;
-use std::convert::TryInto;
-use std::fmt;
-use std::time::SystemTime;
+use core::cmp::Ordering;
+use core::fmt;
 
 /// UTC date time exprimed in the [proleptic gregorian calendar](https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar)
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
@@ -155,7 +153,11 @@ impl UtcDateTime {
     }
 
     /// Returns the current UTC date time
+    #[cfg(feature = "std")]
     pub fn now() -> Result<Self, TzError> {
+        use core::convert::TryInto;
+        use std::time::SystemTime;
+
         let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?;
         Ok(Self::from_timespec(now.as_secs().try_into()?, now.subsec_nanos())?)
     }
@@ -273,6 +275,7 @@ impl DateTime {
     /// * `time_zone_ref`: Reference to a time zone
     ///
     #[allow(clippy::too_many_arguments)]
+    #[cfg(feature = "alloc")]
     pub fn find(
         year: i32,
         month: u8,
@@ -403,7 +406,11 @@ impl DateTime {
     }
 
     /// Returns the current date time associated to the specified time zone
+    #[cfg(feature = "std")]
     pub fn now(time_zone_ref: TimeZoneRef) -> Result<Self, TzError> {
+        use core::convert::TryInto;
+        use std::time::SystemTime;
+
         let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?;
         Ok(Self::from_timespec(now.as_secs().try_into()?, now.subsec_nanos(), time_zone_ref)?)
     }
@@ -726,9 +733,12 @@ fn format_date_time(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::timezone::*;
     use crate::Result;
 
+    #[cfg(feature = "alloc")]
+    use crate::timezone::TimeZone;
+
+    #[cfg(feature = "alloc")]
     pub(super) fn check_equal_date_time(x: &DateTime, y: &DateTime) {
         assert_eq!(x.year(), y.year());
         assert_eq!(x.month(), y.month());
@@ -741,6 +751,7 @@ mod test {
         assert_eq!(x.nanoseconds(), y.nanoseconds());
     }
 
+    #[cfg(feature = "alloc")]
     #[test]
     fn test_date_time() -> Result<()> {
         let time_zone_utc = TimeZone::utc();
@@ -752,9 +763,12 @@ mod test {
         let time_zone_eet = TimeZone::fixed(7200)?;
         let eet = LocalTimeType::with_ut_offset(7200)?;
 
-        assert_eq!(DateTime::now(time_zone_utc.as_ref())?.local_time_type().ut_offset(), 0);
-        assert_eq!(DateTime::now(time_zone_cet.as_ref())?.local_time_type().ut_offset(), 3600);
-        assert_eq!(DateTime::now(time_zone_eet.as_ref())?.local_time_type().ut_offset(), 7200);
+        #[cfg(feature = "std")]
+        {
+            assert_eq!(DateTime::now(time_zone_utc.as_ref())?.local_time_type().ut_offset(), 0);
+            assert_eq!(DateTime::now(time_zone_cet.as_ref())?.local_time_type().ut_offset(), 3600);
+            assert_eq!(DateTime::now(time_zone_eet.as_ref())?.local_time_type().ut_offset(), 7200);
+        }
 
         let unix_times = &[
             -93750523134,
@@ -872,6 +886,7 @@ mod test {
         Ok(())
     }
 
+    #[cfg(feature = "alloc")]
     #[test]
     fn test_date_time_leap_seconds() -> Result<()> {
         let utc_date_time = UtcDateTime::new(1972, 6, 30, 23, 59, 60, 1000)?;
@@ -897,6 +912,7 @@ mod test {
         Ok(())
     }
 
+    #[cfg(feature = "alloc")]
     #[test]
     fn test_date_time_partial_eq_partial_ord() -> Result<()> {
         let time_zone_utc = TimeZone::utc();
@@ -1008,8 +1024,11 @@ mod test {
         Ok(())
     }
 
+    #[cfg(feature = "alloc")]
     #[test]
     fn test_date_time_format() -> Result<()> {
+        use alloc::string::ToString;
+
         let time_zones = [
             TimeZone::fixed(-49550)?,
             TimeZone::fixed(-5400)?,
@@ -1055,6 +1074,7 @@ mod test {
         Ok(())
     }
 
+    #[cfg(feature = "alloc")]
     #[test]
     fn test_date_time_overflow() -> Result<()> {
         assert!(UtcDateTime::new(i32::MIN, 1, 1, 0, 0, 0, 0).is_ok());
@@ -1181,6 +1201,8 @@ mod test {
     #[test]
     #[cfg(feature = "const")]
     fn test_const() -> Result<()> {
+        use crate::timezone::*;
+
         macro_rules! unwrap {
             ($x:expr) => {
                 match $x {

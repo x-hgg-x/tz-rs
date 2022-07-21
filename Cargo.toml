@@ -17,5 +17,7 @@ name = "tz"
 const_fn = { version = "0.4.4", optional = true }
 
 [features]
-default = ["const"]
+default = ["std", "const"]
+std = ["alloc"]
+alloc = []
 const = ["const_fn"]

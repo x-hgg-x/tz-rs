@@ -4,6 +4,9 @@ use crate::datetime::*;
 use crate::timezone::TransitionRule;
 use crate::Result;
 
+#[cfg(feature = "alloc")]
+use alloc::vec::Vec;
+
 /// Type of a found date time created by the [`DateTime::find`] method
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum FoundDateTimeKind {
@@ -26,9 +29,11 @@ pub enum FoundDateTimeKind {
 ///
 /// It can be empty if no local time type was found for the provided date, time and time zone.
 ///
+#[cfg(feature = "alloc")]
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct FoundDateTimeList(Vec<FoundDateTimeKind>);
 
+#[cfg(feature = "alloc")]
 impl FoundDateTimeList {
     /// Returns the found date time if existing and unique
     pub fn unique(&self) -> Option<DateTime> {
@@ -131,6 +136,7 @@ pub(super) trait DateTimeList {
     fn push(&mut self, found_date_time: FoundDateTimeKind);
 }
 
+#[cfg(feature = "alloc")]
 impl DateTimeList for FoundDateTimeList {
     fn push(&mut self, found_date_time: FoundDateTimeKind) {
         self.0.push(found_date_time);
@@ -343,11 +349,14 @@ pub(super) fn find_date_time(
     Ok(())
 }
 
+#[cfg(feature = "alloc")]
 #[cfg(test)]
 mod test {
     use super::*;
     use crate::datetime::test::check_equal_date_time;
     use crate::timezone::*;
+
+    use alloc::vec;
 
     fn check_equal_option_date_time(x: &Option<DateTime>, y: &Option<DateTime>) {
         match (x, y) {
