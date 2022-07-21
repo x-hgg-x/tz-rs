@@ -3,7 +3,7 @@
 use crate::error::OutOfRangeError;
 use crate::timezone::{LeapSecond, Transition};
 
-use std::cmp::Ordering;
+use core::cmp::Ordering;
 
 /// Compare two values
 #[cfg_attr(feature = "const", const_fn::const_fn)]

@@ -1,7 +1,9 @@
 //! Types related to a date time.
 
+#[cfg(feature = "std")]
 mod find;
 
+#[cfg(feature = "std")]
 pub use find::*;
 
 use crate::constants::*;
@@ -9,9 +11,9 @@ use crate::error::*;
 use crate::timezone::{LocalTimeType, TimeZoneRef};
 use crate::utils::*;
 
-use std::cmp::Ordering;
-use std::convert::TryInto;
-use std::fmt;
+use core::cmp::Ordering;
+use core::fmt;
+#[cfg(feature = "std")]
 use std::time::SystemTime;
 
 /// UTC date time exprimed in the [proleptic gregorian calendar](https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar)
@@ -155,7 +157,10 @@ impl UtcDateTime {
     }
 
     /// Returns the current UTC date time
+    #[cfg(feature = "std")]
     pub fn now() -> Result<Self, TzError> {
+        use core::convert::TryInto;
+
         let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?;
         Ok(Self::from_timespec(now.as_secs().try_into()?, now.subsec_nanos())?)
     }
@@ -272,6 +277,7 @@ impl DateTime {
     /// * `nanoseconds`: Nanoseconds in `[0, 999_999_999]`
     /// * `time_zone_ref`: Reference to a time zone
     ///
+    #[cfg(feature = "std")]
     #[allow(clippy::too_many_arguments)]
     pub fn find(
         year: i32,
@@ -333,7 +339,10 @@ impl DateTime {
     }
 
     /// Returns the current date time associated to the specified time zone
+    #[cfg(feature = "std")]
     pub fn now(time_zone_ref: TimeZoneRef) -> Result<Self, TzError> {
+        use core::convert::TryInto;
+
         let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?;
         Ok(Self::from_timespec(now.as_secs().try_into()?, now.subsec_nanos(), time_zone_ref)?)
     }
@@ -656,9 +665,11 @@ fn format_date_time(
 #[cfg(test)]
 mod test {
     use super::*;
+    #[cfg(feature = "std")]
     use crate::timezone::*;
     use crate::Result;
 
+    #[cfg(feature = "std")]
     pub(super) fn check_equal_date_time(x: &DateTime, y: &DateTime) {
         assert_eq!(x.year(), y.year());
         assert_eq!(x.month(), y.month());
@@ -671,6 +682,7 @@ mod test {
         assert_eq!(x.nanoseconds(), y.nanoseconds());
     }
 
+    #[cfg(feature = "std")]
     #[test]
     fn test_date_time() -> Result<()> {
         let time_zone_utc = TimeZone::utc();
@@ -802,6 +814,7 @@ mod test {
         Ok(())
     }
 
+    #[cfg(feature = "std")]
     #[test]
     fn test_date_time_leap_seconds() -> Result<()> {
         let utc_date_time = UtcDateTime::new(1972, 6, 30, 23, 59, 60, 1000)?;
@@ -827,6 +840,7 @@ mod test {
         Ok(())
     }
 
+    #[cfg(feature = "std")]
     #[test]
     fn test_date_time_partial_eq_partial_ord() -> Result<()> {
         let time_zone_utc = TimeZone::utc();
@@ -938,6 +952,7 @@ mod test {
         Ok(())
     }
 
+    #[cfg(feature = "std")]
     #[test]
     fn test_date_time_format() -> Result<()> {
         let time_zones = [
@@ -985,6 +1000,7 @@ mod test {
         Ok(())
     }
 
+    #[cfg(feature = "std")]
     #[test]
     fn test_date_time_overflow() -> Result<()> {
         assert!(UtcDateTime::new(i32::MIN, 1, 1, 0, 0, 0, 0).is_ok());

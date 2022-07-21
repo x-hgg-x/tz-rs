@@ -1,5 +1,11 @@
 use tz::*;
 
+#[cfg(not(feature = "std"))]
+fn main() -> Result<()> {
+    Ok(())
+}
+
+#[cfg(feature = "std")]
 fn main() -> Result<()> {
     //
     // TimeZone

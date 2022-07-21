@@ -751,6 +751,7 @@ mod test {
         Ok(())
     }
 
+    #[cfg(feature = "std")]
     #[test]
     fn test_check_dst_transition_rules_consistency() -> Result<()> {
         let utc = LocalTimeType::utc();

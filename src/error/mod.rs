@@ -1,12 +1,14 @@
 //! Error types.
 
-use std::array::TryFromSliceError;
-use std::error;
-use std::fmt;
+use core::array::TryFromSliceError;
+use core::fmt;
+use core::num::ParseIntError;
+use core::num::TryFromIntError;
+use core::str::Utf8Error;
+
+#[cfg(feature = "std")]
 use std::io;
-use std::num::ParseIntError;
-use std::num::TryFromIntError;
-use std::str::Utf8Error;
+#[cfg(feature = "std")]
 use std::time::SystemTimeError;
 
 /// Unified error type for parsing a TZ string
@@ -18,6 +20,7 @@ pub enum TzStringError {
     /// Integer parsing error
     ParseIntError(ParseIntError),
     /// I/O error
+    #[cfg(feature = "std")]
     IoError(io::Error),
     /// Invalid TZ string
     InvalidTzString(&'static str),
@@ -30,6 +33,7 @@ impl fmt::Display for TzStringError {
         match self {
             Self::Utf8Error(error) => error.fmt(f),
             Self::ParseIntError(error) => error.fmt(f),
+            #[cfg(feature = "std")]
             Self::IoError(error) => error.fmt(f),
             Self::InvalidTzString(error) => write!(f, "invalid TZ string: {}", error),
             Self::UnsupportedTzString(error) => write!(f, "unsupported TZ string: {}", error),
@@ -37,7 +41,8 @@ impl fmt::Display for TzStringError {
     }
 }
 
-impl error::Error for TzStringError {}
+#[cfg(feature = "std")]
+impl std::error::Error for TzStringError {}
 
 impl From<Utf8Error> for TzStringError {
     fn from(error: Utf8Error) -> Self {
@@ -51,6 +56,7 @@ impl From<ParseIntError> for TzStringError {
     }
 }
 
+#[cfg(feature = "std")]
 impl From<io::Error> for TzStringError {
     fn from(error: io::Error) -> Self {
         Self::IoError(error)
@@ -64,6 +70,7 @@ pub enum TzFileError {
     /// Conversion from slice to array error
     TryFromSliceError(TryFromSliceError),
     /// I/O error
+    #[cfg(feature = "std")]
     IoError(io::Error),
     /// Unified error for parsing a TZ string
     TzStringError(TzStringError),
@@ -77,6 +84,7 @@ impl fmt::Display for TzFileError {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         match self {
             Self::TryFromSliceError(error) => error.fmt(f),
+            #[cfg(feature = "std")]
             Self::IoError(error) => error.fmt(f),
             Self::TzStringError(error) => error.fmt(f),
             Self::InvalidTzFile(error) => write!(f, "invalid TZ file: {}", error),
@@ -85,7 +93,8 @@ impl fmt::Display for TzFileError {
     }
 }
 
-impl error::Error for TzFileError {}
+#[cfg(feature = "std")]
+impl std::error::Error for TzFileError {}
 
 impl From<TryFromSliceError> for TzFileError {
     fn from(error: TryFromSliceError) -> Self {
@@ -93,6 +102,7 @@ impl From<TryFromSliceError> for TzFileError {
     }
 }
 
+#[cfg(feature = "std")]
 impl From<io::Error> for TzFileError {
     fn from(error: io::Error) -> Self {
         Self::IoError(error)
@@ -120,7 +130,8 @@ macro_rules! create_error {
             }
         }
 
-        impl error::Error for $name {}
+        #[cfg(feature = "std")]
+        impl std::error::Error for $name {}
     };
 }
 
@@ -153,8 +164,10 @@ pub enum TzError {
     /// Conversion from slice to array error
     TryFromSliceError(TryFromSliceError),
     /// I/O error
+    #[cfg(feature = "std")]
     IoError(io::Error),
     /// System time error
+    #[cfg(feature = "std")]
     SystemTimeError(SystemTimeError),
     /// Unified error for parsing a TZif file
     TzFileError(TzFileError),
@@ -181,7 +194,9 @@ impl fmt::Display for TzError {
         match self {
             Self::Utf8Error(error) => error.fmt(f),
             Self::TryFromSliceError(error) => error.fmt(f),
+            #[cfg(feature = "std")]
             Self::IoError(error) => error.fmt(f),
+            #[cfg(feature = "std")]
             Self::SystemTimeError(error) => error.fmt(f),
             Self::TzFileError(error) => error.fmt(f),
             Self::TzStringError(error) => error.fmt(f),
@@ -196,7 +211,8 @@ impl fmt::Display for TzError {
     }
 }
 
-impl error::Error for TzError {}
+#[cfg(feature = "std")]
+impl std::error::Error for TzError {}
 
 impl From<Utf8Error> for TzError {
     fn from(error: Utf8Error) -> Self {
@@ -210,12 +226,14 @@ impl From<TryFromSliceError> for TzError {
     }
 }
 
+#[cfg(feature = "std")]
 impl From<io::Error> for TzError {
     fn from(error: io::Error) -> Self {
         Self::IoError(error)
     }
 }
 
+#[cfg(feature = "std")]
 impl From<SystemTimeError> for TzError {
     fn from(error: SystemTimeError) -> Self {
         Self::SystemTimeError(error)

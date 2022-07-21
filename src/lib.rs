@@ -1,4 +1,5 @@
 #![deny(missing_docs)]
+#![cfg_attr(not(feature = "std"), no_std)]
 
 //! This crate provides the [`TimeZone`] and [`DateTime`] types, which can be used to determine local time on a given time zone.
 //!
@@ -18,6 +19,7 @@
 //!
 //! ```rust
 //! # fn main() -> Result<(), tz::TzError> {
+//! # #[cfg(feature = "std")] let _: () = {
 //! use tz::TimeZone;
 //!
 //! // 2000-01-01T00:00:00Z
@@ -47,6 +49,7 @@
 //! TimeZone::from_posix_tz("NZST-12:00:00NZDT-13:00:00,M10.1.0,M3.3.0")?;
 //! // Use a leading colon to force searching for a corresponding file
 //! let _ = TimeZone::from_posix_tz(":UTC");
+//! # };
 //! # Ok(())
 //! # }
 //! ```
@@ -55,6 +58,7 @@
 //!
 //! ```rust
 //! # fn main() -> Result<(), tz::TzError> {
+//! # #[cfg(feature = "std")] let _: () = {
 //! use tz::{DateTime, LocalTimeType, TimeZone, UtcDateTime};
 //!
 //! // Get the current UTC date time
@@ -178,11 +182,13 @@
 //! assert_eq!(latest.minute(), 30);
 //! assert_eq!(latest.local_time_type().ut_offset(), 3600);
 //! assert_eq!(latest.local_time_type().time_zone_designation(), "CET");
+//! # };
 //! # Ok(())
 //! # }
 //! ```
 
 mod constants;
+#[cfg(feature = "std")]
 mod parse;
 mod utils;
 
@@ -192,7 +198,9 @@ pub mod timezone;
 
 pub use datetime::{DateTime, UtcDateTime};
 pub use error::TzError;
-pub use timezone::{LocalTimeType, TimeZone, TimeZoneRef};
+#[cfg(feature = "std")]
+pub use timezone::TimeZone;
+pub use timezone::{LocalTimeType, TimeZoneRef};
 
 /// Alias for [`std::result::Result`] with the crate unified error
-pub type Result<T> = std::result::Result<T, TzError>;
+pub type Result<T> = core::result::Result<T, TzError>;
