@@ -42,6 +42,10 @@ Note that the determination of the local time zone with this crate is not suppor
 
 Alternatively, a crate like [tzdb](https://github.com/Kijewski/tzdb) can be used, which statically provides existing time zone definitions for this crate, and supports finding the local time zone for all [Tier 1](https://doc.rust-lang.org/nightly/rustc/platform-support.html) platforms.
 
+## Date time formatting (equivalent of libc `strftime` function)
+
+This crate doesn't provide custom date time formatting support, but the [`custom-format`](https://github.com/x-hgg-x/custom-format) crate can be used to provide custom format specifiers to the standard library formatting macros.
+
 ## Compiler support
 
 Requires `rustc 1.45+` when building with no default features, or `rustc 1.55+` otherwise.
