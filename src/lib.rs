@@ -1,3 +1,4 @@
+#![allow(clippy::question_mark)]
 #![deny(missing_docs)]
 
 //! This crate provides the [`TimeZone`] and [`DateTime`] types, which can be used to determine local time on a given time zone.
