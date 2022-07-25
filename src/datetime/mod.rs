@@ -158,6 +158,7 @@ impl UtcDateTime {
 
     /// Returns the current UTC date time
     #[cfg(feature = "std")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
     pub fn now() -> Result<Self, TzError> {
         use core::convert::TryInto;
 
@@ -278,6 +279,7 @@ impl DateTime {
     /// * `time_zone_ref`: Reference to a time zone
     ///
     #[cfg(feature = "std")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
     #[allow(clippy::too_many_arguments)]
     pub fn find(
         year: i32,
@@ -340,6 +342,7 @@ impl DateTime {
 
     /// Returns the current date time associated to the specified time zone
     #[cfg(feature = "std")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
     pub fn now(time_zone_ref: TimeZoneRef) -> Result<Self, TzError> {
         use core::convert::TryInto;
 
