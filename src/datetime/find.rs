@@ -30,6 +30,7 @@ pub enum FoundDateTimeKind {
 /// It can be empty if no local time type was found for the provided date, time and time zone.
 ///
 #[cfg(feature = "alloc")]
+#[cfg_attr(docsrs, doc(cfg(feature = "alloc")))]
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct FoundDateTimeList(Vec<FoundDateTimeKind>);
 

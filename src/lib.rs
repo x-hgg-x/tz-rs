@@ -1,6 +1,7 @@
 #![allow(clippy::question_mark)]
 #![deny(missing_docs)]
 #![cfg_attr(not(feature = "std"), no_std)]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 //! This crate provides the [`TimeZone`] and [`DateTime`] types, which can be used to determine local time on a given time zone.
 //!
@@ -201,10 +202,16 @@ pub mod datetime;
 pub mod error;
 pub mod timezone;
 
+#[doc(inline)]
 pub use datetime::{DateTime, UtcDateTime};
+
+#[doc(inline)]
 pub use error::TzError;
+
+#[doc(inline)]
 pub use timezone::{LocalTimeType, TimeZoneRef};
 
+#[doc(inline)]
 #[cfg(feature = "alloc")]
 pub use timezone::TimeZone;
 

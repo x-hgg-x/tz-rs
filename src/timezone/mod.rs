@@ -224,6 +224,7 @@ impl LocalTimeType {
 
 /// Time zone
 #[cfg(feature = "alloc")]
+#[cfg_attr(docsrs, doc(cfg(feature = "alloc")))]
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct TimeZone {
     /// List of transitions
@@ -494,6 +495,7 @@ impl TimeZone {
     /// This method in not supported on non-UNIX platforms, and returns the UTC time zone instead.
     ///
     #[cfg(feature = "std")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
     pub fn local() -> Result<Self, TzError> {
         #[cfg(not(unix))]
         let local_time_zone = Self::utc();
@@ -506,12 +508,14 @@ impl TimeZone {
 
     /// Construct a time zone from the contents of a time zone file
     #[cfg(feature = "std")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
     pub fn from_tz_data(bytes: &[u8]) -> Result<Self, TzError> {
         crate::parse::parse_tz_file(bytes)
     }
 
     /// Construct a time zone from a POSIX TZ string, as described in [the POSIX documentation of the `TZ` environment variable](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap08.html).
     #[cfg(feature = "std")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
     pub fn from_posix_tz(tz_string: &str) -> Result<Self, TzError> {
         use crate::parse::*;
 
@@ -557,6 +561,7 @@ impl TimeZone {
 
     /// Find the current local time type associated to the time zone
     #[cfg(feature = "std")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
     pub fn find_current_local_time_type(&self) -> Result<&LocalTimeType, TzError> {
         use core::convert::TryInto;
         use std::time::SystemTime;

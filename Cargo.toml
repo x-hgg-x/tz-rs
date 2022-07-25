@@ -13,6 +13,10 @@ readme = "README.md"
 [lib]
 name = "tz"
 
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
 [dependencies]
 const_fn = { version = "0.4.4", optional = true }
 

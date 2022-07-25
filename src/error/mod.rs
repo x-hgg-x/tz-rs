@@ -12,6 +12,7 @@ mod parse {
     use core::num::ParseIntError;
 
     /// Unified error type for parsing a TZ string
+    #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
     #[non_exhaustive]
     #[derive(Debug)]
     pub enum TzStringError {
@@ -60,6 +61,7 @@ mod parse {
     }
 
     /// Unified error type for parsing a TZif file
+    #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
     #[non_exhaustive]
     #[derive(Debug)]
     pub enum TzFileError {
@@ -127,6 +129,7 @@ macro_rules! create_error {
         }
 
         #[cfg(feature = "std")]
+        #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
         impl std::error::Error for $name {}
     };
 }
@@ -161,15 +164,19 @@ pub enum TzError {
     TryFromSliceError(TryFromSliceError),
     /// I/O error
     #[cfg(feature = "std")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
     IoError(std::io::Error),
     /// System time error
     #[cfg(feature = "std")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
     SystemTimeError(std::time::SystemTimeError),
     /// Unified error for parsing a TZif file
     #[cfg(feature = "std")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
     TzFileError(TzFileError),
     /// Unified error for parsing a TZ string
     #[cfg(feature = "std")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
     TzStringError(TzStringError),
     /// Out of range error
     OutOfRangeError(OutOfRangeError),
@@ -212,6 +219,7 @@ impl fmt::Display for TzError {
 }
 
 #[cfg(feature = "std")]
+#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 impl std::error::Error for TzError {}
 
 impl From<Utf8Error> for TzError {
@@ -227,6 +235,7 @@ impl From<TryFromSliceError> for TzError {
 }
 
 #[cfg(feature = "std")]
+#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 impl From<std::io::Error> for TzError {
     fn from(error: std::io::Error) -> Self {
         Self::IoError(error)
@@ -234,6 +243,7 @@ impl From<std::io::Error> for TzError {
 }
 
 #[cfg(feature = "std")]
+#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 impl From<std::time::SystemTimeError> for TzError {
     fn from(error: std::time::SystemTimeError) -> Self {
         Self::SystemTimeError(error)
@@ -241,6 +251,7 @@ impl From<std::time::SystemTimeError> for TzError {
 }
 
 #[cfg(feature = "std")]
+#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 impl From<TzFileError> for TzError {
     fn from(error: TzFileError) -> Self {
         Self::TzFileError(error)
@@ -248,6 +259,7 @@ impl From<TzFileError> for TzError {
 }
 
 #[cfg(feature = "std")]
+#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 impl From<TzStringError> for TzError {
     fn from(error: TzStringError) -> Self {
         Self::TzStringError(error)
