@@ -2,15 +2,15 @@ name: CI
 
 on:
   push:
-    branches: ['master']
+    branches: ["master"]
   pull_request:
-    branches: ['master']
+    branches: ["master"]
   schedule:
     - cron: "0 0 * * 0"
 
 jobs:
-  test_old:
-    name: "Test/1.45"
+  check:
+    name: "Check"
 
     runs-on: ubuntu-latest
     steps:
@@ -22,21 +22,46 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: 1.45
+          toolchain: stable
+          override: true
+          components: rustfmt, clippy
+
+      - name: Format
+        run: cargo fmt --all -- --check
+
+      - name: Lint
+        run: cargo clippy -- -D warnings
+
+  doc:
+    name: "Doc"
+
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Install Rust
+        id: actions-rs
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
           override: true
 
-      - name: Test
-        run: cargo test --no-default-features
+      - name: Doc
+        run: RUSTDOCFLAGS="-D warnings --cfg docsrs" cargo doc --all-features --no-deps
 
-  check:
+  test:
     strategy:
       matrix:
-        rust:
-          - 1.55
-          - stable
-          - nightly
+        rust: [1.45, 1.55, stable, nightly]
+        features: ["", alloc, std]
+        include:
+          - const: const
+          - rust: 1.45
+            const: ""
 
-    name: "Check/${{ matrix.rust }}"
+    name: "Test/${{ matrix.rust }}/Features=${{ matrix.const }},${{ matrix.features }}"
 
     runs-on: ubuntu-latest
     steps:
@@ -50,13 +75,8 @@ jobs:
           profile: minimal
           toolchain: ${{ matrix.rust }}
           override: true
-          components: rustfmt, clippy
-
-      - name: Format
-        run: cargo fmt --all -- --check
-
-      - name: Lint
-        run: cargo clippy -- -D warnings
 
       - name: Test
-        run: cargo test
+        run: cargo test --no-default-features --features=${{ matrix.const }},${{ matrix.features }}
+        env:
+          CARGO_NET_GIT_FETCH_WITH_CLI: true
