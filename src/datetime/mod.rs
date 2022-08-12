@@ -717,11 +717,13 @@ fn format_date_time(
         let ut_offset = ut_offset as i64;
         let ut_offset_abs = ut_offset.abs();
 
-        let offset_hour = ut_offset / SECONDS_PER_HOUR;
+        let sign = if ut_offset < 0 { '-' } else { '+' };
+
+        let offset_hour = ut_offset_abs / SECONDS_PER_HOUR;
         let offset_minute = (ut_offset_abs / SECONDS_PER_MINUTE) % MINUTES_PER_HOUR;
         let offset_second = ut_offset_abs % SECONDS_PER_MINUTE;
 
-        write!(f, "{:+03}:{:02}", offset_hour, offset_minute)?;
+        write!(f, "{}{:02}:{:02}", sign, offset_hour, offset_minute)?;
 
         if offset_second != 0 {
             write!(f, ":{:02}", offset_second)?;
@@ -1036,7 +1038,9 @@ mod test {
             TimeZone::fixed(-49550)?,
             TimeZone::fixed(-5400)?,
             TimeZone::fixed(-3600)?,
+            TimeZone::fixed(-1800)?,
             TimeZone::fixed(0)?,
+            TimeZone::fixed(1800)?,
             TimeZone::fixed(3600)?,
             TimeZone::fixed(5400)?,
             TimeZone::fixed(49550)?,
@@ -1051,7 +1055,9 @@ mod test {
                 "2000-01-01T13:18:15.000000000-13:45:50",
                 "2000-01-02T01:34:05.000000000-01:30",
                 "2000-01-02T02:04:05.000000000-01:00",
+                "2000-01-02T02:34:05.000000000-00:30",
                 "2000-01-02T03:04:05.000000000Z",
+                "2000-01-02T03:34:05.000000000+00:30",
                 "2000-01-02T04:04:05.000000000+01:00",
                 "2000-01-02T04:34:05.000000000+01:30",
                 "2000-01-02T16:49:55.000000000+13:45:50",
@@ -1060,7 +1066,9 @@ mod test {
                 "2000-01-01T13:18:15.123456789-13:45:50",
                 "2000-01-02T01:34:05.123456789-01:30",
                 "2000-01-02T02:04:05.123456789-01:00",
+                "2000-01-02T02:34:05.123456789-00:30",
                 "2000-01-02T03:04:05.123456789Z",
+                "2000-01-02T03:34:05.123456789+00:30",
                 "2000-01-02T04:04:05.123456789+01:00",
                 "2000-01-02T04:34:05.123456789+01:30",
                 "2000-01-02T16:49:55.123456789+13:45:50",
