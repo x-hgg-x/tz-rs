@@ -27,18 +27,21 @@ pub struct Transition {
 
 impl Transition {
     /// Construct a TZif file transition
+    #[inline]
     #[cfg_attr(feature = "const", const_fn::const_fn)]
     pub fn new(unix_leap_time: i64, local_time_type_index: usize) -> Self {
         Self { unix_leap_time, local_time_type_index }
     }
 
     /// Returns Unix leap time
+    #[inline]
     #[cfg_attr(feature = "const", const_fn::const_fn)]
     pub fn unix_leap_time(&self) -> i64 {
         self.unix_leap_time
     }
 
     /// Returns local time type index
+    #[inline]
     #[cfg_attr(feature = "const", const_fn::const_fn)]
     pub fn local_time_type_index(&self) -> usize {
         self.local_time_type_index
@@ -56,18 +59,21 @@ pub struct LeapSecond {
 
 impl LeapSecond {
     /// Construct a TZif file leap second
+    #[inline]
     #[cfg_attr(feature = "const", const_fn::const_fn)]
     pub fn new(unix_leap_time: i64, correction: i32) -> Self {
         Self { unix_leap_time, correction }
     }
 
     /// Returns Unix leap time
+    #[inline]
     #[cfg_attr(feature = "const", const_fn::const_fn)]
     pub fn unix_leap_time(&self) -> i64 {
         self.unix_leap_time
     }
 
     /// Returns leap second correction
+    #[inline]
     #[cfg_attr(feature = "const", const_fn::const_fn)]
     pub fn correction(&self) -> i32 {
         self.correction
@@ -111,6 +117,7 @@ impl TzAsciiStr {
     }
 
     /// Returns time zone designation as a byte slice
+    #[inline]
     #[cfg_attr(feature = "const", const_fn::const_fn)]
     fn as_bytes(&self) -> &[u8] {
         match &self.bytes {
@@ -124,6 +131,7 @@ impl TzAsciiStr {
     }
 
     /// Returns time zone designation as a string
+    #[inline]
     #[cfg_attr(feature = "const", const_fn::const_fn)]
     fn as_str(&self) -> &str {
         // SAFETY: ASCII is valid UTF-8
@@ -131,6 +139,7 @@ impl TzAsciiStr {
     }
 
     /// Check if two time zone designations are equal
+    #[inline]
     #[cfg_attr(feature = "const", const_fn::const_fn)]
     fn equal(&self, other: &Self) -> bool {
         u64::from_ne_bytes(self.bytes) == u64::from_ne_bytes(other.bytes)
@@ -174,11 +183,13 @@ impl LocalTimeType {
     }
 
     /// Construct the local time type associated to UTC
+    #[inline]
     pub const fn utc() -> Self {
         Self { ut_offset: 0, is_dst: false, time_zone_designation: None }
     }
 
     /// Construct a local time type with the specified UTC offset in seconds
+    #[inline]
     #[cfg_attr(feature = "const", const_fn::const_fn)]
     pub fn with_ut_offset(ut_offset: i32) -> Result<Self, LocalTimeTypeError> {
         if ut_offset == i32::MIN {
@@ -189,18 +200,21 @@ impl LocalTimeType {
     }
 
     /// Returns offset from UTC in seconds
+    #[inline]
     #[cfg_attr(feature = "const", const_fn::const_fn)]
     pub fn ut_offset(&self) -> i32 {
         self.ut_offset
     }
 
     /// Returns daylight saving time indicator
+    #[inline]
     #[cfg_attr(feature = "const", const_fn::const_fn)]
     pub fn is_dst(&self) -> bool {
         self.is_dst
     }
 
     /// Returns time zone designation
+    #[inline]
     #[cfg_attr(feature = "const", const_fn::const_fn)]
     pub fn time_zone_designation(&self) -> &str {
         match &self.time_zone_designation {
@@ -210,6 +224,7 @@ impl LocalTimeType {
     }
 
     /// Check if two local time types are equal
+    #[inline]
     #[cfg_attr(feature = "const", const_fn::const_fn)]
     fn equal(&self, other: &Self) -> bool {
         self.ut_offset == other.ut_offset
@@ -269,6 +284,7 @@ impl<'a> TimeZoneRef<'a> {
     }
 
     /// Construct the time zone reference associated to UTC
+    #[inline]
     #[cfg_attr(feature = "const", const_fn::const_fn)]
     pub fn utc() -> Self {
         const UTC: LocalTimeType = LocalTimeType::utc();
@@ -276,24 +292,28 @@ impl<'a> TimeZoneRef<'a> {
     }
 
     /// Returns list of transitions
+    #[inline]
     #[cfg_attr(feature = "const", const_fn::const_fn)]
     pub fn transitions(&self) -> &'a [Transition] {
         self.transitions
     }
 
     /// Returns list of local time types
+    #[inline]
     #[cfg_attr(feature = "const", const_fn::const_fn)]
     pub fn local_time_types(&self) -> &'a [LocalTimeType] {
         self.local_time_types
     }
 
     /// Returns list of leap seconds
+    #[inline]
     #[cfg_attr(feature = "const", const_fn::const_fn)]
     pub fn leap_seconds(&self) -> &'a [LeapSecond] {
         self.leap_seconds
     }
 
     /// Returns extra transition rule applicable after the last transition
+    #[inline]
     #[cfg_attr(feature = "const", const_fn::const_fn)]
     pub fn extra_rule(&self) -> &'a Option<TransitionRule> {
         self.extra_rule
@@ -337,6 +357,7 @@ impl<'a> TimeZoneRef<'a> {
     }
 
     /// Construct a reference to a time zone
+    #[inline]
     #[cfg_attr(feature = "const", const_fn::const_fn)]
     fn new_unchecked(
         transitions: &'a [Transition],
@@ -476,16 +497,19 @@ impl TimeZone {
     }
 
     /// Returns a reference to the time zone
+    #[inline]
     pub fn as_ref(&self) -> TimeZoneRef {
         TimeZoneRef::new_unchecked(&self.transitions, &self.local_time_types, &self.leap_seconds, &self.extra_rule)
     }
 
     /// Construct the time zone associated to UTC
+    #[inline]
     pub fn utc() -> Self {
         Self { transitions: Vec::new(), local_time_types: vec![LocalTimeType::utc()], leap_seconds: Vec::new(), extra_rule: None }
     }
 
     /// Construct a time zone with the specified UTC offset in seconds
+    #[inline]
     pub fn fixed(ut_offset: i32) -> Result<Self, LocalTimeTypeError> {
         Ok(Self { transitions: Vec::new(), local_time_types: vec![LocalTimeType::with_ut_offset(ut_offset)?], leap_seconds: Vec::new(), extra_rule: None })
     }

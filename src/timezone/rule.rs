@@ -35,6 +35,7 @@ pub struct Julian1WithoutLeap(u16);
 
 impl Julian1WithoutLeap {
     /// Construct a transition rule day represented by a Julian day in `[1, 365]`, without taking occasional February 29th into account, which is not referenceable
+    #[inline]
     #[cfg_attr(feature = "const", const_fn::const_fn)]
     pub fn new(julian_day_1: u16) -> Result<Self, TransitionRuleError> {
         if !(1 <= julian_day_1 && julian_day_1 <= 365) {
@@ -45,6 +46,7 @@ impl Julian1WithoutLeap {
     }
 
     /// Returns inner value
+    #[inline]
     #[cfg_attr(feature = "const", const_fn::const_fn)]
     pub fn get(&self) -> u16 {
         self.0
@@ -92,6 +94,7 @@ pub struct Julian0WithLeap(u16);
 
 impl Julian0WithLeap {
     /// Construct a transition rule day represented by a zero-based Julian day in `[0, 365]`, taking occasional February 29th into account and allowing December 32nd
+    #[inline]
     #[cfg_attr(feature = "const", const_fn::const_fn)]
     pub fn new(julian_day_0: u16) -> Result<Self, TransitionRuleError> {
         if julian_day_0 > 365 {
@@ -102,6 +105,7 @@ impl Julian0WithLeap {
     }
 
     /// Returns inner value
+    #[inline]
     #[cfg_attr(feature = "const", const_fn::const_fn)]
     pub fn get(&self) -> u16 {
         self.0
@@ -159,6 +163,7 @@ pub struct MonthWeekDay {
 
 impl MonthWeekDay {
     /// Construct a transition rule day represented by a month, a month week and a week day
+    #[inline]
     #[cfg_attr(feature = "const", const_fn::const_fn)]
     pub fn new(month: u8, week: u8, week_day: u8) -> Result<Self, TransitionRuleError> {
         if !(1 <= month && month <= 12) {
@@ -177,18 +182,21 @@ impl MonthWeekDay {
     }
 
     /// Returns month in `[1, 12]`
+    #[inline]
     #[cfg_attr(feature = "const", const_fn::const_fn)]
     pub fn month(&self) -> u8 {
         self.month
     }
 
     /// Returns week of the month in `[1, 5]`, with `5` representing the last week of the month
+    #[inline]
     #[cfg_attr(feature = "const", const_fn::const_fn)]
     pub fn week(&self) -> u8 {
         self.week
     }
 
     /// Returns day of the week in `[0, 6]` from Sunday
+    #[inline]
     #[cfg_attr(feature = "const", const_fn::const_fn)]
     pub fn week_day(&self) -> u8 {
         self.week_day
@@ -358,36 +366,42 @@ impl AlternateTime {
     }
 
     /// Returns local time type for standard time
+    #[inline]
     #[cfg_attr(feature = "const", const_fn::const_fn)]
     pub fn std(&self) -> &LocalTimeType {
         &self.std
     }
 
     /// Returns local time type for Daylight Saving Time
+    #[inline]
     #[cfg_attr(feature = "const", const_fn::const_fn)]
     pub fn dst(&self) -> &LocalTimeType {
         &self.dst
     }
 
     /// Returns start day of Daylight Saving Time
+    #[inline]
     #[cfg_attr(feature = "const", const_fn::const_fn)]
     pub fn dst_start(&self) -> &RuleDay {
         &self.dst_start
     }
 
     /// Returns local start day time of Daylight Saving Time, in seconds
+    #[inline]
     #[cfg_attr(feature = "const", const_fn::const_fn)]
     pub fn dst_start_time(&self) -> i32 {
         self.dst_start_time
     }
 
     /// Returns end day of Daylight Saving Time
+    #[inline]
     #[cfg_attr(feature = "const", const_fn::const_fn)]
     pub fn dst_end(&self) -> &RuleDay {
         &self.dst_end
     }
 
     /// Returns local end day time of Daylight Saving Time, in seconds
+    #[inline]
     #[cfg_attr(feature = "const", const_fn::const_fn)]
     pub fn dst_end_time(&self) -> i32 {
         self.dst_end_time
