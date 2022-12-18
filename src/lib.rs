@@ -1,5 +1,4 @@
 #![deny(missing_docs)]
-#![allow(clippy::question_mark)]
 #![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 

@@ -221,9 +221,9 @@ impl MonthWeekDay {
         }
 
         let week_day_of_first_month_day = (4 + days_since_unix_epoch(year, month, 1)).rem_euclid(DAYS_PER_WEEK);
-        let first_week_day_occurence_in_month = 1 + (week_day as i64 - week_day_of_first_month_day).rem_euclid(DAYS_PER_WEEK);
+        let first_week_day_occurence_in_month = 1 + (week_day - week_day_of_first_month_day).rem_euclid(DAYS_PER_WEEK);
 
-        let mut month_day = first_week_day_occurence_in_month + (week as i64 - 1) * DAYS_PER_WEEK;
+        let mut month_day = first_week_day_occurence_in_month + (week - 1) * DAYS_PER_WEEK;
         if month_day > days_in_month {
             month_day -= DAYS_PER_WEEK
         }
