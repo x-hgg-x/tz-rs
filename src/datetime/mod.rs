@@ -12,7 +12,7 @@ use crate::utils::*;
 use core::cmp::Ordering;
 use core::fmt;
 
-/// UTC date time exprimed in the [proleptic gregorian calendar](https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar)
+/// UTC date time expressed in the [proleptic gregorian calendar](https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar)
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub struct UtcDateTime {
     /// Year
@@ -179,7 +179,7 @@ impl UtcDateTime {
     }
 }
 
-/// Date time associated to a local time type, exprimed in the [proleptic gregorian calendar](https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar)
+/// Date time associated to a local time type, expressed in the [proleptic gregorian calendar](https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar)
 #[derive(Debug, Copy, Clone)]
 pub struct DateTime {
     /// Year
