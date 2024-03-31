@@ -8,6 +8,7 @@ fn main() -> tz::Result<()> {
             ($x:expr) => {
                 match $x {
                     Ok(x) => x,
+                    #[allow(unconditional_panic, clippy::out_of_bounds_indexing)]
                     Err(_) => [][0],
                 }
             };

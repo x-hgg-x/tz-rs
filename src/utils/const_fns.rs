@@ -103,7 +103,7 @@ pub fn binary_search_leap_seconds(slice: &[LeapSecond], x: i64) -> Result<usize,
 /// Macro for panicking in a const context
 macro_rules! const_panic {
     () => {{
-        #[allow(unconditional_panic)]
+        #[allow(unconditional_panic, clippy::out_of_bounds_indexing)]
         let panic = [][0];
         panic
     }};
