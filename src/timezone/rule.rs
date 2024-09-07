@@ -4,7 +4,7 @@ use crate::constants::*;
 use crate::datetime::{days_since_unix_epoch, is_leap_year, UtcDateTime};
 use crate::error::{OutOfRangeError, TransitionRuleError};
 use crate::timezone::LocalTimeType;
-use crate::utils::{binary_search_i64, cmp, const_panic};
+use crate::utils::{binary_search_i64, cmp};
 
 use core::cmp::Ordering;
 
@@ -704,7 +704,7 @@ fn check_two_month_week_days(month_week_day_1: MonthWeekDay, utc_day_time_1: i64
                         Ordering::Greater => (n + DAYS_PER_WEEK * (3 - week_before), n + DAYS_PER_WEEK * (4 - week_before)),
                     }
                 }
-                _ => const_panic!(), // unreachable
+                _ => unreachable!(),
             }
         } else {
             // month_before != month_after

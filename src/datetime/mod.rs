@@ -1232,22 +1232,14 @@ mod tests {
     #[cfg(feature = "const")]
     fn test_const() -> Result<()> {
         use crate::timezone::{AlternateTime, LeapSecond, MonthWeekDay, RuleDay, Transition, TransitionRule};
-        use crate::utils::const_panic;
 
         macro_rules! unwrap {
             ($x:expr) => {
                 match $x {
                     Ok(x) => x,
-                    Err(_) => const_panic!(),
+                    Err(_) => panic!(),
                 }
             };
-        }
-
-        macro_rules! to_const {
-            ($type:ty, $x:expr) => {{
-                const TMP: $type = $x;
-                TMP
-            }};
         }
 
         const TIME_ZONE_REF: TimeZoneRef = unwrap!(TimeZoneRef::new(
@@ -1260,8 +1252,7 @@ mod tests {
                 Transition::new(-765376200, 1),
                 Transition::new(-712150200, 5),
             ],
-            to_const!(
-                &[LocalTimeType],
+            const {
                 &[
                     unwrap!(LocalTimeType::new(-37886, false, Some(b"LMT"))),
                     unwrap!(LocalTimeType::new(-37800, false, Some(b"HST"))),
@@ -1270,7 +1261,7 @@ mod tests {
                     unwrap!(LocalTimeType::new(-34200, true, Some(b"HPT"))),
                     unwrap!(LocalTimeType::new(-36000, false, Some(b"HST"))),
                 ]
-            ),
+            },
             &[
                 LeapSecond::new(78796800, 1),
                 LeapSecond::new(94694401, 2),
@@ -1279,8 +1270,7 @@ mod tests {
                 LeapSecond::new(189302404, 5),
                 LeapSecond::new(220924805, 6),
             ],
-            to_const!(
-                &Option<TransitionRule>,
+            const {
                 &Some(TransitionRule::Alternate(unwrap!(AlternateTime::new(
                     unwrap!(LocalTimeType::new(-36000, false, Some(b"HST"))),
                     unwrap!(LocalTimeType::new(-34200, true, Some(b"HPT"))),
@@ -1289,7 +1279,7 @@ mod tests {
                     RuleDay::MonthWeekDay(unwrap!(MonthWeekDay::new(3, 4, 4))),
                     7200,
                 ))))
-            ),
+            },
         ));
 
         const UTC: TimeZoneRef = TimeZoneRef::utc();

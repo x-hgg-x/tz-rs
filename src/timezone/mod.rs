@@ -5,7 +5,7 @@ mod rule;
 pub use rule::{AlternateTime, Julian0WithLeap, Julian1WithoutLeap, MonthWeekDay, RuleDay, TransitionRule};
 
 use crate::error::{FindLocalTimeTypeError, LocalTimeTypeError, OutOfRangeError, TimeZoneError};
-use crate::utils::{binary_search_leap_seconds, binary_search_transitions, const_panic};
+use crate::utils::{binary_search_leap_seconds, binary_search_transitions};
 
 #[cfg(feature = "std")]
 use {
@@ -136,7 +136,7 @@ impl TzAsciiStr {
             [5, head @ .., _, _] => head,
             [6, head @ .., _] => head,
             [7, head @ ..] => head,
-            _ => const_panic!(), // unreachable
+            _ => unreachable!(),
         }
     }
 
