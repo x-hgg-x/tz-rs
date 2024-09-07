@@ -7,6 +7,12 @@ pub use rule::{AlternateTime, Julian0WithLeap, Julian1WithoutLeap, MonthWeekDay,
 use crate::error::{FindLocalTimeTypeError, LocalTimeTypeError, OutOfRangeError, TimeZoneError};
 use crate::utils::{binary_search_leap_seconds, binary_search_transitions, const_panic};
 
+#[cfg(feature = "std")]
+use {
+    crate::error::{TzError, TzStringError},
+    crate::parse::{get_tz_file, parse_posix_tz, parse_tz_file},
+};
+
 use core::fmt;
 use core::str;
 
@@ -15,10 +21,9 @@ use alloc::{vec, vec::Vec};
 
 #[cfg(feature = "std")]
 use {
-    crate::error::{TzError, TzStringError},
-    crate::parse::{get_tz_file, parse_posix_tz, parse_tz_file},
     std::fs::{self, File},
     std::io::{self, Read},
+    std::time::SystemTime,
 };
 
 /// Transition of a TZif file
@@ -587,9 +592,6 @@ impl TimeZone {
     #[cfg(feature = "std")]
     #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
     pub fn find_current_local_time_type(&self) -> Result<&LocalTimeType, TzError> {
-        use core::convert::TryInto;
-        use std::time::SystemTime;
-
         Ok(self.find_local_time_type(SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs().try_into()?)?)
     }
 

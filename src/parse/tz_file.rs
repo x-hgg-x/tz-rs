@@ -5,7 +5,6 @@ use crate::parse::tz_string::parse_posix_tz;
 use crate::timezone::{LeapSecond, LocalTimeType, TimeZone, Transition, TransitionRule};
 use crate::utils::Cursor;
 
-use core::convert::TryInto;
 use core::iter;
 use core::str;
 
