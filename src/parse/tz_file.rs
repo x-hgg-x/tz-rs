@@ -262,7 +262,7 @@ pub(crate) fn get_tz_file(tz_string: &str) -> Result<File, TzFileError> {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
     use crate::timezone::{AlternateTime, MonthWeekDay, RuleDay};
 

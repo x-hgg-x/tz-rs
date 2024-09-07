@@ -733,7 +733,7 @@ fn check_two_month_week_days(month_week_day_1: MonthWeekDay, utc_day_time_1: i64
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
     use crate::Result;
 

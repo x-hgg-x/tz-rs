@@ -353,9 +353,9 @@ pub(super) fn find_date_time(
 
 #[cfg(feature = "alloc")]
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
-    use crate::datetime::test::check_equal_date_time;
+    use crate::datetime::tests::check_equal_date_time;
     use crate::timezone::{AlternateTime, Julian0WithLeap, Julian1WithoutLeap, LocalTimeType, RuleDay, TimeZone, Transition};
 
     use alloc::vec;
