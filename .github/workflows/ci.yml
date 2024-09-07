@@ -54,12 +54,9 @@ jobs:
   test:
     strategy:
       matrix:
-        rust: [1.45, 1.55, stable, nightly]
+        rust: ["1.81", "stable", "nightly"]
+        const: ["", const]
         features: ["", alloc, std]
-        include:
-          - const: const
-          - rust: 1.45
-            const: ""
 
     name: "Test/${{ matrix.rust }}/Features=${{ matrix.const }},${{ matrix.features }}"
 

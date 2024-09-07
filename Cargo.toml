@@ -2,6 +2,7 @@
 name = "tz-rs"
 version = "0.6.14"
 edition = "2018"
+rust-version = "1.81"
 authors = ["x-hgg-x"]
 repository = "https://github.com/x-hgg-x/tz-rs"
 description = "A pure Rust reimplementation of libc functions localtime, gmtime and mktime."
