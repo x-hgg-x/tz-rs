@@ -242,21 +242,6 @@ impl LocalTimeType {
     }
 }
 
-/// Time zone
-#[cfg(feature = "alloc")]
-#[cfg_attr(docsrs, doc(cfg(feature = "alloc")))]
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct TimeZone {
-    /// List of transitions
-    transitions: Vec<Transition>,
-    /// List of local time types (cannot be empty)
-    local_time_types: Vec<LocalTimeType>,
-    /// List of leap seconds
-    leap_seconds: Vec<LeapSecond>,
-    /// Extra transition rule applicable after the last transition
-    extra_rule: Option<TransitionRule>,
-}
-
 /// Reference to a time zone
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct TimeZoneRef<'a> {
@@ -486,6 +471,21 @@ impl<'a> TimeZoneRef<'a> {
             None => Err(OutOfRangeError("out of range operation")),
         }
     }
+}
+
+/// Time zone
+#[cfg(feature = "alloc")]
+#[cfg_attr(docsrs, doc(cfg(feature = "alloc")))]
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct TimeZone {
+    /// List of transitions
+    transitions: Vec<Transition>,
+    /// List of local time types (cannot be empty)
+    local_time_types: Vec<LocalTimeType>,
+    /// List of leap seconds
+    leap_seconds: Vec<LeapSecond>,
+    /// Extra transition rule applicable after the last transition
+    extra_rule: Option<TransitionRule>,
 }
 
 #[cfg(feature = "alloc")]
