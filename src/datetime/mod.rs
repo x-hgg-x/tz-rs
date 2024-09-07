@@ -1000,8 +1000,8 @@ mod test {
 
     #[test]
     fn test_date_time_sync_and_send() {
-        trait AssertSyncSendStatic: Sync + Send + 'static {}
-        impl AssertSyncSendStatic for DateTime {}
+        trait _AssertSyncSendStatic: Sync + Send + 'static {}
+        impl _AssertSyncSendStatic for DateTime {}
     }
 
     #[test]
