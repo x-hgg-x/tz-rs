@@ -1,11 +1,11 @@
 //! Functions used for parsing a TZ string.
 
 use crate::error::{TzError, TzStringError};
-use crate::timezone::*;
-use crate::utils::*;
+use crate::timezone::{AlternateTime, Julian0WithLeap, Julian1WithoutLeap, LocalTimeType, MonthWeekDay, RuleDay, TransitionRule};
+use crate::utils::Cursor;
 
-use std::num::ParseIntError;
-use std::str::{self, FromStr};
+use core::num::ParseIntError;
+use core::str::{self, FromStr};
 
 /// Parse integer from a slice of bytes
 fn parse_int<T: FromStr<Err = ParseIntError>>(bytes: &[u8]) -> Result<T, TzStringError> {

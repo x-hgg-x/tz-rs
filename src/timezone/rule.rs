@@ -1,7 +1,12 @@
 //! Types related to a time zone extra transition rule.
 
 use crate::constants::*;
-use crate::timezone::*;
+use crate::datetime::{days_since_unix_epoch, is_leap_year, UtcDateTime};
+use crate::error::{OutOfRangeError, TransitionRuleError};
+use crate::timezone::LocalTimeType;
+use crate::utils::{binary_search_i64, cmp, const_panic};
+
+use core::cmp::Ordering;
 
 /// Informations needed for checking DST transition rules consistency, for a Julian day
 #[derive(Debug, PartialEq, Eq)]

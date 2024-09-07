@@ -2,19 +2,24 @@
 
 mod rule;
 
-pub use rule::*;
+pub use rule::{AlternateTime, Julian0WithLeap, Julian1WithoutLeap, MonthWeekDay, RuleDay, TransitionRule};
 
-use crate::datetime::{days_since_unix_epoch, is_leap_year};
-use crate::error::*;
-use crate::utils::*;
-use crate::UtcDateTime;
+use crate::error::{FindLocalTimeTypeError, LocalTimeTypeError, OutOfRangeError, TimeZoneError};
+use crate::utils::{binary_search_leap_seconds, binary_search_transitions, const_panic};
 
-use core::cmp::Ordering;
 use core::fmt;
 use core::str;
 
 #[cfg(feature = "alloc")]
 use alloc::{vec, vec::Vec};
+
+#[cfg(feature = "std")]
+use {
+    crate::error::{TzError, TzStringError},
+    crate::parse::{get_tz_file, parse_posix_tz, parse_tz_file},
+    std::fs::{self, File},
+    std::io::{self, Read},
+};
 
 /// Transition of a TZif file
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -534,18 +539,13 @@ impl TimeZone {
     #[cfg(feature = "std")]
     #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
     pub fn from_tz_data(bytes: &[u8]) -> Result<Self, TzError> {
-        crate::parse::parse_tz_file(bytes)
+        parse_tz_file(bytes)
     }
 
     /// Construct a time zone from a POSIX TZ string, as described in [the POSIX documentation of the `TZ` environment variable](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap08.html).
     #[cfg(feature = "std")]
     #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
     pub fn from_posix_tz(tz_string: &str) -> Result<Self, TzError> {
-        use crate::parse::*;
-
-        use std::fs::{self, File};
-        use std::io::{self, Read};
-
         if tz_string.is_empty() {
             return Err(TzError::TzStringError(TzStringError::InvalidTzString("empty TZ string")));
         }

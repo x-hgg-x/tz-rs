@@ -1,8 +1,8 @@
 fn main() -> tz::Result<()> {
     #[cfg(feature = "const")]
     {
-        use tz::datetime::*;
-        use tz::timezone::*;
+        use tz::datetime::{DateTime, UtcDateTime};
+        use tz::timezone::{AlternateTime, LeapSecond, LocalTimeType, MonthWeekDay, RuleDay, TimeZoneRef, Transition, TransitionRule};
 
         macro_rules! unwrap {
             ($x:expr) => {

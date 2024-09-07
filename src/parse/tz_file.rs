@@ -1,15 +1,16 @@
 //! Functions used for parsing a TZif file.
 
-use super::tz_string::parse_posix_tz;
 use crate::error::{TzError, TzFileError};
-use crate::timezone::*;
-use crate::utils::*;
+use crate::parse::tz_string::parse_posix_tz;
+use crate::timezone::{LeapSecond, LocalTimeType, TimeZone, Transition, TransitionRule};
+use crate::utils::Cursor;
 
-use std::convert::TryInto;
+use core::convert::TryInto;
+use core::iter;
+use core::str;
+
 use std::fs::File;
 use std::io;
-use std::iter;
-use std::str;
 
 /// TZif version
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -263,6 +264,7 @@ pub(crate) fn get_tz_file(tz_string: &str) -> Result<File, TzFileError> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::timezone::{AlternateTime, MonthWeekDay, RuleDay};
 
     #[test]
     fn test_v1_file_with_leap_seconds() -> Result<(), TzError> {

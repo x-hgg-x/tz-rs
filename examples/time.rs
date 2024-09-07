@@ -1,8 +1,10 @@
-use tz::*;
+use tz::Result;
 
 fn main() -> Result<()> {
     #[cfg(feature = "std")]
     {
+        use tz::{DateTime, LocalTimeType, TimeZone, UtcDateTime};
+
         //
         // TimeZone
         //
