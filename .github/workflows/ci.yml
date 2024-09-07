@@ -9,29 +9,6 @@ on:
     - cron: "0 0 * * 0"
 
 jobs:
-  check:
-    name: "Check"
-
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install Rust
-        id: actions-rs
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-          components: rustfmt, clippy
-
-      - name: Format
-        run: cargo fmt --all -- --check
-
-      - name: Lint
-        run: cargo clippy -- -D warnings
-
   doc:
     name: "Doc"
 
@@ -41,24 +18,16 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install Rust
-        id: actions-rs
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: nightly
-          override: true
+        run: |
+          rustup set profile minimal
+          rustup toolchain install nightly
+          rustup override set nightly
 
       - name: Doc
         run: RUSTDOCFLAGS="-D warnings --cfg docsrs" cargo doc --all-features --no-deps
 
   test:
-    strategy:
-      matrix:
-        rust: ["1.81", "stable", "nightly"]
-        const: ["", const]
-        features: ["", alloc, std]
-
-    name: "Test/${{ matrix.rust }}/Features=${{ matrix.const }},${{ matrix.features }}"
+    name: "Test"
 
     runs-on: ubuntu-latest
     steps:
@@ -66,14 +35,12 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install Rust
-        id: actions-rs
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: ${{ matrix.rust }}
-          override: true
+        run: |
+          rustup set profile minimal
+          rustup toolchain install 1.81 stable nightly --component clippy
+          rustup override set stable
 
       - name: Test
-        run: cargo test --no-default-features --features=${{ matrix.const }},${{ matrix.features }}
+        run: ./check_release.sh
         env:
           CARGO_NET_GIT_FETCH_WITH_CLI: true

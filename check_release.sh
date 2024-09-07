@@ -1,13 +1,26 @@
 #!/bin/sh
 
-cargo +1.81 test --no-default-features --features=const
-cargo +1.81 test --no-default-features --features=const,alloc
-cargo +1.81 test --no-default-features --features=const,std
+set -e
 
-cargo +stable test --no-default-features --features=const
-cargo +stable test --no-default-features --features=const,alloc
-cargo +stable test --no-default-features --features=const,std
+fmt_cmd="cargo fmt --all -- --check"
+echo "+ $fmt_cmd"
+$fmt_cmd
 
-cargo +nightly test --no-default-features --features=const
-cargo +nightly test --no-default-features --features=const,alloc
-cargo +nightly test --no-default-features --features=const,std
+run() {
+    cargo_arg=$1
+    bin_arg=$2
+
+    for rust in "1.81" "stable" "nightly"; do
+        for const in "" "const"; do
+            for feature in "" "alloc" "std"; do
+                cmd="cargo +$rust -q $cargo_arg --no-default-features --features=$const,$feature $bin_arg"
+                echo "+ $cmd"
+                $cmd
+                echo "\n"
+            done
+        done
+    done
+}
+
+run "clippy" "-- -D warnings"
+run "test"
