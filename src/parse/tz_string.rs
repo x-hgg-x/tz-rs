@@ -365,8 +365,8 @@ mod tests {
 
     #[test]
     fn test_error() -> Result<(), TzError> {
-        assert!(matches!(parse_posix_tz(b"IST-1GMT0", false), Err(TzError::TzStringError(TzStringError::UnsupportedTzString(_)))));
-        assert!(matches!(parse_posix_tz(b"EET-2EEST", false), Err(TzError::TzStringError(TzStringError::UnsupportedTzString(_)))));
+        assert!(matches!(parse_posix_tz(b"IST-1GMT0", false), Err(TzError::TzString(TzStringError::UnsupportedTzString(_)))));
+        assert!(matches!(parse_posix_tz(b"EET-2EEST", false), Err(TzError::TzString(TzStringError::UnsupportedTzString(_)))));
 
         Ok(())
     }

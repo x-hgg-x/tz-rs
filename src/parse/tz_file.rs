@@ -81,7 +81,7 @@ fn parse_header(cursor: &mut Cursor<'_>) -> Result<Header, TzFileError> {
 
 /// Parse TZif footer
 fn parse_footer(footer: &[u8], use_string_extensions: bool) -> Result<Option<TransitionRule>, TzError> {
-    let footer = str::from_utf8(footer)?;
+    let footer = str::from_utf8(footer).map_err(TzFileError::from)?;
     if !(footer.starts_with('\n') && footer.ends_with('\n')) {
         return Err(TzFileError::InvalidTzFile("invalid footer").into());
     }
@@ -255,7 +255,7 @@ pub(crate) fn get_tz_file(tz_string: &str) -> Result<File, TzFileError> {
                     return Ok(file);
                 }
             }
-            Err(TzFileError::IoError(io::ErrorKind::NotFound.into()))
+            Err(TzFileError::Io(io::ErrorKind::NotFound.into()))
         }
     }
 }
