@@ -2,7 +2,7 @@
 
 use crate::error::{TzError, TzFileError};
 use crate::parse::tz_string::parse_posix_tz;
-use crate::parse::utils::{read_exact, Cursor};
+use crate::parse::utils::{read_chunk_exact, read_exact, Cursor};
 use crate::timezone::{LeapSecond, LocalTimeType, TimeZone, Transition, TransitionRule};
 
 use core::iter;
@@ -57,12 +57,12 @@ fn parse_header(cursor: &mut Cursor<'_>) -> Result<Header, TzFileError> {
 
     read_exact(cursor, 15)?;
 
-    let ut_local_count = u32::from_be_bytes(read_exact(cursor, 4)?.try_into()?);
-    let std_wall_count = u32::from_be_bytes(read_exact(cursor, 4)?.try_into()?);
-    let leap_count = u32::from_be_bytes(read_exact(cursor, 4)?.try_into()?);
-    let transition_count = u32::from_be_bytes(read_exact(cursor, 4)?.try_into()?);
-    let type_count = u32::from_be_bytes(read_exact(cursor, 4)?.try_into()?);
-    let char_count = u32::from_be_bytes(read_exact(cursor, 4)?.try_into()?);
+    let ut_local_count = u32::from_be_bytes(*read_chunk_exact(cursor)?);
+    let std_wall_count = u32::from_be_bytes(*read_chunk_exact(cursor)?);
+    let leap_count = u32::from_be_bytes(*read_chunk_exact(cursor)?);
+    let transition_count = u32::from_be_bytes(*read_chunk_exact(cursor)?);
+    let type_count = u32::from_be_bytes(*read_chunk_exact(cursor)?);
+    let char_count = u32::from_be_bytes(*read_chunk_exact(cursor)?);
 
     if !(type_count != 0 && char_count != 0 && (ut_local_count == 0 || ut_local_count == type_count) && (std_wall_count == 0 || std_wall_count == type_count)) {
         return Err(TzFileError::InvalidTzFile("invalid header"));
@@ -99,9 +99,7 @@ fn parse_footer(footer: &[u8], use_string_extensions: bool) -> Result<Option<Tra
 }
 
 /// TZif data blocks
-struct DataBlock<'a> {
-    /// Time size in bytes
-    time_size: usize,
+struct DataBlocks<'a, const TIME_SIZE: usize> {
     /// Transition times data block
     transition_times: &'a [u8],
     /// Transition types data block
@@ -118,54 +116,69 @@ struct DataBlock<'a> {
     ut_locals: &'a [u8],
 }
 
-impl<'a> DataBlock<'a> {
-    /// Read TZif data blocks
-    fn new(cursor: &mut Cursor<'a>, header: &Header, version: Version) -> Result<Self, TzFileError> {
-        let time_size = match version {
-            Version::V1 => 4,
-            Version::V2 | Version::V3 => 8,
-        };
+/// Read TZif data blocks
+fn read_data_blocks<'a, const TIME_SIZE: usize>(cursor: &mut Cursor<'a>, header: &Header) -> Result<DataBlocks<'a, TIME_SIZE>, TzFileError> {
+    Ok(DataBlocks {
+        transition_times: read_exact(cursor, header.transition_count * TIME_SIZE)?,
+        transition_types: read_exact(cursor, header.transition_count)?,
+        local_time_types: read_exact(cursor, header.type_count * 6)?,
+        time_zone_designations: read_exact(cursor, header.char_count)?,
+        leap_seconds: read_exact(cursor, header.leap_count * (TIME_SIZE + 4))?,
+        std_walls: read_exact(cursor, header.std_wall_count)?,
+        ut_locals: read_exact(cursor, header.ut_local_count)?,
+    })
+}
 
-        Ok(Self {
-            time_size,
-            transition_times: read_exact(cursor, header.transition_count * time_size)?,
-            transition_types: read_exact(cursor, header.transition_count)?,
-            local_time_types: read_exact(cursor, header.type_count * 6)?,
-            time_zone_designations: read_exact(cursor, header.char_count)?,
-            leap_seconds: read_exact(cursor, header.leap_count * (time_size + 4))?,
-            std_walls: read_exact(cursor, header.std_wall_count)?,
-            ut_locals: read_exact(cursor, header.ut_local_count)?,
-        })
+trait ParseTime {
+    type TimeData;
+
+    fn parse_time(&self, data: &Self::TimeData) -> i64;
+}
+
+impl<'a> ParseTime for DataBlocks<'a, 4> {
+    type TimeData = [u8; 4];
+
+    fn parse_time(&self, data: &Self::TimeData) -> i64 {
+        i32::from_be_bytes(*data).into()
     }
+}
 
-    /// Parse time values
-    fn parse_time(&self, arr: &[u8], version: Version) -> Result<i64, TzFileError> {
-        Ok(match version {
-            Version::V1 => i32::from_be_bytes(arr.try_into()?).into(),
-            Version::V2 | Version::V3 => i64::from_be_bytes(arr.try_into()?),
-        })
+impl<'a> ParseTime for DataBlocks<'a, 8> {
+    type TimeData = [u8; 8];
+
+    fn parse_time(&self, data: &Self::TimeData) -> i64 {
+        i64::from_be_bytes(*data)
     }
+}
 
+impl<'a, const TIME_SIZE: usize> DataBlocks<'a, TIME_SIZE>
+where
+    DataBlocks<'a, TIME_SIZE>: ParseTime<TimeData = [u8; TIME_SIZE]>,
+{
     /// Parse time zone data
     fn parse(&self, header: &Header, footer: Option<&[u8]>) -> Result<TimeZone, TzError> {
         let mut transitions = Vec::with_capacity(header.transition_count);
-        for (arr_time, &local_time_type_index) in self.transition_times.chunks_exact(self.time_size).zip(self.transition_types) {
-            let unix_leap_time = self.parse_time(&arr_time[0..self.time_size], header.version)?;
+        for (time_data, &local_time_type_index) in self.transition_times.chunks_exact(TIME_SIZE).zip(self.transition_types) {
+            let time_data = time_data.first_chunk::<TIME_SIZE>().unwrap();
+
+            let unix_leap_time = self.parse_time(time_data);
             let local_time_type_index = local_time_type_index as usize;
             transitions.push(Transition::new(unix_leap_time, local_time_type_index));
         }
 
         let mut local_time_types = Vec::with_capacity(header.type_count);
-        for arr in self.local_time_types.chunks_exact(6) {
-            let ut_offset = i32::from_be_bytes(arr[0..4].try_into()?);
+        for data in self.local_time_types.chunks_exact(6) {
+            let [d0, d1, d2, d3, d4, d5] = <[u8; 6]>::try_from(data).unwrap();
 
-            let is_dst = match arr[4] {
+            let ut_offset = i32::from_be_bytes([d0, d1, d2, d3]);
+
+            let is_dst = match d4 {
                 0 => false,
                 1 => true,
                 _ => return Err(TzFileError::InvalidTzFile("invalid DST indicator").into()),
             };
 
-            let char_index = arr[5] as usize;
+            let char_index = d5 as usize;
             if char_index >= header.char_count {
                 return Err(TzFileError::InvalidTzFile("invalid time zone designation char index").into());
             }
@@ -187,9 +200,12 @@ impl<'a> DataBlock<'a> {
         }
 
         let mut leap_seconds = Vec::with_capacity(header.leap_count);
-        for arr in self.leap_seconds.chunks_exact(self.time_size + 4) {
-            let unix_leap_time = self.parse_time(&arr[0..self.time_size], header.version)?;
-            let correction = i32::from_be_bytes(arr[self.time_size..self.time_size + 4].try_into()?);
+        for data in self.leap_seconds.chunks_exact(TIME_SIZE + 4) {
+            let (time_data, tail) = data.split_first_chunk::<TIME_SIZE>().unwrap();
+            let correction_data = tail.first_chunk::<4>().unwrap();
+
+            let unix_leap_time = self.parse_time(time_data);
+            let correction = i32::from_be_bytes(*correction_data);
             leap_seconds.push(LeapSecond::new(unix_leap_time, correction));
         }
 
@@ -215,23 +231,23 @@ pub(crate) fn parse_tz_file(bytes: &[u8]) -> Result<TimeZone, TzError> {
 
     match header.version {
         Version::V1 => {
-            let data_block = DataBlock::new(&mut cursor, &header, header.version)?;
+            let data_blocks = read_data_blocks::<4>(&mut cursor, &header)?;
 
             if !cursor.is_empty() {
                 return Err(TzFileError::InvalidTzFile("remaining data after end of TZif v1 data block").into());
             }
 
-            Ok(data_block.parse(&header, None)?)
+            Ok(data_blocks.parse(&header, None)?)
         }
         Version::V2 | Version::V3 => {
             // Skip v1 data block
-            DataBlock::new(&mut cursor, &header, Version::V1)?;
+            read_data_blocks::<4>(&mut cursor, &header)?;
 
             let header = parse_header(&mut cursor)?;
-            let data_block = DataBlock::new(&mut cursor, &header, header.version)?;
+            let data_blocks = read_data_blocks::<8>(&mut cursor, &header)?;
             let footer = cursor;
 
-            Ok(data_block.parse(&header, Some(footer))?)
+            Ok(data_blocks.parse(&header, Some(footer))?)
         }
     }
 }

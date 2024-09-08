@@ -15,6 +15,17 @@ pub(super) fn read_exact<'a>(cursor: &mut Cursor<'a>, count: usize) -> Result<&'
     }
 }
 
+/// Read exactly `N` bytes into an array and reduce remaining data
+pub(super) fn read_chunk_exact<'a, const N: usize>(cursor: &mut Cursor<'a>) -> Result<&'a [u8; N], ParseDataError> {
+    match cursor.split_first_chunk::<N>() {
+        Some((result, tail)) => {
+            *cursor = tail;
+            Ok(result)
+        }
+        None => Err(ParseDataError::UnexpectedEof),
+    }
+}
+
 /// Read bytes and compare them to the provided tag
 pub(super) fn read_tag(cursor: &mut Cursor<'_>, tag: &[u8]) -> Result<(), ParseDataError> {
     if read_exact(cursor, tag.len())? == tag {

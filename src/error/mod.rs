@@ -1,6 +1,5 @@
 //! Error types.
 
-use core::array::TryFromSliceError;
 use core::error::Error;
 use core::fmt;
 use core::num::TryFromIntError;
@@ -90,8 +89,6 @@ mod parse {
     pub enum TzFileError {
         /// UTF-8 error
         Utf8(Utf8Error),
-        /// Conversion from slice to array error
-        TryFromSlice(TryFromSliceError),
         /// Parse data error
         ParseData(ParseDataError),
         /// I/O error
@@ -108,7 +105,6 @@ mod parse {
         fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
             match self {
                 Self::Utf8(error) => error.fmt(f),
-                Self::TryFromSlice(error) => error.fmt(f),
                 Self::ParseData(error) => error.fmt(f),
                 Self::Io(error) => error.fmt(f),
                 Self::TzString(error) => error.fmt(f),
@@ -123,12 +119,6 @@ mod parse {
     impl From<Utf8Error> for TzFileError {
         fn from(error: Utf8Error) -> Self {
             Self::Utf8(error)
-        }
-    }
-
-    impl From<TryFromSliceError> for TzFileError {
-        fn from(error: TryFromSliceError) -> Self {
-            Self::TryFromSlice(error)
         }
     }
 
@@ -197,8 +187,6 @@ impl From<FindLocalTimeTypeError> for ProjectDateTimeError {
 #[non_exhaustive]
 #[derive(Debug)]
 pub enum TzError {
-    /// Conversion from slice to array error
-    TryFromSlice(TryFromSliceError),
     /// I/O error
     #[cfg(feature = "std")]
     #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
@@ -234,7 +222,6 @@ pub enum TzError {
 impl fmt::Display for TzError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::TryFromSlice(error) => error.fmt(f),
             #[cfg(feature = "std")]
             Self::Io(error) => error.fmt(f),
             #[cfg(feature = "std")]
@@ -255,12 +242,6 @@ impl fmt::Display for TzError {
 }
 
 impl Error for TzError {}
-
-impl From<TryFromSliceError> for TzError {
-    fn from(error: TryFromSliceError) -> Self {
-        Self::TryFromSlice(error)
-    }
-}
 
 #[cfg(feature = "std")]
 #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
