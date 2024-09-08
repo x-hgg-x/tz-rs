@@ -1,6 +1,7 @@
 //! Error types.
 
 use core::array::TryFromSliceError;
+use core::error::Error;
 use core::fmt;
 use core::num::TryFromIntError;
 use core::str::Utf8Error;
@@ -40,7 +41,7 @@ mod parse {
         }
     }
 
-    impl std::error::Error for TzStringError {}
+    impl Error for TzStringError {}
 
     impl From<Utf8Error> for TzStringError {
         fn from(error: Utf8Error) -> Self {
@@ -89,7 +90,7 @@ mod parse {
         }
     }
 
-    impl std::error::Error for TzFileError {}
+    impl Error for TzFileError {}
 
     impl From<TryFromSliceError> for TzFileError {
         fn from(error: TryFromSliceError) -> Self {
@@ -128,9 +129,7 @@ macro_rules! create_error {
             }
         }
 
-        #[cfg(feature = "std")]
-        #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
-        impl std::error::Error for $name {}
+        impl Error for $name {}
     };
 }
 
@@ -218,9 +217,7 @@ impl fmt::Display for TzError {
     }
 }
 
-#[cfg(feature = "std")]
-#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
-impl std::error::Error for TzError {}
+impl Error for TzError {}
 
 impl From<Utf8Error> for TzError {
     fn from(error: Utf8Error) -> Self {
