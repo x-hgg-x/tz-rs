@@ -2,8 +2,8 @@
 
 use crate::error::{TzError, TzFileError};
 use crate::parse::tz_string::parse_posix_tz;
+use crate::parse::utils::{read_exact, Cursor};
 use crate::timezone::{LeapSecond, LocalTimeType, TimeZone, Transition, TransitionRule};
-use crate::utils::Cursor;
 
 use core::iter;
 use core::str;
@@ -42,27 +42,27 @@ struct Header {
 }
 
 /// Parse TZif header
-fn parse_header(cursor: &mut Cursor) -> Result<Header, TzFileError> {
-    let magic = cursor.read_exact(4)?;
+fn parse_header(cursor: &mut Cursor<'_>) -> Result<Header, TzFileError> {
+    let magic = read_exact(cursor, 4)?;
     if magic != *b"TZif" {
         return Err(TzFileError::InvalidTzFile("invalid magic number"));
     }
 
-    let version = match cursor.read_exact(1)? {
+    let version = match read_exact(cursor, 1)? {
         [0x00] => Version::V1,
         [0x32] => Version::V2,
         [0x33] => Version::V3,
         _ => return Err(TzFileError::UnsupportedTzFile("unsupported TZif version")),
     };
 
-    cursor.read_exact(15)?;
+    read_exact(cursor, 15)?;
 
-    let ut_local_count = u32::from_be_bytes(cursor.read_exact(4)?.try_into()?);
-    let std_wall_count = u32::from_be_bytes(cursor.read_exact(4)?.try_into()?);
-    let leap_count = u32::from_be_bytes(cursor.read_exact(4)?.try_into()?);
-    let transition_count = u32::from_be_bytes(cursor.read_exact(4)?.try_into()?);
-    let type_count = u32::from_be_bytes(cursor.read_exact(4)?.try_into()?);
-    let char_count = u32::from_be_bytes(cursor.read_exact(4)?.try_into()?);
+    let ut_local_count = u32::from_be_bytes(read_exact(cursor, 4)?.try_into()?);
+    let std_wall_count = u32::from_be_bytes(read_exact(cursor, 4)?.try_into()?);
+    let leap_count = u32::from_be_bytes(read_exact(cursor, 4)?.try_into()?);
+    let transition_count = u32::from_be_bytes(read_exact(cursor, 4)?.try_into()?);
+    let type_count = u32::from_be_bytes(read_exact(cursor, 4)?.try_into()?);
+    let char_count = u32::from_be_bytes(read_exact(cursor, 4)?.try_into()?);
 
     if !(type_count != 0 && char_count != 0 && (ut_local_count == 0 || ut_local_count == type_count) && (std_wall_count == 0 || std_wall_count == type_count)) {
         return Err(TzFileError::InvalidTzFile("invalid header"));
@@ -128,13 +128,13 @@ impl<'a> DataBlock<'a> {
 
         Ok(Self {
             time_size,
-            transition_times: cursor.read_exact(header.transition_count * time_size)?,
-            transition_types: cursor.read_exact(header.transition_count)?,
-            local_time_types: cursor.read_exact(header.type_count * 6)?,
-            time_zone_designations: cursor.read_exact(header.char_count)?,
-            leap_seconds: cursor.read_exact(header.leap_count * (time_size + 4))?,
-            std_walls: cursor.read_exact(header.std_wall_count)?,
-            ut_locals: cursor.read_exact(header.ut_local_count)?,
+            transition_times: read_exact(cursor, header.transition_count * time_size)?,
+            transition_types: read_exact(cursor, header.transition_count)?,
+            local_time_types: read_exact(cursor, header.type_count * 6)?,
+            time_zone_designations: read_exact(cursor, header.char_count)?,
+            leap_seconds: read_exact(cursor, header.leap_count * (time_size + 4))?,
+            std_walls: read_exact(cursor, header.std_wall_count)?,
+            ut_locals: read_exact(cursor, header.ut_local_count)?,
         })
     }
 
@@ -209,7 +209,7 @@ impl<'a> DataBlock<'a> {
 
 /// Parse TZif file as described in [RFC 8536](https://datatracker.ietf.org/doc/html/rfc8536)
 pub(crate) fn parse_tz_file(bytes: &[u8]) -> Result<TimeZone, TzError> {
-    let mut cursor = Cursor::new(bytes);
+    let mut cursor = bytes;
 
     let header = parse_header(&mut cursor)?;
 
@@ -229,7 +229,7 @@ pub(crate) fn parse_tz_file(bytes: &[u8]) -> Result<TimeZone, TzError> {
 
             let header = parse_header(&mut cursor)?;
             let data_block = DataBlock::new(&mut cursor, &header, header.version)?;
-            let footer = cursor.remaining();
+            let footer = cursor;
 
             Ok(data_block.parse(&header, Some(footer))?)
         }

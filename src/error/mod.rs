@@ -12,6 +12,28 @@ mod parse {
 
     use core::num::ParseIntError;
 
+    /// Parse data error
+    #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
+    #[non_exhaustive]
+    #[derive(Debug)]
+    pub enum ParseDataError {
+        /// Unexpected end of data
+        UnexpectedEof,
+        /// Invalid data
+        InvalidData,
+    }
+
+    impl fmt::Display for ParseDataError {
+        fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+            match self {
+                Self::UnexpectedEof => f.write_str("unexpected end of data"),
+                Self::InvalidData => f.write_str("invalid data"),
+            }
+        }
+    }
+
+    impl Error for ParseDataError {}
+
     /// Unified error type for parsing a TZ string
     #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
     #[non_exhaustive]
@@ -21,8 +43,8 @@ mod parse {
         Utf8Error(Utf8Error),
         /// Integer parsing error
         ParseIntError(ParseIntError),
-        /// I/O error
-        IoError(std::io::Error),
+        /// Parse data error
+        ParseDataError(ParseDataError),
         /// Invalid TZ string
         InvalidTzString(&'static str),
         /// Unsupported TZ string
@@ -34,7 +56,7 @@ mod parse {
             match self {
                 Self::Utf8Error(error) => error.fmt(f),
                 Self::ParseIntError(error) => error.fmt(f),
-                Self::IoError(error) => error.fmt(f),
+                Self::ParseDataError(error) => error.fmt(f),
                 Self::InvalidTzString(error) => write!(f, "invalid TZ string: {}", error),
                 Self::UnsupportedTzString(error) => write!(f, "unsupported TZ string: {}", error),
             }
@@ -55,9 +77,9 @@ mod parse {
         }
     }
 
-    impl From<std::io::Error> for TzStringError {
-        fn from(error: std::io::Error) -> Self {
-            Self::IoError(error)
+    impl From<ParseDataError> for TzStringError {
+        fn from(error: ParseDataError) -> Self {
+            Self::ParseDataError(error)
         }
     }
 
@@ -68,6 +90,8 @@ mod parse {
     pub enum TzFileError {
         /// Conversion from slice to array error
         TryFromSliceError(TryFromSliceError),
+        /// Parse data error
+        ParseDataError(ParseDataError),
         /// I/O error
         IoError(std::io::Error),
         /// Unified error for parsing a TZ string
@@ -82,6 +106,7 @@ mod parse {
         fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
             match self {
                 Self::TryFromSliceError(error) => error.fmt(f),
+                Self::ParseDataError(error) => error.fmt(f),
                 Self::IoError(error) => error.fmt(f),
                 Self::TzStringError(error) => error.fmt(f),
                 Self::InvalidTzFile(error) => write!(f, "invalid TZ file: {}", error),
@@ -104,6 +129,12 @@ mod parse {
         }
     }
 
+    impl From<ParseDataError> for TzFileError {
+        fn from(error: ParseDataError) -> Self {
+            Self::ParseDataError(error)
+        }
+    }
+
     impl From<TzStringError> for TzFileError {
         fn from(error: TzStringError) -> Self {
             Self::TzStringError(error)
@@ -112,7 +143,7 @@ mod parse {
 }
 
 #[cfg(feature = "std")]
-pub use parse::{TzFileError, TzStringError};
+pub use parse::{ParseDataError, TzFileError, TzStringError};
 
 macro_rules! create_error {
     (#[$doc:meta], $name:ident) => {

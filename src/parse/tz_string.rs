@@ -1,11 +1,16 @@
 //! Functions used for parsing a TZ string.
 
-use crate::error::{TzError, TzStringError};
+use crate::error::{ParseDataError, TzError, TzStringError};
+use crate::parse::utils::{read_exact, read_optional_tag, read_tag, read_until, read_while, Cursor};
 use crate::timezone::{AlternateTime, Julian0WithLeap, Julian1WithoutLeap, LocalTimeType, MonthWeekDay, RuleDay, TransitionRule};
-use crate::utils::Cursor;
 
 use core::num::ParseIntError;
 use core::str::{self, FromStr};
+
+/// Convert the `Err` variant of a `Result`
+fn map_err<T>(result: Result<T, ParseDataError>) -> Result<T, TzStringError> {
+    Ok(result?)
+}
 
 /// Parse integer from a slice of bytes
 fn parse_int<T: FromStr<Err = ParseIntError>>(bytes: &[u8]) -> Result<T, TzStringError> {
@@ -13,31 +18,31 @@ fn parse_int<T: FromStr<Err = ParseIntError>>(bytes: &[u8]) -> Result<T, TzStrin
 }
 
 /// Parse time zone designation
-fn parse_time_zone_designation<'a>(cursor: &mut Cursor<'a>) -> Result<&'a [u8], TzStringError> {
-    let unquoted = if cursor.remaining().first() == Some(&b'<') {
-        cursor.read_exact(1)?;
-        let unquoted = cursor.read_until(|&x| x == b'>')?;
-        cursor.read_exact(1)?;
+fn parse_time_zone_designation<'a>(cursor: &mut Cursor<'a>) -> Result<&'a [u8], ParseDataError> {
+    let unquoted = if cursor.first() == Some(&b'<') {
+        read_exact(cursor, 1)?;
+        let unquoted = read_until(cursor, |&x| x == b'>')?;
+        read_exact(cursor, 1)?;
         unquoted
     } else {
-        cursor.read_while(u8::is_ascii_alphabetic)?
+        read_while(cursor, u8::is_ascii_alphabetic)?
     };
 
     Ok(unquoted)
 }
 
 /// Parse hours, minutes and seconds
-fn parse_hhmmss(cursor: &mut Cursor) -> Result<(i32, i32, i32), TzStringError> {
-    let hour = parse_int(cursor.read_while(u8::is_ascii_digit)?)?;
+fn parse_hhmmss(cursor: &mut Cursor<'_>) -> Result<(i32, i32, i32), TzStringError> {
+    let hour = parse_int(read_while(cursor, u8::is_ascii_digit)?)?;
 
     let mut minute = 0;
     let mut second = 0;
 
-    if cursor.read_optional_tag(b":")? {
-        minute = parse_int(cursor.read_while(u8::is_ascii_digit)?)?;
+    if read_optional_tag(cursor, b":")? {
+        minute = parse_int(read_while(cursor, u8::is_ascii_digit)?)?;
 
-        if cursor.read_optional_tag(b":")? {
-            second = parse_int(cursor.read_while(u8::is_ascii_digit)?)?;
+        if read_optional_tag(cursor, b":")? {
+            second = parse_int(read_while(cursor, u8::is_ascii_digit)?)?;
         }
     }
 
@@ -45,10 +50,10 @@ fn parse_hhmmss(cursor: &mut Cursor) -> Result<(i32, i32, i32), TzStringError> {
 }
 
 /// Parse signed hours, minutes and seconds
-fn parse_signed_hhmmss(cursor: &mut Cursor) -> Result<(i32, i32, i32, i32), TzStringError> {
+fn parse_signed_hhmmss(cursor: &mut Cursor<'_>) -> Result<(i32, i32, i32, i32), TzStringError> {
     let mut sign = 1;
-    if let Some(&c @ b'+') | Some(&c @ b'-') = cursor.remaining().first() {
-        cursor.read_exact(1)?;
+    if let Some(&c @ b'+') | Some(&c @ b'-') = cursor.first() {
+        read_exact(cursor, 1)?;
         if c == b'-' {
             sign = -1;
         }
@@ -59,7 +64,7 @@ fn parse_signed_hhmmss(cursor: &mut Cursor) -> Result<(i32, i32, i32, i32), TzSt
 }
 
 /// Parse time zone offset
-fn parse_offset(cursor: &mut Cursor) -> Result<i32, TzStringError> {
+fn parse_offset(cursor: &mut Cursor<'_>) -> Result<i32, TzStringError> {
     let (sign, hour, minute, second) = parse_signed_hhmmss(cursor)?;
 
     if !(0..=24).contains(&hour) {
@@ -76,29 +81,33 @@ fn parse_offset(cursor: &mut Cursor) -> Result<i32, TzStringError> {
 }
 
 /// Parse transition rule day
-fn parse_rule_day(cursor: &mut Cursor) -> Result<RuleDay, TzError> {
-    match cursor.remaining().first() {
+fn parse_rule_day(cursor: &mut Cursor<'_>) -> Result<RuleDay, TzError> {
+    match cursor.first() {
         Some(b'J') => {
-            cursor.read_exact(1)?;
-            Ok(RuleDay::Julian1WithoutLeap(Julian1WithoutLeap::new(parse_int(cursor.read_while(u8::is_ascii_digit)?)?)?))
+            map_err(read_exact(cursor, 1))?;
+            let data = map_err(read_while(cursor, u8::is_ascii_digit))?;
+            Ok(RuleDay::Julian1WithoutLeap(Julian1WithoutLeap::new(parse_int(data)?)?))
         }
         Some(b'M') => {
-            cursor.read_exact(1)?;
+            map_err(read_exact(cursor, 1))?;
 
-            let month = parse_int(cursor.read_while(u8::is_ascii_digit)?)?;
-            cursor.read_tag(b".")?;
-            let week = parse_int(cursor.read_while(u8::is_ascii_digit)?)?;
-            cursor.read_tag(b".")?;
-            let week_day = parse_int(cursor.read_while(u8::is_ascii_digit)?)?;
+            let month = parse_int(map_err(read_while(cursor, u8::is_ascii_digit))?)?;
+            map_err(read_tag(cursor, b"."))?;
+            let week = parse_int(map_err(read_while(cursor, u8::is_ascii_digit))?)?;
+            map_err(read_tag(cursor, b"."))?;
+            let week_day = parse_int(map_err(read_while(cursor, u8::is_ascii_digit))?)?;
 
             Ok(RuleDay::MonthWeekDay(MonthWeekDay::new(month, week, week_day)?))
         }
-        _ => Ok(RuleDay::Julian0WithLeap(Julian0WithLeap::new(parse_int(cursor.read_while(u8::is_ascii_digit)?)?)?)),
+        _ => {
+            let data = map_err(read_while(cursor, u8::is_ascii_digit))?;
+            Ok(RuleDay::Julian0WithLeap(Julian0WithLeap::new(parse_int(data)?)?))
+        }
     }
 }
 
 /// Parse transition rule time
-fn parse_rule_time(cursor: &mut Cursor) -> Result<i32, TzStringError> {
+fn parse_rule_time(cursor: &mut Cursor<'_>) -> Result<i32, TzStringError> {
     let (hour, minute, second) = parse_hhmmss(cursor)?;
 
     if !(0..=24).contains(&hour) {
@@ -115,7 +124,7 @@ fn parse_rule_time(cursor: &mut Cursor) -> Result<i32, TzStringError> {
 }
 
 /// Parse transition rule time with TZ string extensions
-fn parse_rule_time_extended(cursor: &mut Cursor) -> Result<i32, TzStringError> {
+fn parse_rule_time_extended(cursor: &mut Cursor<'_>) -> Result<i32, TzStringError> {
     let (sign, hour, minute, second) = parse_signed_hhmmss(cursor)?;
 
     if !(-167..=167).contains(&hour) {
@@ -132,10 +141,10 @@ fn parse_rule_time_extended(cursor: &mut Cursor) -> Result<i32, TzStringError> {
 }
 
 /// Parse transition rule
-fn parse_rule_block(cursor: &mut Cursor, use_string_extensions: bool) -> Result<(RuleDay, i32), TzError> {
+fn parse_rule_block(cursor: &mut Cursor<'_>, use_string_extensions: bool) -> Result<(RuleDay, i32), TzError> {
     let date = parse_rule_day(cursor)?;
 
-    let time = if cursor.read_optional_tag(b"/")? {
+    let time = if map_err(read_optional_tag(cursor, b"/"))? {
         if use_string_extensions {
             parse_rule_time_extended(cursor)?
         } else {
@@ -153,18 +162,18 @@ fn parse_rule_block(cursor: &mut Cursor, use_string_extensions: bool) -> Result<
 /// TZ string extensions from [RFC 8536](https://datatracker.ietf.org/doc/html/rfc8536#section-3.3.1) may be used.
 ///
 pub(crate) fn parse_posix_tz(tz_string: &[u8], use_string_extensions: bool) -> Result<TransitionRule, TzError> {
-    let mut cursor = Cursor::new(tz_string);
+    let mut cursor = tz_string;
 
-    let std_time_zone = Some(parse_time_zone_designation(&mut cursor)?);
+    let std_time_zone = Some(map_err(parse_time_zone_designation(&mut cursor))?);
     let std_offset = parse_offset(&mut cursor)?;
 
     if cursor.is_empty() {
         return Ok(TransitionRule::Fixed(LocalTimeType::new(-std_offset, false, std_time_zone)?));
     }
 
-    let dst_time_zone = Some(parse_time_zone_designation(&mut cursor)?);
+    let dst_time_zone = Some(map_err(parse_time_zone_designation(&mut cursor))?);
 
-    let dst_offset = match cursor.remaining().first() {
+    let dst_offset = match cursor.first() {
         Some(&b',') => std_offset - 3600,
         Some(_) => parse_offset(&mut cursor)?,
         None => return Err(TzStringError::UnsupportedTzString("DST start and end rules must be provided").into()),
@@ -174,10 +183,10 @@ pub(crate) fn parse_posix_tz(tz_string: &[u8], use_string_extensions: bool) -> R
         return Err(TzStringError::UnsupportedTzString("DST start and end rules must be provided").into());
     }
 
-    cursor.read_tag(b",")?;
+    map_err(read_tag(&mut cursor, b","))?;
     let (dst_start, dst_start_time) = parse_rule_block(&mut cursor, use_string_extensions)?;
 
-    cursor.read_tag(b",")?;
+    map_err(read_tag(&mut cursor, b","))?;
     let (dst_end, dst_end_time) = parse_rule_block(&mut cursor, use_string_extensions)?;
 
     if !cursor.is_empty() {
