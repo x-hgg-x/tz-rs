@@ -23,7 +23,6 @@ use alloc::{vec, vec::Vec};
 use {
     std::fs::{self, File},
     std::io::{self, Read},
-    std::time::SystemTime,
 };
 
 /// Transition of a TZif file
@@ -524,6 +523,11 @@ impl TimeZone {
         Ok(Self { transitions: Vec::new(), local_time_types: vec![LocalTimeType::with_ut_offset(ut_offset)?], leap_seconds: Vec::new(), extra_rule: None })
     }
 
+    /// Find the local time type associated to the time zone at the specified Unix time in seconds
+    pub fn find_local_time_type(&self, unix_time: i64) -> Result<&LocalTimeType, FindLocalTimeTypeError> {
+        self.as_ref().find_local_time_type(unix_time)
+    }
+
     /// Returns local time zone.
     ///
     /// This method in not supported on non-UNIX platforms, and returns the UTC time zone instead.
@@ -592,12 +596,7 @@ impl TimeZone {
     #[cfg(feature = "std")]
     #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
     pub fn find_current_local_time_type(&self) -> Result<&LocalTimeType, TzError> {
-        Ok(self.find_local_time_type(SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs().try_into()?)?)
-    }
-
-    /// Find the local time type associated to the time zone at the specified Unix time in seconds
-    pub fn find_local_time_type(&self, unix_time: i64) -> Result<&LocalTimeType, FindLocalTimeTypeError> {
-        self.as_ref().find_local_time_type(unix_time)
+        Ok(self.find_local_time_type(crate::utils::current_unix_time())?)
     }
 }
 

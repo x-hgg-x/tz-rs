@@ -2,8 +2,8 @@
 
 use core::error::Error;
 use core::fmt;
-use core::num::TryFromIntError;
 
+/// Parsing error types.
 #[cfg(feature = "std")]
 mod parse {
     use super::*;
@@ -144,6 +144,7 @@ mod parse {
 #[cfg(feature = "std")]
 pub use parse::{ParseDataError, TzFileError, TzStringError};
 
+/// Create a new error type
 macro_rules! create_error {
     (#[$doc:meta], $name:ident) => {
         #[$doc]
@@ -191,10 +192,6 @@ pub enum TzError {
     #[cfg(feature = "std")]
     #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
     Io(std::io::Error),
-    /// System time error
-    #[cfg(feature = "std")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
-    SystemTime(std::time::SystemTimeError),
     /// Unified error for parsing a TZif file
     #[cfg(feature = "std")]
     #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
@@ -225,8 +222,6 @@ impl fmt::Display for TzError {
             #[cfg(feature = "std")]
             Self::Io(error) => error.fmt(f),
             #[cfg(feature = "std")]
-            Self::SystemTime(error) => error.fmt(f),
-            #[cfg(feature = "std")]
             Self::TzFile(error) => error.fmt(f),
             #[cfg(feature = "std")]
             Self::TzString(error) => error.fmt(f),
@@ -253,14 +248,6 @@ impl From<std::io::Error> for TzError {
 
 #[cfg(feature = "std")]
 #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
-impl From<std::time::SystemTimeError> for TzError {
-    fn from(error: std::time::SystemTimeError) -> Self {
-        Self::SystemTime(error)
-    }
-}
-
-#[cfg(feature = "std")]
-#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 impl From<TzFileError> for TzError {
     fn from(error: TzFileError) -> Self {
         Self::TzFile(error)
@@ -278,12 +265,6 @@ impl From<TzStringError> for TzError {
 impl From<OutOfRangeError> for TzError {
     fn from(error: OutOfRangeError) -> Self {
         Self::OutOfRange(error)
-    }
-}
-
-impl From<TryFromIntError> for TzError {
-    fn from(_: TryFromIntError) -> Self {
-        Self::OutOfRange(OutOfRangeError("out of range integer conversion"))
     }
 }
 

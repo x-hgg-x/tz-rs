@@ -2,6 +2,7 @@
 
 use crate::error::ParseDataError;
 
+/// Cursor type alias
 pub(super) type Cursor<'a> = &'a [u8];
 
 /// Read exactly `count` bytes and reduce remaining data

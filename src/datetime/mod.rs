@@ -15,9 +15,6 @@ use crate::utils::{min, try_into_i32, try_into_i64};
 use core::cmp::Ordering;
 use core::fmt;
 
-#[cfg(feature = "std")]
-use std::time::SystemTime;
-
 /// UTC date time expressed in the [proleptic gregorian calendar](https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar)
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub struct UtcDateTime {
@@ -162,8 +159,7 @@ impl UtcDateTime {
     #[cfg(feature = "std")]
     #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
     pub fn now() -> Result<Self, TzError> {
-        let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?;
-        Ok(Self::from_timespec(now.as_secs().try_into()?, now.subsec_nanos())?)
+        Ok(Self::from_total_nanoseconds(crate::utils::current_total_nanoseconds())?)
     }
 
     /// Returns the Unix time in seconds associated to the UTC date time
@@ -414,8 +410,8 @@ impl DateTime {
     #[cfg(feature = "std")]
     #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
     pub fn now(time_zone_ref: TimeZoneRef) -> Result<Self, TzError> {
-        let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?;
-        Ok(Self::from_timespec(now.as_secs().try_into()?, now.subsec_nanos(), time_zone_ref)?)
+        let now = crate::utils::current_total_nanoseconds();
+        Ok(Self::from_total_nanoseconds(now, time_zone_ref)?)
     }
 
     /// Project the date time into another time zone.
