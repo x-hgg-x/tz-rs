@@ -18,11 +18,7 @@ name = "tz"
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
-[dependencies]
-const_fn = { version = "0.4.4", optional = true }
-
 [features]
-default = ["std", "const"]
+default = ["std"]
 std = ["alloc"]
 alloc = []
-const = ["const_fn"]

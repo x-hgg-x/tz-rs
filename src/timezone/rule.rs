@@ -41,8 +41,7 @@ pub struct Julian1WithoutLeap(u16);
 impl Julian1WithoutLeap {
     /// Construct a transition rule day represented by a Julian day in `[1, 365]`, without taking occasional February 29th into account, which is not referenceable
     #[inline]
-    #[cfg_attr(feature = "const", const_fn::const_fn)]
-    pub fn new(julian_day_1: u16) -> Result<Self, TransitionRuleError> {
+    pub const fn new(julian_day_1: u16) -> Result<Self, TransitionRuleError> {
         if !(1 <= julian_day_1 && julian_day_1 <= 365) {
             return Err(TransitionRuleError("invalid rule day julian day"));
         }
@@ -52,8 +51,7 @@ impl Julian1WithoutLeap {
 
     /// Returns inner value
     #[inline]
-    #[cfg_attr(feature = "const", const_fn::const_fn)]
-    pub fn get(&self) -> u16 {
+    pub const fn get(&self) -> u16 {
         self.0
     }
 
@@ -64,8 +62,7 @@ impl Julian1WithoutLeap {
     /// * `month`: Month in `[1, 12]`
     /// * `month_day`: Day of the month in `[1, 31]`
     ///
-    #[cfg_attr(feature = "const", const_fn::const_fn)]
-    fn transition_date(&self) -> (usize, i64) {
+    const fn transition_date(&self) -> (usize, i64) {
         let year_day = self.0 as i64;
 
         let month = match binary_search_i64(&CUMUL_DAYS_IN_MONTHS_NORMAL_YEAR, year_day - 1) {
@@ -79,8 +76,7 @@ impl Julian1WithoutLeap {
     }
 
     /// Compute the informations needed for checking DST transition rules consistency
-    #[cfg_attr(feature = "const", const_fn::const_fn)]
-    fn compute_check_infos(&self, utc_day_time: i64) -> JulianDayCheckInfos {
+    const fn compute_check_infos(&self, utc_day_time: i64) -> JulianDayCheckInfos {
         let start_normal_year_offset = (self.0 as i64 - 1) * SECONDS_PER_DAY + utc_day_time;
         let start_leap_year_offset = if self.0 <= 59 { start_normal_year_offset } else { start_normal_year_offset + SECONDS_PER_DAY };
 
@@ -100,8 +96,7 @@ pub struct Julian0WithLeap(u16);
 impl Julian0WithLeap {
     /// Construct a transition rule day represented by a zero-based Julian day in `[0, 365]`, taking occasional February 29th into account and allowing December 32nd
     #[inline]
-    #[cfg_attr(feature = "const", const_fn::const_fn)]
-    pub fn new(julian_day_0: u16) -> Result<Self, TransitionRuleError> {
+    pub const fn new(julian_day_0: u16) -> Result<Self, TransitionRuleError> {
         if julian_day_0 > 365 {
             return Err(TransitionRuleError("invalid rule day julian day"));
         }
@@ -111,8 +106,7 @@ impl Julian0WithLeap {
 
     /// Returns inner value
     #[inline]
-    #[cfg_attr(feature = "const", const_fn::const_fn)]
-    pub fn get(&self) -> u16 {
+    pub const fn get(&self) -> u16 {
         self.0
     }
 
@@ -125,8 +119,7 @@ impl Julian0WithLeap {
     /// * `month`: Month in `[1, 12]`
     /// * `month_day`: Day of the month in `[1, 32]`
     ///
-    #[cfg_attr(feature = "const", const_fn::const_fn)]
-    fn transition_date(&self, leap_year: bool) -> (usize, i64) {
+    const fn transition_date(&self, leap_year: bool) -> (usize, i64) {
         let cumul_day_in_months = if leap_year { &CUMUL_DAYS_IN_MONTHS_LEAP_YEAR } else { &CUMUL_DAYS_IN_MONTHS_NORMAL_YEAR };
 
         let year_day = self.0 as i64;
@@ -142,8 +135,7 @@ impl Julian0WithLeap {
     }
 
     /// Compute the informations needed for checking DST transition rules consistency
-    #[cfg_attr(feature = "const", const_fn::const_fn)]
-    fn compute_check_infos(&self, utc_day_time: i64) -> JulianDayCheckInfos {
+    const fn compute_check_infos(&self, utc_day_time: i64) -> JulianDayCheckInfos {
         let start_year_offset = self.0 as i64 * SECONDS_PER_DAY + utc_day_time;
 
         JulianDayCheckInfos {
@@ -169,8 +161,7 @@ pub struct MonthWeekDay {
 impl MonthWeekDay {
     /// Construct a transition rule day represented by a month, a month week and a week day
     #[inline]
-    #[cfg_attr(feature = "const", const_fn::const_fn)]
-    pub fn new(month: u8, week: u8, week_day: u8) -> Result<Self, TransitionRuleError> {
+    pub const fn new(month: u8, week: u8, week_day: u8) -> Result<Self, TransitionRuleError> {
         if !(1 <= month && month <= 12) {
             return Err(TransitionRuleError("invalid rule day month"));
         }
@@ -188,22 +179,19 @@ impl MonthWeekDay {
 
     /// Returns month in `[1, 12]`
     #[inline]
-    #[cfg_attr(feature = "const", const_fn::const_fn)]
-    pub fn month(&self) -> u8 {
+    pub const fn month(&self) -> u8 {
         self.month
     }
 
     /// Returns week of the month in `[1, 5]`, with `5` representing the last week of the month
     #[inline]
-    #[cfg_attr(feature = "const", const_fn::const_fn)]
-    pub fn week(&self) -> u8 {
+    pub const fn week(&self) -> u8 {
         self.week
     }
 
     /// Returns day of the week in `[0, 6]` from Sunday
     #[inline]
-    #[cfg_attr(feature = "const", const_fn::const_fn)]
-    pub fn week_day(&self) -> u8 {
+    pub const fn week_day(&self) -> u8 {
         self.week_day
     }
 
@@ -214,8 +202,7 @@ impl MonthWeekDay {
     /// * `month`: Month in `[1, 12]`
     /// * `month_day`: Day of the month in `[1, 31]`
     ///
-    #[cfg_attr(feature = "const", const_fn::const_fn)]
-    fn transition_date(&self, year: i32) -> (usize, i64) {
+    const fn transition_date(&self, year: i32) -> (usize, i64) {
         let month = self.month as usize;
         let week = self.week as i64;
         let week_day = self.week_day as i64;
@@ -237,8 +224,7 @@ impl MonthWeekDay {
     }
 
     /// Compute the informations needed for checking DST transition rules consistency
-    #[cfg_attr(feature = "const", const_fn::const_fn)]
-    fn compute_check_infos(&self, utc_day_time: i64) -> MonthWeekDayCheckInfos {
+    const fn compute_check_infos(&self, utc_day_time: i64) -> MonthWeekDayCheckInfos {
         let month = self.month as usize;
         let week = self.week as i64;
 
@@ -300,8 +286,7 @@ impl RuleDay {
     /// * `month`: Month in `[1, 12]`
     /// * `month_day`: Day of the month in `[1, 32]`
     ///
-    #[cfg_attr(feature = "const", const_fn::const_fn)]
-    fn transition_date(&self, year: i32) -> (usize, i64) {
+    const fn transition_date(&self, year: i32) -> (usize, i64) {
         match self {
             Self::Julian1WithoutLeap(rule_day) => rule_day.transition_date(),
             Self::Julian0WithLeap(rule_day) => rule_day.transition_date(is_leap_year(year)),
@@ -310,8 +295,7 @@ impl RuleDay {
     }
 
     /// Returns the UTC Unix time in seconds associated to the transition date for the provided year
-    #[cfg_attr(feature = "const", const_fn::const_fn)]
-    pub(crate) fn unix_time(&self, year: i32, day_time_in_utc: i64) -> i64 {
+    pub(crate) const fn unix_time(&self, year: i32, day_time_in_utc: i64) -> i64 {
         let (month, month_day) = self.transition_date(year);
         days_since_unix_epoch(year, month, month_day) * SECONDS_PER_DAY + day_time_in_utc
     }
@@ -336,8 +320,7 @@ pub struct AlternateTime {
 
 impl AlternateTime {
     /// Construct a transition rule representing alternate local time types
-    #[cfg_attr(feature = "const", const_fn::const_fn)]
-    pub fn new(
+    pub const fn new(
         std: LocalTimeType,
         dst: LocalTimeType,
         dst_start: RuleDay,
@@ -372,49 +355,42 @@ impl AlternateTime {
 
     /// Returns local time type for standard time
     #[inline]
-    #[cfg_attr(feature = "const", const_fn::const_fn)]
-    pub fn std(&self) -> &LocalTimeType {
+    pub const fn std(&self) -> &LocalTimeType {
         &self.std
     }
 
     /// Returns local time type for Daylight Saving Time
     #[inline]
-    #[cfg_attr(feature = "const", const_fn::const_fn)]
-    pub fn dst(&self) -> &LocalTimeType {
+    pub const fn dst(&self) -> &LocalTimeType {
         &self.dst
     }
 
     /// Returns start day of Daylight Saving Time
     #[inline]
-    #[cfg_attr(feature = "const", const_fn::const_fn)]
-    pub fn dst_start(&self) -> &RuleDay {
+    pub const fn dst_start(&self) -> &RuleDay {
         &self.dst_start
     }
 
     /// Returns local start day time of Daylight Saving Time, in seconds
     #[inline]
-    #[cfg_attr(feature = "const", const_fn::const_fn)]
-    pub fn dst_start_time(&self) -> i32 {
+    pub const fn dst_start_time(&self) -> i32 {
         self.dst_start_time
     }
 
     /// Returns end day of Daylight Saving Time
     #[inline]
-    #[cfg_attr(feature = "const", const_fn::const_fn)]
-    pub fn dst_end(&self) -> &RuleDay {
+    pub const fn dst_end(&self) -> &RuleDay {
         &self.dst_end
     }
 
     /// Returns local end day time of Daylight Saving Time, in seconds
     #[inline]
-    #[cfg_attr(feature = "const", const_fn::const_fn)]
-    pub fn dst_end_time(&self) -> i32 {
+    pub const fn dst_end_time(&self) -> i32 {
         self.dst_end_time
     }
 
     /// Find the local time type associated to the alternate transition rule at the specified Unix time in seconds
-    #[cfg_attr(feature = "const", const_fn::const_fn)]
-    fn find_local_time_type(&self, unix_time: i64) -> Result<&LocalTimeType, OutOfRangeError> {
+    const fn find_local_time_type(&self, unix_time: i64) -> Result<&LocalTimeType, OutOfRangeError> {
         // Overflow is not possible
         let dst_start_time_in_utc = self.dst_start_time as i64 - self.std.ut_offset as i64;
         let dst_end_time_in_utc = self.dst_end_time as i64 - self.dst.ut_offset as i64;
@@ -499,8 +475,7 @@ pub enum TransitionRule {
 
 impl TransitionRule {
     /// Find the local time type associated to the transition rule at the specified Unix time in seconds
-    #[cfg_attr(feature = "const", const_fn::const_fn)]
-    pub(super) fn find_local_time_type(&self, unix_time: i64) -> Result<&LocalTimeType, OutOfRangeError> {
+    pub(super) const fn find_local_time_type(&self, unix_time: i64) -> Result<&LocalTimeType, OutOfRangeError> {
         match self {
             Self::Fixed(local_time_type) => Ok(local_time_type),
             Self::Alternate(alternate_time) => alternate_time.find_local_time_type(unix_time),
@@ -512,8 +487,7 @@ impl TransitionRule {
 ///
 /// This prevents from having an additional transition at the year boundary, when the order of DST start and end time is different on consecutive years.
 ///
-#[cfg_attr(feature = "const", const_fn::const_fn)]
-fn check_dst_transition_rules_consistency(
+const fn check_dst_transition_rules_consistency(
     std: &LocalTimeType,
     dst: &LocalTimeType,
     dst_start: RuleDay,
@@ -557,8 +531,7 @@ fn check_dst_transition_rules_consistency(
 }
 
 /// Check DST transition rules consistency for two Julian days
-#[cfg_attr(feature = "const", const_fn::const_fn)]
-fn check_two_julian_days(check_infos_1: JulianDayCheckInfos, check_infos_2: JulianDayCheckInfos) -> bool {
+const fn check_two_julian_days(check_infos_1: JulianDayCheckInfos, check_infos_2: JulianDayCheckInfos) -> bool {
     // Check in same year
     let (before, after) = if check_infos_1.start_normal_year_offset <= check_infos_2.start_normal_year_offset
         && check_infos_1.start_leap_year_offset <= check_infos_2.start_leap_year_offset
@@ -591,8 +564,7 @@ fn check_two_julian_days(check_infos_1: JulianDayCheckInfos, check_infos_2: Juli
 }
 
 /// Check DST transition rules consistency for a Julian day and a day represented by a month, a month week and a week day
-#[cfg_attr(feature = "const", const_fn::const_fn)]
-fn check_month_week_day_and_julian_day(check_infos_1: MonthWeekDayCheckInfos, check_infos_2: JulianDayCheckInfos) -> bool {
+const fn check_month_week_day_and_julian_day(check_infos_1: MonthWeekDayCheckInfos, check_infos_2: JulianDayCheckInfos) -> bool {
     // Check in same year, then in consecutive years
     if check_infos_2.start_normal_year_offset <= check_infos_1.start_normal_year_offset_range.0
         && check_infos_2.start_leap_year_offset <= check_infos_1.start_leap_year_offset_range.0
@@ -642,8 +614,7 @@ fn check_month_week_day_and_julian_day(check_infos_1: MonthWeekDayCheckInfos, ch
 }
 
 /// Check DST transition rules consistency for two days represented by a month, a month week and a week day
-#[cfg_attr(feature = "const", const_fn::const_fn)]
-fn check_two_month_week_days(month_week_day_1: MonthWeekDay, utc_day_time_1: i64, month_week_day_2: MonthWeekDay, utc_day_time_2: i64) -> bool {
+const fn check_two_month_week_days(month_week_day_1: MonthWeekDay, utc_day_time_1: i64, month_week_day_2: MonthWeekDay, utc_day_time_2: i64) -> bool {
     // Sort rule days
     let (month_week_day_before, utc_day_time_before, month_week_day_after, utc_day_time_after) = {
         let rem = (month_week_day_2.month as i64 - month_week_day_1.month as i64).rem_euclid(MONTHS_PER_YEAR);
