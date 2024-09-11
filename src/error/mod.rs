@@ -56,8 +56,8 @@ mod parse {
                 Self::Utf8(error) => error.fmt(f),
                 Self::ParseInt(error) => error.fmt(f),
                 Self::ParseData(error) => error.fmt(f),
-                Self::InvalidTzString(error) => write!(f, "invalid TZ string: {}", error),
-                Self::UnsupportedTzString(error) => write!(f, "unsupported TZ string: {}", error),
+                Self::InvalidTzString(error) => write!(f, "invalid TZ string: {error}"),
+                Self::UnsupportedTzString(error) => write!(f, "unsupported TZ string: {error}"),
             }
         }
     }
@@ -108,8 +108,8 @@ mod parse {
                 Self::ParseData(error) => error.fmt(f),
                 Self::Io(error) => error.fmt(f),
                 Self::TzString(error) => error.fmt(f),
-                Self::InvalidTzFile(error) => write!(f, "invalid TZ file: {}", error),
-                Self::UnsupportedTzFile(error) => write!(f, "unsupported TZ file: {}", error),
+                Self::InvalidTzFile(error) => write!(f, "invalid TZ file: {error}"),
+                Self::UnsupportedTzFile(error) => write!(f, "unsupported TZ file: {error}"),
             }
         }
     }
@@ -226,10 +226,10 @@ impl fmt::Display for TzError {
             #[cfg(feature = "std")]
             Self::TzString(error) => error.fmt(f),
             Self::OutOfRange(error) => error.fmt(f),
-            Self::LocalTimeType(error) => write!(f, "invalid local time type: {}", error),
-            Self::TransitionRule(error) => write!(f, "invalid transition rule: {}", error),
-            Self::TimeZone(error) => write!(f, "invalid time zone: {}", error),
-            Self::DateTime(error) => write!(f, "invalid date time: {}", error),
+            Self::LocalTimeType(error) => write!(f, "invalid local time type: {error}"),
+            Self::TransitionRule(error) => write!(f, "invalid transition rule: {error}"),
+            Self::TimeZone(error) => write!(f, "invalid time zone: {error}"),
+            Self::DateTime(error) => write!(f, "invalid date time: {error}"),
             Self::FindLocalTimeType(error) => error.fmt(f),
             Self::ProjectDateTime(error) => error.fmt(f),
         }

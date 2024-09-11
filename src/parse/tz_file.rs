@@ -267,7 +267,7 @@ pub(crate) fn get_tz_file(tz_string: &str) -> Result<File, TzFileError> {
             Ok(File::open(tz_string)?)
         } else {
             for folder in &ZONE_INFO_DIRECTORIES {
-                if let Ok(file) = File::open(format!("{}/{}", folder, tz_string)) {
+                if let Ok(file) = File::open(format!("{folder}/{tz_string}")) {
                     return Ok(file);
                 }
             }

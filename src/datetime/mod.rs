@@ -694,7 +694,7 @@ fn format_date_time(
     nanoseconds: u32,
     ut_offset: i32,
 ) -> fmt::Result {
-    write!(f, "{}-{:02}-{:02}T{:02}:{:02}:{:02}.{:09}", year, month, month_day, hour, minute, second, nanoseconds)?;
+    write!(f, "{year}-{month:02}-{month_day:02}T{hour:02}:{minute:02}:{second:02}.{nanoseconds:09}")?;
 
     if ut_offset != 0 {
         let ut_offset = ut_offset as i64;
@@ -706,10 +706,10 @@ fn format_date_time(
         let offset_minute = (ut_offset_abs / SECONDS_PER_MINUTE) % MINUTES_PER_HOUR;
         let offset_second = ut_offset_abs % SECONDS_PER_MINUTE;
 
-        write!(f, "{}{:02}:{:02}", sign, offset_hour, offset_minute)?;
+        write!(f, "{sign}{offset_hour:02}:{offset_minute:02}")?;
 
         if offset_second != 0 {
-            write!(f, ":{:02}", offset_second)?;
+            write!(f, ":{offset_second:02}")?;
         }
     } else {
         write!(f, "Z")?;

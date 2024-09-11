@@ -51,6 +51,8 @@ fn main() -> tz::Result<()> {
         },
     ));
 
+    const LOCAL_TIME_TYPE: LocalTimeType = *unwrap!(TIME_ZONE_REF.find_local_time_type(0));
+
     const UTC: TimeZoneRef = TimeZoneRef::utc();
 
     const UNIX_EPOCH: UtcDateTime = unwrap!(UtcDateTime::from_timespec(0, 0));
@@ -61,16 +63,16 @@ fn main() -> tz::Result<()> {
     const DATE_TIME_1: DateTime = unwrap!(UTC_DATE_TIME.project(TIME_ZONE_REF));
     const DATE_TIME_2: DateTime = unwrap!(DATE_TIME_1.project(UTC));
 
-    println!("{:#?}", TIME_ZONE_REF);
-    println!("{:?}", TIME_ZONE_REF.find_local_time_type(0));
+    println!("{TIME_ZONE_REF:#?}");
+    println!("{LOCAL_TIME_TYPE:?}");
 
-    println!("{:?}", UNIX_EPOCH);
-    println!("{:?}", UTC_DATE_TIME);
+    println!("{UNIX_EPOCH:?}");
+    println!("{UTC_DATE_TIME:?}");
 
-    println!("{:#?}", DATE_TIME);
+    println!("{DATE_TIME:#?}");
 
-    println!("{:#?}", DATE_TIME_1);
-    println!("{:#?}", DATE_TIME_2);
+    println!("{DATE_TIME_1:#?}");
+    println!("{DATE_TIME_2:#?}");
 
     Ok(())
 }

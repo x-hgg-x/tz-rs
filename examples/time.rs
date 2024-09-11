@@ -23,8 +23,7 @@ fn main() -> tz::Result<()> {
         println!("{:?}", time_zone_local.find_local_time_type(unix_time)?.ut_offset());
 
         // Get the current local time type
-        let current_local_time_type = time_zone_local.find_current_local_time_type()?;
-        println!("{:?}", current_local_time_type);
+        println!("{:?}", time_zone_local.find_current_local_time_type()?);
 
         // Get time zone from a TZ string:
         // From an absolute file
@@ -43,33 +42,32 @@ fn main() -> tz::Result<()> {
         //
 
         // Get the current UTC date time
-        let current_utc_date_time = UtcDateTime::now()?;
-        println!("{:?}", current_utc_date_time);
+        println!("{:?}", UtcDateTime::now()?);
 
         // Create a new UTC date time (2000-01-01T00:00:00.123456789Z)
         let utc_date_time = UtcDateTime::new(2000, 1, 1, 0, 0, 0, 123_456_789)?;
-        println!("{}", utc_date_time);
-        println!("{:?}", utc_date_time);
+        println!("{utc_date_time}");
+        println!("{utc_date_time:?}");
 
         // Create a new UTC date time from a Unix time with nanoseconds (2000-01-01T00:00:00.123456789Z)
         let other_utc_date_time = UtcDateTime::from_timespec(946684800, 123_456_789)?;
-        println!("{}", other_utc_date_time);
-        println!("{:?}", other_utc_date_time);
+        println!("{other_utc_date_time}");
+        println!("{other_utc_date_time:?}");
 
         // Project the UTC date time to a time zone
         let date_time = utc_date_time.project(TimeZone::fixed(-3600)?.as_ref())?;
-        println!("{}", date_time);
-        println!("{:#?}", date_time);
+        println!("{date_time}");
+        println!("{date_time:#?}");
 
         // Project the date time to another time zone
         let other_date_time = date_time.project(TimeZone::fixed(3600)?.as_ref())?;
-        println!("{}", other_date_time);
-        println!("{:#?}", other_date_time);
+        println!("{other_date_time}");
+        println!("{other_date_time:#?}");
 
         // Create a new date time from a Unix time with nanoseconds and a time zone (2000-01-01T00:00:00.123456789Z)
         let another_date_time = DateTime::from_timespec(946684800, 123_456_789, TimeZone::fixed(86400)?.as_ref())?;
-        println!("{}", another_date_time);
-        println!("{:#?}", another_date_time);
+        println!("{another_date_time}");
+        println!("{another_date_time:#?}");
 
         // Get the corresponding UTC Unix times with nanoseconds
         println!("{:?}", (utc_date_time.unix_time(), utc_date_time.nanoseconds()));
@@ -79,17 +77,15 @@ fn main() -> tz::Result<()> {
 
         // Nanoseconds are always added towards the future
         let neg_utc_date_time = UtcDateTime::from_timespec(-1, 123_456_789)?;
-        println!("{}", neg_utc_date_time);
+        println!("{neg_utc_date_time}");
         println!("{}", neg_utc_date_time.total_nanoseconds());
 
         // Get the current date time at the local time zone (UNIX only)
         let time_zone_local = TimeZone::local()?;
-        let date_time = DateTime::now(time_zone_local.as_ref())?;
-        println!("{:#?}", date_time);
+        println!("{:#?}", DateTime::now(time_zone_local.as_ref())?);
 
         // Create a new date time with an UTC offset (2000-01-01T01:00:00.123456789+01:00)
-        let date_time = DateTime::new(2000, 1, 1, 1, 0, 0, 123_456_789, LocalTimeType::with_ut_offset(3600)?)?;
-        println!("{:#?}", date_time);
+        println!("{:#?}", DateTime::new(2000, 1, 1, 1, 0, 0, 123_456_789, LocalTimeType::with_ut_offset(3600)?)?);
 
         //
         // Find the possible date times corresponding to a date, a time and a time zone
@@ -98,21 +94,21 @@ fn main() -> tz::Result<()> {
 
         // Found date time is unique
         let found_date_times = DateTime::find(2000, 1, 1, 0, 0, 0, 0, time_zone.as_ref())?;
-        println!("{:#?}", found_date_times);
+        println!("{found_date_times:#?}");
         println!("{:#?}", found_date_times.unique());
         println!("{:#?}", found_date_times.earliest());
         println!("{:#?}", found_date_times.latest());
 
         // Found date time was skipped by a forward transition
         let found_date_times = DateTime::find(2000, 3, 26, 2, 30, 0, 0, time_zone.as_ref())?;
-        println!("{:#?}", found_date_times);
+        println!("{found_date_times:#?}");
         println!("{:#?}", found_date_times.unique());
         println!("{:#?}", found_date_times.earliest());
         println!("{:#?}", found_date_times.latest());
 
         // Found date time is ambiguous because of a backward transition
         let found_date_times = DateTime::find(2000, 10, 29, 2, 30, 0, 0, time_zone.as_ref())?;
-        println!("{:#?}", found_date_times);
+        println!("{found_date_times:#?}");
         println!("{:#?}", found_date_times.unique());
         println!("{:#?}", found_date_times.earliest());
         println!("{:#?}", found_date_times.latest());
