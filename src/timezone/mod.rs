@@ -479,7 +479,7 @@ impl TimeZone {
 
     /// Returns a reference to the time zone
     #[inline]
-    pub fn as_ref(&self) -> TimeZoneRef {
+    pub fn as_ref(&self) -> TimeZoneRef<'_> {
         TimeZoneRef::new_unchecked(&self.transitions, &self.local_time_types, &self.leap_seconds, &self.extra_rule)
     }
 

@@ -11,7 +11,7 @@ fn main() -> tz::Result<()> {
         };
     }
 
-    const TIME_ZONE_REF: TimeZoneRef = unwrap!(TimeZoneRef::new(
+    const TIME_ZONE_REF: TimeZoneRef<'static> = unwrap!(TimeZoneRef::new(
         &[
             Transition::new(-2334101314, 1),
             Transition::new(-1157283000, 2),
@@ -53,7 +53,7 @@ fn main() -> tz::Result<()> {
 
     const LOCAL_TIME_TYPE: LocalTimeType = *unwrap!(TIME_ZONE_REF.find_local_time_type(0));
 
-    const UTC: TimeZoneRef = TimeZoneRef::utc();
+    const UTC: TimeZoneRef<'static> = TimeZoneRef::utc();
 
     const UNIX_EPOCH: UtcDateTime = unwrap!(UtcDateTime::from_timespec(0, 0));
     const UTC_DATE_TIME: UtcDateTime = unwrap!(UtcDateTime::new(2000, 1, 1, 0, 0, 0, 1000));

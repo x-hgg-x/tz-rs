@@ -180,7 +180,7 @@ pub(super) fn find_date_time(
     minute: u8,
     second: u8,
     nanoseconds: u32,
-    time_zone_ref: TimeZoneRef,
+    time_zone_ref: TimeZoneRef<'_>,
 ) -> Result<()> {
     let transitions = time_zone_ref.transitions();
     let local_time_types = time_zone_ref.local_time_types();
@@ -374,7 +374,7 @@ mod tests {
     }
 
     fn check(
-        time_zone_ref: TimeZoneRef,
+        time_zone_ref: TimeZoneRef<'_>,
         posssible_date_time_results: &[Check],
         searched: (i32, u8, u8, u8, u8, u8),
         result_indices: &[usize],

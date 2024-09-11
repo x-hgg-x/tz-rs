@@ -160,7 +160,7 @@ impl UtcDateTime {
     ///
     /// Leap seconds are not preserved.
     ///
-    pub const fn project(&self, time_zone_ref: TimeZoneRef) -> Result<DateTime, ProjectDateTimeError> {
+    pub const fn project(&self, time_zone_ref: TimeZoneRef<'_>) -> Result<DateTime, ProjectDateTimeError> {
         DateTime::from_timespec(self.unix_time(), self.nanoseconds, time_zone_ref)
     }
 
@@ -278,7 +278,7 @@ impl DateTime {
         minute: u8,
         second: u8,
         nanoseconds: u32,
-        time_zone_ref: TimeZoneRef,
+        time_zone_ref: TimeZoneRef<'_>,
     ) -> Result<FoundDateTimeList, TzError> {
         let mut found_date_time_list = FoundDateTimeList::default();
         find_date_time(&mut found_date_time_list, year, month, month_day, hour, minute, second, nanoseconds, time_zone_ref)?;
@@ -346,7 +346,7 @@ impl DateTime {
         minute: u8,
         second: u8,
         nanoseconds: u32,
-        time_zone_ref: TimeZoneRef,
+        time_zone_ref: TimeZoneRef<'_>,
     ) -> Result<FoundDateTimeListRefMut<'a>, TzError> {
         let mut found_date_time_list = FoundDateTimeListRefMut::new(buf);
         find_date_time(&mut found_date_time_list, year, month, month_day, hour, minute, second, nanoseconds, time_zone_ref)?;
@@ -370,7 +370,7 @@ impl DateTime {
     }
 
     /// Construct a date time from a Unix time in seconds with nanoseconds and a time zone
-    pub const fn from_timespec(unix_time: i64, nanoseconds: u32, time_zone_ref: TimeZoneRef) -> Result<Self, ProjectDateTimeError> {
+    pub const fn from_timespec(unix_time: i64, nanoseconds: u32, time_zone_ref: TimeZoneRef<'_>) -> Result<Self, ProjectDateTimeError> {
         let local_time_type = match time_zone_ref.find_local_time_type(unix_time) {
             Ok(&local_time_type) => local_time_type,
             Err(FindLocalTimeTypeError(error)) => return Err(ProjectDateTimeError(error)),
@@ -388,7 +388,7 @@ impl DateTime {
     }
 
     /// Construct a date time from total nanoseconds since Unix epoch (`1970-01-01T00:00:00Z`) and a time zone
-    pub const fn from_total_nanoseconds(total_nanoseconds: i128, time_zone_ref: TimeZoneRef) -> Result<Self, ProjectDateTimeError> {
+    pub const fn from_total_nanoseconds(total_nanoseconds: i128, time_zone_ref: TimeZoneRef<'_>) -> Result<Self, ProjectDateTimeError> {
         match total_nanoseconds_to_timespec(total_nanoseconds) {
             Ok((unix_time, nanoseconds)) => Self::from_timespec(unix_time, nanoseconds, time_zone_ref),
             Err(OutOfRangeError(error)) => Err(ProjectDateTimeError(error)),
@@ -399,14 +399,14 @@ impl DateTime {
     ///
     /// Leap seconds are not preserved.
     ///
-    pub const fn project(&self, time_zone_ref: TimeZoneRef) -> Result<Self, ProjectDateTimeError> {
+    pub const fn project(&self, time_zone_ref: TimeZoneRef<'_>) -> Result<Self, ProjectDateTimeError> {
         Self::from_timespec(self.unix_time, self.nanoseconds, time_zone_ref)
     }
 
     /// Returns the current date time associated to the specified time zone
     #[cfg(feature = "std")]
     #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
-    pub fn now(time_zone_ref: TimeZoneRef) -> Result<Self, TzError> {
+    pub fn now(time_zone_ref: TimeZoneRef<'_>) -> Result<Self, TzError> {
         let now = crate::utils::current_total_nanoseconds();
         Ok(Self::from_total_nanoseconds(now, time_zone_ref)?)
     }
@@ -1205,7 +1205,7 @@ mod tests {
             };
         }
 
-        const TIME_ZONE_REF: TimeZoneRef = unwrap!(TimeZoneRef::new(
+        const TIME_ZONE_REF: TimeZoneRef<'static> = unwrap!(TimeZoneRef::new(
             &[
                 Transition::new(-2334101314, 1),
                 Transition::new(-1157283000, 2),
@@ -1245,7 +1245,7 @@ mod tests {
             },
         ));
 
-        const UTC: TimeZoneRef = TimeZoneRef::utc();
+        const UTC: TimeZoneRef<'static> = TimeZoneRef::utc();
 
         const UNIX_EPOCH: UtcDateTime = unwrap!(UtcDateTime::from_timespec(0, 0));
         const UTC_DATE_TIME: UtcDateTime = unwrap!(UtcDateTime::new(2000, 1, 1, 0, 0, 0, 1000));
