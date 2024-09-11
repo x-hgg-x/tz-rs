@@ -10,7 +10,7 @@ use crate::utils::{binary_search_leap_seconds, binary_search_transitions};
 #[cfg(feature = "std")]
 use {
     crate::error::{TzError, TzStringError},
-    crate::parse::{get_tz_file, parse_posix_tz, parse_tz_file},
+    crate::parse::{parse_posix_tz, parse_tz_file, read_tz_file},
 };
 
 use core::fmt;
@@ -20,10 +20,7 @@ use core::str;
 use alloc::{vec, vec::Vec};
 
 #[cfg(feature = "std")]
-use {
-    std::fs::{self, File},
-    std::io::{self, Read},
-};
+use std::fs;
 
 /// Transition of a TZif file
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -538,19 +535,13 @@ impl TimeZone {
             return parse_tz_file(&fs::read("/etc/localtime")?);
         }
 
-        let read = |mut file: File| -> io::Result<_> {
-            let mut bytes = Vec::new();
-            file.read_to_end(&mut bytes)?;
-            Ok(bytes)
-        };
-
         let mut chars = tz_string.chars();
         if chars.next() == Some(':') {
-            return parse_tz_file(&read(get_tz_file(chars.as_str())?)?);
+            return parse_tz_file(&read_tz_file(chars.as_str())?);
         }
 
-        match get_tz_file(tz_string) {
-            Ok(file) => parse_tz_file(&read(file)?),
+        match read_tz_file(tz_string) {
+            Ok(bytes) => parse_tz_file(&bytes),
             Err(_) => {
                 let tz_string = tz_string.trim_matches(|c: char| c.is_ascii_whitespace());
 
