@@ -139,6 +139,7 @@ pub(super) trait DateTimeList {
 }
 
 #[cfg(feature = "alloc")]
+#[cfg_attr(docsrs, doc(cfg(feature = "alloc")))]
 impl DateTimeList for FoundDateTimeList {
     fn push(&mut self, found_date_time: FoundDateTimeKind) {
         self.0.push(found_date_time);

@@ -2,25 +2,23 @@
 
 mod rule;
 
+#[doc(inline)]
 pub use rule::{AlternateTime, Julian0WithLeap, Julian1WithoutLeap, MonthWeekDay, RuleDay, TransitionRule};
 
 use crate::error::{FindLocalTimeTypeError, LocalTimeTypeError, OutOfRangeError, TimeZoneError};
 use crate::utils::{binary_search_leap_seconds, binary_search_transitions};
 
-#[cfg(feature = "std")]
-use {
-    crate::error::{TzError, TzStringError},
-    crate::parse::{parse_posix_tz, parse_tz_file, read_tz_file},
+#[cfg(feature = "alloc")]
+use crate::{
+    error::{TzError, TzFileError, TzStringError},
+    parse::{parse_posix_tz, parse_tz_file},
 };
 
 use core::fmt;
 use core::str;
 
 #[cfg(feature = "alloc")]
-use alloc::{vec, vec::Vec};
-
-#[cfg(feature = "std")]
-use std::fs;
+use alloc::{boxed::Box, format, vec, vec::Vec};
 
 /// Transition of a TZif file
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -500,6 +498,11 @@ impl TimeZone {
         self.as_ref().find_local_time_type(unix_time)
     }
 
+    /// Construct a time zone from the contents of a time zone file
+    pub fn from_tz_data(bytes: &[u8]) -> Result<Self, TzError> {
+        parse_tz_file(bytes)
+    }
+
     /// Returns local time zone.
     ///
     /// This method in not supported on non-UNIX platforms, and returns the UTC time zone instead.
@@ -507,40 +510,91 @@ impl TimeZone {
     #[cfg(feature = "std")]
     #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
     pub fn local() -> Result<Self, TzError> {
-        #[cfg(not(unix))]
-        let local_time_zone = Self::utc();
-
-        #[cfg(unix)]
-        let local_time_zone = Self::from_posix_tz("localtime")?;
-
-        Ok(local_time_zone)
-    }
-
-    /// Construct a time zone from the contents of a time zone file
-    #[cfg(feature = "std")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
-    pub fn from_tz_data(bytes: &[u8]) -> Result<Self, TzError> {
-        parse_tz_file(bytes)
+        TimeZoneSettings::DEFAULT.parse_local()
     }
 
     /// Construct a time zone from a POSIX TZ string, as described in [the POSIX documentation of the `TZ` environment variable](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap08.html).
     #[cfg(feature = "std")]
     #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
     pub fn from_posix_tz(tz_string: &str) -> Result<Self, TzError> {
+        TimeZoneSettings::DEFAULT.parse_posix_tz(tz_string)
+    }
+
+    /// Find the current local time type associated to the time zone
+    #[cfg(feature = "std")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
+    pub fn find_current_local_time_type(&self) -> Result<&LocalTimeType, TzError> {
+        Ok(self.find_local_time_type(crate::utils::current_unix_time())?)
+    }
+}
+
+/// Read file function type alias
+#[cfg(feature = "alloc")]
+#[cfg_attr(docsrs, doc(cfg(feature = "alloc")))]
+type ReadFileFn = fn(path: &str) -> Result<Vec<u8>, Box<dyn core::error::Error + Send + Sync + 'static>>;
+
+/// Time zone settings
+#[cfg(feature = "alloc")]
+#[cfg_attr(docsrs, doc(cfg(feature = "alloc")))]
+#[derive(Debug)]
+pub struct TimeZoneSettings<'a> {
+    /// Possible system timezone directories
+    directories: &'a [&'a str],
+    /// Read file function
+    read_file_fn: ReadFileFn,
+}
+
+#[cfg(feature = "alloc")]
+impl<'a> TimeZoneSettings<'a> {
+    /// Default possible system timezone directories
+    pub const DEFAULT_DIRECTORIES: &'static [&'static str] = &["/usr/share/zoneinfo", "/share/zoneinfo", "/etc/zoneinfo"];
+
+    /// Default read file function
+    #[cfg(feature = "std")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
+    pub const DEFAULT_READ_FILE_FN: ReadFileFn = |path| Ok(std::fs::read(path)?);
+
+    /// Default time zone settings
+    #[cfg(feature = "std")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
+    pub const DEFAULT: TimeZoneSettings<'static> = TimeZoneSettings { directories: Self::DEFAULT_DIRECTORIES, read_file_fn: Self::DEFAULT_READ_FILE_FN };
+
+    /// Construct time zone settings
+    pub const fn new(directories: &'a [&'a str], read_file_fn: ReadFileFn) -> TimeZoneSettings<'a> {
+        Self { directories, read_file_fn }
+    }
+
+    /// Returns local time zone using current settings.
+    ///
+    /// This method in not supported on non-UNIX platforms, and returns the UTC time zone instead.
+    ///
+    pub fn parse_local(&self) -> Result<TimeZone, TzError> {
+        #[cfg(not(unix))]
+        let local_time_zone = Self::utc();
+
+        #[cfg(unix)]
+        let local_time_zone = self.parse_posix_tz("localtime")?;
+
+        Ok(local_time_zone)
+    }
+
+    /// Construct a time zone from a POSIX TZ string using current settings,
+    /// as described in [the POSIX documentation of the `TZ` environment variable](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap08.html).
+    pub fn parse_posix_tz(&self, tz_string: &str) -> Result<TimeZone, TzError> {
         if tz_string.is_empty() {
             return Err(TzError::TzString(TzStringError::InvalidTzString("empty TZ string")));
         }
 
         if tz_string == "localtime" {
-            return parse_tz_file(&fs::read("/etc/localtime")?);
+            return parse_tz_file(&(self.read_file_fn)("/etc/localtime").map_err(TzFileError::Io)?);
         }
 
         let mut chars = tz_string.chars();
         if chars.next() == Some(':') {
-            return parse_tz_file(&read_tz_file(chars.as_str())?);
+            return parse_tz_file(&self.read_tz_file(chars.as_str())?);
         }
 
-        match read_tz_file(tz_string) {
+        match self.read_tz_file(tz_string) {
             Ok(bytes) => parse_tz_file(&bytes),
             Err(_) => {
                 let tz_string = tz_string.trim_matches(|c: char| c.is_ascii_whitespace());
@@ -558,11 +612,20 @@ impl TimeZone {
         }
     }
 
-    /// Find the current local time type associated to the time zone
-    #[cfg(feature = "std")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
-    pub fn find_current_local_time_type(&self) -> Result<&LocalTimeType, TzError> {
-        Ok(self.find_local_time_type(crate::utils::current_unix_time())?)
+    /// Read the TZif file corresponding to a TZ string using current settings
+    fn read_tz_file(&self, tz_string: &str) -> Result<Vec<u8>, TzFileError> {
+        let read_file_fn = |path: &str| (self.read_file_fn)(path).map_err(TzFileError::Io);
+
+        // Don't check system timezone directories on non-UNIX platforms
+        #[cfg(not(unix))]
+        return Ok(read_file_fn(tz_string)?);
+
+        #[cfg(unix)]
+        if tz_string.starts_with('/') {
+            Ok(read_file_fn(tz_string)?)
+        } else {
+            self.directories.iter().find_map(|folder| read_file_fn(&format!("{folder}/{tz_string}")).ok()).ok_or(TzFileError::FileNotFound)
+        }
     }
 }
 

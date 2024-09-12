@@ -2,8 +2,10 @@
 
 mod find;
 
+#[doc(inline)]
 #[cfg(feature = "alloc")]
 pub use find::FoundDateTimeList;
+#[doc(inline)]
 pub use find::{FoundDateTimeKind, FoundDateTimeListRefMut};
 
 use crate::constants::*;

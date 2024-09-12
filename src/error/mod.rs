@@ -4,15 +4,16 @@ use core::error::Error;
 use core::fmt;
 
 /// Parsing error types.
-#[cfg(feature = "std")]
+#[cfg(feature = "alloc")]
 mod parse {
     use super::*;
 
+    use alloc::boxed::Box;
     use core::num::ParseIntError;
     use core::str::Utf8Error;
 
     /// Parse data error
-    #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "alloc")))]
     #[non_exhaustive]
     #[derive(Debug)]
     pub enum ParseDataError {
@@ -34,7 +35,7 @@ mod parse {
     impl Error for ParseDataError {}
 
     /// Unified error type for parsing a TZ string
-    #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "alloc")))]
     #[non_exhaustive]
     #[derive(Debug)]
     pub enum TzStringError {
@@ -83,16 +84,18 @@ mod parse {
     }
 
     /// Unified error type for parsing a TZif file
-    #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "alloc")))]
     #[non_exhaustive]
     #[derive(Debug)]
     pub enum TzFileError {
+        /// File was not found
+        FileNotFound,
         /// UTF-8 error
         Utf8(Utf8Error),
         /// Parse data error
         ParseData(ParseDataError),
         /// I/O error
-        Io(std::io::Error),
+        Io(Box<dyn Error + Send + Sync + 'static>),
         /// Unified error for parsing a TZ string
         TzString(TzStringError),
         /// Invalid TZif file
@@ -104,6 +107,7 @@ mod parse {
     impl fmt::Display for TzFileError {
         fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
             match self {
+                Self::FileNotFound => f.write_str("file was not found"),
                 Self::Utf8(error) => error.fmt(f),
                 Self::ParseData(error) => error.fmt(f),
                 Self::Io(error) => error.fmt(f),
@@ -122,12 +126,6 @@ mod parse {
         }
     }
 
-    impl From<std::io::Error> for TzFileError {
-        fn from(error: std::io::Error) -> Self {
-            Self::Io(error)
-        }
-    }
-
     impl From<ParseDataError> for TzFileError {
         fn from(error: ParseDataError) -> Self {
             Self::ParseData(error)
@@ -141,7 +139,8 @@ mod parse {
     }
 }
 
-#[cfg(feature = "std")]
+#[doc(inline)]
+#[cfg(feature = "alloc")]
 pub use parse::{ParseDataError, TzFileError, TzStringError};
 
 /// Create a new error type
@@ -188,17 +187,13 @@ impl From<FindLocalTimeTypeError> for ProjectDateTimeError {
 #[non_exhaustive]
 #[derive(Debug)]
 pub enum TzError {
-    /// I/O error
-    #[cfg(feature = "std")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
-    Io(std::io::Error),
     /// Unified error for parsing a TZif file
-    #[cfg(feature = "std")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
+    #[cfg(feature = "alloc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "alloc")))]
     TzFile(TzFileError),
     /// Unified error for parsing a TZ string
-    #[cfg(feature = "std")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
+    #[cfg(feature = "alloc")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "alloc")))]
     TzString(TzStringError),
     /// Out of range error
     OutOfRange(OutOfRangeError),
@@ -219,11 +214,9 @@ pub enum TzError {
 impl fmt::Display for TzError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            #[cfg(feature = "std")]
-            Self::Io(error) => error.fmt(f),
-            #[cfg(feature = "std")]
+            #[cfg(feature = "alloc")]
             Self::TzFile(error) => error.fmt(f),
-            #[cfg(feature = "std")]
+            #[cfg(feature = "alloc")]
             Self::TzString(error) => error.fmt(f),
             Self::OutOfRange(error) => error.fmt(f),
             Self::LocalTimeType(error) => write!(f, "invalid local time type: {error}"),
@@ -238,24 +231,16 @@ impl fmt::Display for TzError {
 
 impl Error for TzError {}
 
-#[cfg(feature = "std")]
-#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
-impl From<std::io::Error> for TzError {
-    fn from(error: std::io::Error) -> Self {
-        Self::Io(error)
-    }
-}
-
-#[cfg(feature = "std")]
-#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
+#[cfg(feature = "alloc")]
+#[cfg_attr(docsrs, doc(cfg(feature = "alloc")))]
 impl From<TzFileError> for TzError {
     fn from(error: TzFileError) -> Self {
         Self::TzFile(error)
     }
 }
 
-#[cfg(feature = "std")]
-#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
+#[cfg(feature = "alloc")]
+#[cfg_attr(docsrs, doc(cfg(feature = "alloc")))]
 impl From<TzStringError> for TzError {
     fn from(error: TzStringError) -> Self {
         Self::TzString(error)

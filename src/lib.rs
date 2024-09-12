@@ -188,6 +188,13 @@
 //! # Ok(())
 //! # }
 //! ```
+//!
+//! # No std
+//!
+//! This crate can be used in `no_std` context.
+//!
+//! The `settings.rs` example shows how to construct a [`TimeZone`] by specifying a custom `read_file` function via the [`TimeZoneSettings`] struct.
+//!
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
@@ -195,7 +202,8 @@ extern crate alloc;
 mod constants;
 mod utils;
 
-#[cfg(feature = "std")]
+#[cfg(feature = "alloc")]
+#[cfg_attr(docsrs, doc(cfg(feature = "alloc")))]
 mod parse;
 
 pub mod datetime;
@@ -213,7 +221,7 @@ pub use timezone::{LocalTimeType, TimeZoneRef};
 
 #[doc(inline)]
 #[cfg(feature = "alloc")]
-pub use timezone::TimeZone;
+pub use timezone::{TimeZone, TimeZoneSettings};
 
-/// Alias for [`std::result::Result`] with the crate unified error
+/// Alias for [`core::result::Result`] with the crate unified error
 pub type Result<T> = core::result::Result<T, TzError>;

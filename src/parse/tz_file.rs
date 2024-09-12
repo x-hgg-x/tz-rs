@@ -5,11 +5,9 @@ use crate::parse::tz_string::parse_posix_tz;
 use crate::parse::utils::{read_chunk_exact, read_exact, Cursor};
 use crate::timezone::{LeapSecond, LocalTimeType, TimeZone, Transition, TransitionRule};
 
+use alloc::vec::Vec;
 use core::iter;
 use core::str;
-
-use std::fs;
-use std::io;
 
 /// TZif version
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -252,34 +250,12 @@ pub(crate) fn parse_tz_file(bytes: &[u8]) -> Result<TimeZone, TzError> {
     }
 }
 
-/// Read the TZif file corresponding to a TZ string
-pub(crate) fn read_tz_file(tz_string: &str) -> Result<Vec<u8>, TzFileError> {
-    // Don't check system timezone directories on non-UNIX platforms
-    #[cfg(not(unix))]
-    return Ok(fs::read(tz_string)?);
-
-    #[cfg(unix)]
-    {
-        // Possible system timezone directories
-        const ZONE_INFO_DIRECTORIES: [&str; 3] = ["/usr/share/zoneinfo", "/share/zoneinfo", "/etc/zoneinfo"];
-
-        if tz_string.starts_with('/') {
-            Ok(fs::read(tz_string)?)
-        } else {
-            for folder in &ZONE_INFO_DIRECTORIES {
-                if let Ok(file) = fs::read(format!("{folder}/{tz_string}")) {
-                    return Ok(file);
-                }
-            }
-            Err(TzFileError::Io(io::ErrorKind::NotFound.into()))
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::timezone::{AlternateTime, MonthWeekDay, RuleDay};
+    use crate::timezone::{AlternateTime, MonthWeekDay, RuleDay, TimeZone};
+
+    use alloc::vec;
 
     #[test]
     fn test_v1_file_with_leap_seconds() -> Result<(), TzError> {
