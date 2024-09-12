@@ -168,7 +168,6 @@ impl UtcDateTime {
 
     /// Returns the current UTC date time
     #[cfg(feature = "std")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
     pub fn now() -> Result<Self, TzError> {
         Ok(Self::from_total_nanoseconds(crate::utils::current_total_nanoseconds())?)
     }
@@ -271,7 +270,6 @@ impl DateTime {
     ///
     #[allow(clippy::too_many_arguments)]
     #[cfg(feature = "alloc")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "alloc")))]
     pub fn find(
         year: i32,
         month: u8,
@@ -407,7 +405,6 @@ impl DateTime {
 
     /// Returns the current date time associated to the specified time zone
     #[cfg(feature = "std")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
     pub fn now(time_zone_ref: TimeZoneRef<'_>) -> Result<Self, TzError> {
         let now = crate::utils::current_total_nanoseconds();
         Ok(Self::from_total_nanoseconds(now, time_zone_ref)?)

@@ -449,7 +449,6 @@ impl<'a> TimeZoneRef<'a> {
 
 /// Time zone
 #[cfg(feature = "alloc")]
-#[cfg_attr(docsrs, doc(cfg(feature = "alloc")))]
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct TimeZone {
     /// List of transitions
@@ -508,21 +507,18 @@ impl TimeZone {
     /// This method in not supported on non-UNIX platforms, and returns the UTC time zone instead.
     ///
     #[cfg(feature = "std")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
     pub fn local() -> Result<Self, TzError> {
         TimeZoneSettings::DEFAULT.parse_local()
     }
 
     /// Construct a time zone from a POSIX TZ string, as described in [the POSIX documentation of the `TZ` environment variable](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap08.html).
     #[cfg(feature = "std")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
     pub fn from_posix_tz(tz_string: &str) -> Result<Self, TzError> {
         TimeZoneSettings::DEFAULT.parse_posix_tz(tz_string)
     }
 
     /// Find the current local time type associated to the time zone
     #[cfg(feature = "std")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
     pub fn find_current_local_time_type(&self) -> Result<&LocalTimeType, TzError> {
         Ok(self.find_local_time_type(crate::utils::current_unix_time())?)
     }
@@ -530,12 +526,10 @@ impl TimeZone {
 
 /// Read file function type alias
 #[cfg(feature = "alloc")]
-#[cfg_attr(docsrs, doc(cfg(feature = "alloc")))]
 type ReadFileFn = fn(path: &str) -> Result<Vec<u8>, Box<dyn core::error::Error + Send + Sync + 'static>>;
 
 /// Time zone settings
 #[cfg(feature = "alloc")]
-#[cfg_attr(docsrs, doc(cfg(feature = "alloc")))]
 #[derive(Debug)]
 pub struct TimeZoneSettings<'a> {
     /// Possible system timezone directories
@@ -551,12 +545,10 @@ impl<'a> TimeZoneSettings<'a> {
 
     /// Default read file function
     #[cfg(feature = "std")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
     pub const DEFAULT_READ_FILE_FN: ReadFileFn = |path| Ok(std::fs::read(path)?);
 
     /// Default time zone settings
     #[cfg(feature = "std")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "std")))]
     pub const DEFAULT: TimeZoneSettings<'static> = TimeZoneSettings { directories: Self::DEFAULT_DIRECTORIES, read_file_fn: Self::DEFAULT_READ_FILE_FN };
 
     /// Construct time zone settings

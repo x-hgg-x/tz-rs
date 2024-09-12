@@ -13,7 +13,6 @@ mod parse {
     use core::str::Utf8Error;
 
     /// Parse data error
-    #[cfg_attr(docsrs, doc(cfg(feature = "alloc")))]
     #[non_exhaustive]
     #[derive(Debug)]
     pub enum ParseDataError {
@@ -35,7 +34,6 @@ mod parse {
     impl Error for ParseDataError {}
 
     /// Unified error type for parsing a TZ string
-    #[cfg_attr(docsrs, doc(cfg(feature = "alloc")))]
     #[non_exhaustive]
     #[derive(Debug)]
     pub enum TzStringError {
@@ -84,7 +82,6 @@ mod parse {
     }
 
     /// Unified error type for parsing a TZif file
-    #[cfg_attr(docsrs, doc(cfg(feature = "alloc")))]
     #[non_exhaustive]
     #[derive(Debug)]
     pub enum TzFileError {
@@ -189,11 +186,9 @@ impl From<FindLocalTimeTypeError> for ProjectDateTimeError {
 pub enum TzError {
     /// Unified error for parsing a TZif file
     #[cfg(feature = "alloc")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "alloc")))]
     TzFile(TzFileError),
     /// Unified error for parsing a TZ string
     #[cfg(feature = "alloc")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "alloc")))]
     TzString(TzStringError),
     /// Out of range error
     OutOfRange(OutOfRangeError),
@@ -232,7 +227,6 @@ impl fmt::Display for TzError {
 impl Error for TzError {}
 
 #[cfg(feature = "alloc")]
-#[cfg_attr(docsrs, doc(cfg(feature = "alloc")))]
 impl From<TzFileError> for TzError {
     fn from(error: TzFileError) -> Self {
         Self::TzFile(error)
@@ -240,7 +234,6 @@ impl From<TzFileError> for TzError {
 }
 
 #[cfg(feature = "alloc")]
-#[cfg_attr(docsrs, doc(cfg(feature = "alloc")))]
 impl From<TzStringError> for TzError {
     fn from(error: TzStringError) -> Self {
         Self::TzString(error)

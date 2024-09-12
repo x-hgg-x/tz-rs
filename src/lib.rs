@@ -1,7 +1,7 @@
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 #![cfg_attr(not(feature = "std"), no_std)]
-#![cfg_attr(docsrs, feature(doc_cfg))]
+#![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
 //! This crate provides the [`TimeZone`] and [`DateTime`] types, which can be used to determine local time on a given time zone.
 //!
@@ -203,7 +203,6 @@ mod constants;
 mod utils;
 
 #[cfg(feature = "alloc")]
-#[cfg_attr(docsrs, doc(cfg(feature = "alloc")))]
 mod parse;
 
 pub mod datetime;
