@@ -260,8 +260,7 @@ impl<'a> TimeZoneRef<'a> {
     /// Construct the time zone reference associated to UTC
     #[inline]
     pub const fn utc() -> Self {
-        const UTC: LocalTimeType = LocalTimeType::utc();
-        Self { transitions: &[], local_time_types: &[UTC], leap_seconds: &[], extra_rule: &None }
+        Self { transitions: &[], local_time_types: &[const { LocalTimeType::utc() }], leap_seconds: &[], extra_rule: &None }
     }
 
     /// Returns list of transitions
