@@ -561,7 +561,7 @@ impl<'a> TimeZoneSettings<'a> {
     ///
     pub fn parse_local(&self) -> Result<TimeZone, TzError> {
         #[cfg(not(unix))]
-        let local_time_zone = Self::utc();
+        let local_time_zone = TimeZone::utc();
 
         #[cfg(unix)]
         let local_time_zone = self.parse_posix_tz("localtime")?;
