@@ -1,9 +1,8 @@
 //! Types related to the [`DateTime::find`] method.
 
 use crate::datetime::{check_date_time_inputs, unix_time, DateTime, UtcDateTime};
-use crate::error::OutOfRangeError;
+use crate::error::TzError;
 use crate::timezone::{TimeZoneRef, TransitionRule};
-use crate::Result;
 
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
@@ -180,7 +179,7 @@ pub(super) fn find_date_time(
     second: u8,
     nanoseconds: u32,
     time_zone_ref: TimeZoneRef<'_>,
-) -> Result<()> {
+) -> Result<(), TzError> {
     let transitions = time_zone_ref.transitions();
     let local_time_types = time_zone_ref.local_time_types();
     let extra_rule = time_zone_ref.extra_rule();
@@ -200,16 +199,16 @@ pub(super) fn find_date_time(
     if !transitions.is_empty() {
         let mut last_cached_time = None;
 
-        let mut get_time = |local_time_type_index: usize| {
+        let mut get_time = |local_time_type_index: usize| -> Result<_, TzError> {
             match last_cached_time {
-                Some((index, value)) if index == local_time_type_index => Result::Ok(value),
+                Some((index, value)) if index == local_time_type_index => Ok(value),
                 _ => {
                     // Overflow is not possible
                     let unix_time = utc_unix_time - local_time_types[local_time_type_index].ut_offset() as i64;
                     let unix_leap_time = time_zone_ref.unix_time_to_unix_leap_time(unix_time)?;
 
                     last_cached_time = Some((local_time_type_index, (unix_time, unix_leap_time)));
-                    Result::Ok((unix_time, unix_leap_time))
+                    Ok((unix_time, unix_leap_time))
                 }
             }
         };
@@ -282,7 +281,7 @@ pub(super) fn find_date_time(
 
             // Check if the year is valid for the following computations
             if !(i32::MIN + 2..=i32::MAX - 2).contains(&year) {
-                return Err(OutOfRangeError("out of range date time").into());
+                return Err(TzError::OutOfRange);
             }
 
             // Check DST start/end Unix times for previous/current/next years to support for transition day times outside of [0h, 24h] range.
@@ -380,9 +379,9 @@ mod tests {
         unique: Option<[usize; 2]>,
         earlier: Option<[usize; 2]>,
         later: Option<[usize; 2]>,
-    ) -> Result<()> {
+    ) -> Result<(), TzError> {
         let new_date_time = |(year, month, month_day, hour, minute, second, ut_offset)| {
-            Result::Ok(DateTime::new(year, month, month_day, hour, minute, second, 0, LocalTimeType::with_ut_offset(ut_offset)?)?)
+            DateTime::new(year, month, month_day, hour, minute, second, 0, LocalTimeType::with_ut_offset(ut_offset)?)
         };
 
         let (year, month, month_day, hour, minute, second) = searched;
@@ -425,7 +424,7 @@ mod tests {
     }
 
     #[test]
-    fn test_find_date_time_fixed() -> Result<()> {
+    fn test_find_date_time_fixed() -> Result<(), TzError> {
         let local_time_type = LocalTimeType::with_ut_offset(3600)?;
 
         let results = &[Check::Normal([3600])];
@@ -445,7 +444,7 @@ mod tests {
     }
 
     #[test]
-    fn test_find_date_time_no_offset() -> Result<()> {
+    fn test_find_date_time_no_offset() -> Result<(), TzError> {
         let local_time_types = [
             LocalTimeType::new(0, false, Some(b"STD1"))?,
             LocalTimeType::new(0, true, Some(b"DST1"))?,
@@ -469,7 +468,7 @@ mod tests {
 
         let time_zone_ref = time_zone.as_ref();
 
-        let find_unique_local_time_type = |year, month, month_day, hour, minute, second, nanoseconds| {
+        let find_unique_local_time_type = |year, month, month_day, hour, minute, second, nanoseconds| -> Result<_, TzError> {
             let mut found_date_time_list = FoundDateTimeList::default();
             find_date_time(&mut found_date_time_list, year, month, month_day, hour, minute, second, nanoseconds, time_zone_ref)?;
 
@@ -482,7 +481,7 @@ mod tests {
             let datetime_2 = found_date_time_list_ref_mut.unique().unwrap();
             assert_eq!(datetime_1, datetime_2);
 
-            Result::Ok(*datetime_1.local_time_type())
+            Ok(*datetime_1.local_time_type())
         };
 
         assert_eq!(local_time_types[0], find_unique_local_time_type(1970, 1, 1, 0, 30, 0, 0)?);
@@ -495,7 +494,7 @@ mod tests {
     }
 
     #[test]
-    fn test_find_date_time_extra_rule_only() -> Result<()> {
+    fn test_find_date_time_extra_rule_only() -> Result<(), TzError> {
         let time_zone = TimeZone::new(
             vec![],
             vec![LocalTimeType::utc(), LocalTimeType::with_ut_offset(3600)?],
@@ -535,7 +534,7 @@ mod tests {
     }
 
     #[test]
-    fn test_find_date_time_transitions_only() -> Result<()> {
+    fn test_find_date_time_transitions_only() -> Result<(), TzError> {
         let time_zone = TimeZone::new(
             vec![
                 Transition::new(0, 0),
@@ -591,7 +590,7 @@ mod tests {
     }
 
     #[test]
-    fn test_find_date_time_transitions_with_extra_rule() -> Result<()> {
+    fn test_find_date_time_transitions_with_extra_rule() -> Result<(), TzError> {
         let time_zone = TimeZone::new(
             vec![Transition::new(0, 0), Transition::new(3600, 1), Transition::new(7200, 0), Transition::new(10800, 2)],
             vec![LocalTimeType::utc(), LocalTimeType::with_ut_offset(i32::MAX)?, LocalTimeType::with_ut_offset(3600)?],
@@ -655,7 +654,7 @@ mod tests {
     }
 
     #[test]
-    fn test_find_date_time_ref_mut() -> Result<()> {
+    fn test_find_date_time_ref_mut() -> Result<(), TzError> {
         let transitions = &[Transition::new(3600, 1), Transition::new(86400, 0), Transition::new(i64::MAX, 0)];
         let local_time_types = &[LocalTimeType::new(0, false, Some(b"STD"))?, LocalTimeType::new(3600, true, Some(b"DST"))?];
         let time_zone_ref = TimeZoneRef::new(transitions, local_time_types, &[], &None)?;

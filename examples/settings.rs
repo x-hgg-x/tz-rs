@@ -1,4 +1,4 @@
-fn main() -> tz::Result<()> {
+fn main() -> Result<(), tz::Error> {
     #[cfg(feature = "std")]
     {
         use tz::TimeZoneSettings;

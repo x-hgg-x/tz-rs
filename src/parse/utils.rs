@@ -1,6 +1,6 @@
 //! Some useful functions.
 
-use crate::error::ParseDataError;
+use crate::error::parse::ParseDataError;
 
 /// Cursor type alias
 pub(super) type Cursor<'a> = &'a [u8];

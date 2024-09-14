@@ -1,6 +1,6 @@
 //! Some useful constant functions.
 
-use crate::error::OutOfRangeError;
+use crate::error::TzError;
 use crate::timezone::{LeapSecond, Transition};
 
 use core::cmp::Ordering;
@@ -33,18 +33,18 @@ macro_rules! impl_try_into_integer {
         if min <= $value && $value <= max {
             Ok($value as $to_type)
         } else {
-            Err(OutOfRangeError("out of range integer conversion"))
+            Err(TzError::OutOfRange)
         }
     }};
 }
 
 /// Convert a `i64` value to a `i32` value
-pub(crate) const fn try_into_i32(value: i64) -> Result<i32, OutOfRangeError> {
+pub(crate) const fn try_into_i32(value: i64) -> Result<i32, TzError> {
     impl_try_into_integer!(i64, i32, value)
 }
 
 /// Convert a `i128` value to a `i64` value
-pub(crate) const fn try_into_i64(value: i128) -> Result<i64, OutOfRangeError> {
+pub(crate) const fn try_into_i64(value: i128) -> Result<i64, TzError> {
     impl_try_into_integer!(i128, i64, value)
 }
 

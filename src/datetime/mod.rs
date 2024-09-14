@@ -10,7 +10,8 @@ pub use find::{FoundDateTimeKind, FoundDateTimeListRefMut};
 
 use crate::constants::*;
 use crate::datetime::find::find_date_time;
-use crate::error::{DateTimeError, FindLocalTimeTypeError, OutOfRangeError, ProjectDateTimeError, TzError};
+use crate::error::datetime::DateTimeError;
+use crate::error::TzError;
 use crate::timezone::{LocalTimeType, TimeZoneRef};
 use crate::utils::{min, try_into_i32, try_into_i64};
 
@@ -49,11 +50,11 @@ impl UtcDateTime {
     const MAX_UNIX_TIME: i64 = 67767976233532799;
 
     /// Check if the UTC date time associated to a Unix time in seconds is valid
-    const fn check_unix_time(unix_time: i64) -> Result<(), DateTimeError> {
+    const fn check_unix_time(unix_time: i64) -> Result<(), TzError> {
         if Self::MIN_UNIX_TIME <= unix_time && unix_time <= Self::MAX_UNIX_TIME {
             Ok(())
         } else {
-            Err(DateTimeError("out of range date time"))
+            Err(TzError::OutOfRange)
         }
     }
 
@@ -69,24 +70,24 @@ impl UtcDateTime {
     /// * `second`: Seconds in `[0, 60]`, with a possible leap second
     /// * `nanoseconds`: Nanoseconds in `[0, 999_999_999]`
     ///
-    pub const fn new(year: i32, month: u8, month_day: u8, hour: u8, minute: u8, second: u8, nanoseconds: u32) -> Result<Self, DateTimeError> {
+    pub const fn new(year: i32, month: u8, month_day: u8, hour: u8, minute: u8, second: u8, nanoseconds: u32) -> Result<Self, TzError> {
         // Exclude the maximum possible UTC date time with a leap second
         if year == i32::MAX && month == 12 && month_day == 31 && hour == 23 && minute == 59 && second == 60 {
-            return Err(DateTimeError("out of range date time"));
+            return Err(TzError::OutOfRange);
         }
 
         if let Err(error) = check_date_time_inputs(year, month, month_day, hour, minute, second, nanoseconds) {
-            return Err(error);
+            return Err(TzError::DateTime(error));
         }
 
         Ok(Self { year, month, month_day, hour, minute, second, nanoseconds })
     }
 
     /// Construct a UTC date time from a Unix time in seconds and nanoseconds
-    pub const fn from_timespec(unix_time: i64, nanoseconds: u32) -> Result<Self, OutOfRangeError> {
+    pub const fn from_timespec(unix_time: i64, nanoseconds: u32) -> Result<Self, TzError> {
         let seconds = match unix_time.checked_sub(UNIX_OFFSET_SECS) {
             Some(seconds) => seconds,
-            None => return Err(OutOfRangeError("out of range operation")),
+            None => return Err(TzError::OutOfRange),
         };
 
         let mut remaining_days = seconds / SECONDS_PER_DAY;
@@ -146,7 +147,7 @@ impl UtcDateTime {
     }
 
     /// Construct a UTC date time from total nanoseconds since Unix epoch (`1970-01-01T00:00:00Z`)
-    pub const fn from_total_nanoseconds(total_nanoseconds: i128) -> Result<Self, OutOfRangeError> {
+    pub const fn from_total_nanoseconds(total_nanoseconds: i128) -> Result<Self, TzError> {
         match total_nanoseconds_to_timespec(total_nanoseconds) {
             Ok((unix_time, nanoseconds)) => Self::from_timespec(unix_time, nanoseconds),
             Err(error) => Err(error),
@@ -162,14 +163,14 @@ impl UtcDateTime {
     ///
     /// Leap seconds are not preserved.
     ///
-    pub const fn project(&self, time_zone_ref: TimeZoneRef<'_>) -> Result<DateTime, ProjectDateTimeError> {
+    pub const fn project(&self, time_zone_ref: TimeZoneRef<'_>) -> Result<DateTime, TzError> {
         DateTime::from_timespec(self.unix_time(), self.nanoseconds, time_zone_ref)
     }
 
     /// Returns the current UTC date time
     #[cfg(feature = "std")]
     pub fn now() -> Result<Self, TzError> {
-        Ok(Self::from_total_nanoseconds(crate::utils::current_total_nanoseconds())?)
+        Self::from_total_nanoseconds(crate::utils::current_total_nanoseconds())
     }
 }
 
@@ -239,9 +240,9 @@ impl DateTime {
         second: u8,
         nanoseconds: u32,
         local_time_type: LocalTimeType,
-    ) -> Result<Self, DateTimeError> {
+    ) -> Result<Self, TzError> {
         if let Err(error) = check_date_time_inputs(year, month, month_day, hour, minute, second, nanoseconds) {
-            return Err(error);
+            return Err(TzError::DateTime(error));
         }
 
         // Overflow is not possible
@@ -354,15 +355,15 @@ impl DateTime {
     }
 
     /// Construct a date time from a Unix time in seconds with nanoseconds and a local time type
-    pub const fn from_timespec_and_local(unix_time: i64, nanoseconds: u32, local_time_type: LocalTimeType) -> Result<Self, ProjectDateTimeError> {
+    pub const fn from_timespec_and_local(unix_time: i64, nanoseconds: u32, local_time_type: LocalTimeType) -> Result<Self, TzError> {
         let unix_time_with_offset = match unix_time.checked_add(local_time_type.ut_offset() as i64) {
             Some(unix_time_with_offset) => unix_time_with_offset,
-            None => return Err(ProjectDateTimeError("out of range date time")),
+            None => return Err(TzError::OutOfRange),
         };
 
         let utc_date_time_with_offset = match UtcDateTime::from_timespec(unix_time_with_offset, nanoseconds) {
             Ok(utc_date_time_with_offset) => utc_date_time_with_offset,
-            Err(OutOfRangeError(error)) => return Err(ProjectDateTimeError(error)),
+            Err(error) => return Err(error),
         };
 
         let UtcDateTime { year, month, month_day, hour, minute, second, nanoseconds } = utc_date_time_with_offset;
@@ -370,28 +371,28 @@ impl DateTime {
     }
 
     /// Construct a date time from a Unix time in seconds with nanoseconds and a time zone
-    pub const fn from_timespec(unix_time: i64, nanoseconds: u32, time_zone_ref: TimeZoneRef<'_>) -> Result<Self, ProjectDateTimeError> {
+    pub const fn from_timespec(unix_time: i64, nanoseconds: u32, time_zone_ref: TimeZoneRef<'_>) -> Result<Self, TzError> {
         let local_time_type = match time_zone_ref.find_local_time_type(unix_time) {
             Ok(&local_time_type) => local_time_type,
-            Err(FindLocalTimeTypeError(error)) => return Err(ProjectDateTimeError(error)),
+            Err(error) => return Err(error),
         };
 
         Self::from_timespec_and_local(unix_time, nanoseconds, local_time_type)
     }
 
     /// Construct a date time from total nanoseconds since Unix epoch (`1970-01-01T00:00:00Z`) and a local time type
-    pub const fn from_total_nanoseconds_and_local(total_nanoseconds: i128, local_time_type: LocalTimeType) -> Result<Self, ProjectDateTimeError> {
+    pub const fn from_total_nanoseconds_and_local(total_nanoseconds: i128, local_time_type: LocalTimeType) -> Result<Self, TzError> {
         match total_nanoseconds_to_timespec(total_nanoseconds) {
             Ok((unix_time, nanoseconds)) => Self::from_timespec_and_local(unix_time, nanoseconds, local_time_type),
-            Err(OutOfRangeError(error)) => Err(ProjectDateTimeError(error)),
+            Err(error) => Err(error),
         }
     }
 
     /// Construct a date time from total nanoseconds since Unix epoch (`1970-01-01T00:00:00Z`) and a time zone
-    pub const fn from_total_nanoseconds(total_nanoseconds: i128, time_zone_ref: TimeZoneRef<'_>) -> Result<Self, ProjectDateTimeError> {
+    pub const fn from_total_nanoseconds(total_nanoseconds: i128, time_zone_ref: TimeZoneRef<'_>) -> Result<Self, TzError> {
         match total_nanoseconds_to_timespec(total_nanoseconds) {
             Ok((unix_time, nanoseconds)) => Self::from_timespec(unix_time, nanoseconds, time_zone_ref),
-            Err(OutOfRangeError(error)) => Err(ProjectDateTimeError(error)),
+            Err(error) => Err(error),
         }
     }
 
@@ -399,7 +400,7 @@ impl DateTime {
     ///
     /// Leap seconds are not preserved.
     ///
-    pub const fn project(&self, time_zone_ref: TimeZoneRef<'_>) -> Result<Self, ProjectDateTimeError> {
+    pub const fn project(&self, time_zone_ref: TimeZoneRef<'_>) -> Result<Self, TzError> {
         Self::from_timespec(self.unix_time, self.nanoseconds, time_zone_ref)
     }
 
@@ -407,7 +408,7 @@ impl DateTime {
     #[cfg(feature = "std")]
     pub fn now(time_zone_ref: TimeZoneRef<'_>) -> Result<Self, TzError> {
         let now = crate::utils::current_total_nanoseconds();
-        Ok(Self::from_total_nanoseconds(now, time_zone_ref)?)
+        Self::from_total_nanoseconds(now, time_zone_ref)
     }
 }
 
@@ -610,7 +611,7 @@ const fn nanoseconds_since_unix_epoch(unix_time: i64, nanoseconds: u32) -> i128 
 /// * `nanoseconds`: Nanoseconds in `[0, 999_999_999]`
 ///
 #[inline]
-const fn total_nanoseconds_to_timespec(total_nanoseconds: i128) -> Result<(i64, u32), OutOfRangeError> {
+const fn total_nanoseconds_to_timespec(total_nanoseconds: i128) -> Result<(i64, u32), TzError> {
     let unix_time = match try_into_i64(total_nanoseconds.div_euclid(NANOSECONDS_PER_SECOND as i128)) {
         Ok(unix_time) => unix_time,
         Err(error) => return Err(error),
@@ -635,22 +636,22 @@ const fn total_nanoseconds_to_timespec(total_nanoseconds: i128) -> Result<(i64, 
 ///
 const fn check_date_time_inputs(year: i32, month: u8, month_day: u8, hour: u8, minute: u8, second: u8, nanoseconds: u32) -> Result<(), DateTimeError> {
     if !(1 <= month && month <= 12) {
-        return Err(DateTimeError("invalid month"));
+        return Err(DateTimeError::InvalidMonth);
     }
     if !(1 <= month_day && month_day <= 31) {
-        return Err(DateTimeError("invalid month day"));
+        return Err(DateTimeError::InvalidMonthDay);
     }
     if hour > 23 {
-        return Err(DateTimeError("invalid hour"));
+        return Err(DateTimeError::InvalidHour);
     }
     if minute > 59 {
-        return Err(DateTimeError("invalid minute"));
+        return Err(DateTimeError::InvalidMinute);
     }
     if second > 60 {
-        return Err(DateTimeError("invalid second"));
+        return Err(DateTimeError::InvalidSecond);
     }
     if nanoseconds >= NANOSECONDS_PER_SECOND {
-        return Err(DateTimeError("invalid nanoseconds"));
+        return Err(DateTimeError::InvalidNanoseconds);
     }
 
     let leap = is_leap_year(year) as i64;
@@ -661,7 +662,7 @@ const fn check_date_time_inputs(year: i32, month: u8, month_day: u8, hour: u8, m
     }
 
     if month_day as i64 > days_in_month {
-        return Err(DateTimeError("invalid month day"));
+        return Err(DateTimeError::InvalidMonthDay);
     }
 
     Ok(())
@@ -720,7 +721,6 @@ fn format_date_time(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Result;
 
     #[cfg(feature = "alloc")]
     use crate::timezone::TimeZone;
@@ -740,7 +740,7 @@ mod tests {
 
     #[cfg(feature = "alloc")]
     #[test]
-    fn test_date_time() -> Result<()> {
+    fn test_date_time() -> Result<(), TzError> {
         let time_zone_utc = TimeZone::utc();
         let utc = LocalTimeType::utc();
 
@@ -875,7 +875,7 @@ mod tests {
 
     #[cfg(feature = "alloc")]
     #[test]
-    fn test_date_time_leap_seconds() -> Result<()> {
+    fn test_date_time_leap_seconds() -> Result<(), TzError> {
         let utc_date_time = UtcDateTime::new(1972, 6, 30, 23, 59, 60, 1000)?;
 
         assert_eq!(UtcDateTime::from_timespec(utc_date_time.unix_time(), 1000)?, UtcDateTime::new(1972, 7, 1, 0, 0, 0, 1000)?);
@@ -901,7 +901,7 @@ mod tests {
 
     #[cfg(feature = "alloc")]
     #[test]
-    fn test_date_time_partial_eq_partial_ord() -> Result<()> {
+    fn test_date_time_partial_eq_partial_ord() -> Result<(), TzError> {
         let time_zone_utc = TimeZone::utc();
         let time_zone_cet = TimeZone::fixed(3600)?;
         let time_zone_eet = TimeZone::fixed(7200)?;
@@ -968,7 +968,7 @@ mod tests {
     }
 
     #[test]
-    fn test_utc_date_time_ord() -> Result<()> {
+    fn test_utc_date_time_ord() -> Result<(), TzError> {
         let utc_date_time_1 = UtcDateTime::new(1972, 6, 30, 23, 59, 59, 1000)?;
         let utc_date_time_2 = UtcDateTime::new(1972, 6, 30, 23, 59, 60, 1000)?;
         let utc_date_time_3 = UtcDateTime::new(1972, 7, 1, 0, 0, 0, 1000)?;
@@ -1013,7 +1013,7 @@ mod tests {
 
     #[cfg(feature = "alloc")]
     #[test]
-    fn test_date_time_format() -> Result<()> {
+    fn test_date_time_format() -> Result<(), TzError> {
         use alloc::string::ToString;
 
         let time_zones = [
@@ -1069,37 +1069,37 @@ mod tests {
 
     #[cfg(feature = "alloc")]
     #[test]
-    fn test_date_time_overflow() -> Result<()> {
+    fn test_date_time_overflow() -> Result<(), TzError> {
         assert!(UtcDateTime::new(i32::MIN, 1, 1, 0, 0, 0, 0).is_ok());
         assert!(UtcDateTime::new(i32::MAX, 12, 31, 23, 59, 59, 0).is_ok());
 
         assert!(DateTime::new(i32::MIN, 1, 1, 0, 0, 0, 0, LocalTimeType::utc()).is_ok());
         assert!(DateTime::new(i32::MAX, 12, 31, 23, 59, 59, 0, LocalTimeType::utc()).is_ok());
 
-        assert!(matches!(DateTime::new(i32::MIN, 1, 1, 0, 0, 0, 0, LocalTimeType::with_ut_offset(1)?), Err(DateTimeError(_))));
-        assert!(matches!(DateTime::new(i32::MAX, 12, 31, 23, 59, 59, 0, LocalTimeType::with_ut_offset(-1)?), Err(DateTimeError(_))));
+        assert!(matches!(DateTime::new(i32::MIN, 1, 1, 0, 0, 0, 0, LocalTimeType::with_ut_offset(1)?), Err(TzError::OutOfRange)));
+        assert!(matches!(DateTime::new(i32::MAX, 12, 31, 23, 59, 59, 0, LocalTimeType::with_ut_offset(-1)?), Err(TzError::OutOfRange)));
 
-        assert!(matches!(UtcDateTime::new(i32::MAX, 12, 31, 23, 59, 60, 0), Err(DateTimeError(_))));
-        assert!(matches!(DateTime::new(i32::MAX, 12, 31, 23, 59, 60, 0, LocalTimeType::utc()), Err(DateTimeError(_))));
+        assert!(matches!(UtcDateTime::new(i32::MAX, 12, 31, 23, 59, 60, 0), Err(TzError::OutOfRange)));
+        assert!(matches!(DateTime::new(i32::MAX, 12, 31, 23, 59, 60, 0, LocalTimeType::utc()), Err(TzError::OutOfRange)));
         assert!(DateTime::new(i32::MAX, 12, 31, 23, 59, 60, 0, LocalTimeType::with_ut_offset(1)?).is_ok());
 
         assert!(UtcDateTime::from_timespec(UtcDateTime::MIN_UNIX_TIME, 0).is_ok());
         assert!(UtcDateTime::from_timespec(UtcDateTime::MAX_UNIX_TIME, 0).is_ok());
 
-        assert!(matches!(UtcDateTime::from_timespec(UtcDateTime::MIN_UNIX_TIME - 1, 0), Err(OutOfRangeError(_))));
-        assert!(matches!(UtcDateTime::from_timespec(UtcDateTime::MAX_UNIX_TIME + 1, 0), Err(OutOfRangeError(_))));
+        assert!(matches!(UtcDateTime::from_timespec(UtcDateTime::MIN_UNIX_TIME - 1, 0), Err(TzError::OutOfRange)));
+        assert!(matches!(UtcDateTime::from_timespec(UtcDateTime::MAX_UNIX_TIME + 1, 0), Err(TzError::OutOfRange)));
 
-        assert!(matches!(UtcDateTime::from_timespec(UtcDateTime::MIN_UNIX_TIME, 0)?.project(TimeZone::fixed(-1)?.as_ref()), Err(ProjectDateTimeError(_))));
-        assert!(matches!(UtcDateTime::from_timespec(UtcDateTime::MAX_UNIX_TIME, 0)?.project(TimeZone::fixed(1)?.as_ref()), Err(ProjectDateTimeError(_))));
+        assert!(matches!(UtcDateTime::from_timespec(UtcDateTime::MIN_UNIX_TIME, 0)?.project(TimeZone::fixed(-1)?.as_ref()), Err(TzError::OutOfRange)));
+        assert!(matches!(UtcDateTime::from_timespec(UtcDateTime::MAX_UNIX_TIME, 0)?.project(TimeZone::fixed(1)?.as_ref()), Err(TzError::OutOfRange)));
 
-        assert!(matches!(UtcDateTime::from_timespec(i64::MIN, 0), Err(OutOfRangeError(_))));
-        assert!(matches!(UtcDateTime::from_timespec(i64::MAX, 0), Err(OutOfRangeError(_))));
+        assert!(matches!(UtcDateTime::from_timespec(i64::MIN, 0), Err(TzError::OutOfRange)));
+        assert!(matches!(UtcDateTime::from_timespec(i64::MAX, 0), Err(TzError::OutOfRange)));
 
         assert!(DateTime::from_timespec(UtcDateTime::MIN_UNIX_TIME, 0, TimeZone::fixed(0)?.as_ref()).is_ok());
         assert!(DateTime::from_timespec(UtcDateTime::MAX_UNIX_TIME, 0, TimeZone::fixed(0)?.as_ref()).is_ok());
 
-        assert!(matches!(DateTime::from_timespec(i64::MIN, 0, TimeZone::fixed(-1)?.as_ref()), Err(ProjectDateTimeError(_))));
-        assert!(matches!(DateTime::from_timespec(i64::MAX, 0, TimeZone::fixed(1)?.as_ref()), Err(ProjectDateTimeError(_))));
+        assert!(matches!(DateTime::from_timespec(i64::MIN, 0, TimeZone::fixed(-1)?.as_ref()), Err(TzError::OutOfRange)));
+        assert!(matches!(DateTime::from_timespec(i64::MAX, 0, TimeZone::fixed(1)?.as_ref()), Err(TzError::OutOfRange)));
 
         Ok(())
     }
@@ -1170,14 +1170,14 @@ mod tests {
     }
 
     #[test]
-    fn test_total_nanoseconds_to_timespec() -> Result<()> {
+    fn test_total_nanoseconds_to_timespec() -> Result<(), TzError> {
         assert!(matches!(total_nanoseconds_to_timespec(1_000_001_000), Ok((1, 1000))));
         assert!(matches!(total_nanoseconds_to_timespec(1000), Ok((0, 1000))));
         assert!(matches!(total_nanoseconds_to_timespec(-999_999_000), Ok((-1, 1000))));
         assert!(matches!(total_nanoseconds_to_timespec(-1_999_999_000), Ok((-2, 1000))));
 
-        assert!(matches!(total_nanoseconds_to_timespec(i128::MAX), Err(OutOfRangeError(_))));
-        assert!(matches!(total_nanoseconds_to_timespec(i128::MIN), Err(OutOfRangeError(_))));
+        assert!(matches!(total_nanoseconds_to_timespec(i128::MAX), Err(TzError::OutOfRange)));
+        assert!(matches!(total_nanoseconds_to_timespec(i128::MIN), Err(TzError::OutOfRange)));
 
         let min_total_nanoseconds = -9223372036854775808000000000;
         let max_total_nanoseconds = 9223372036854775807999999999;
@@ -1185,14 +1185,14 @@ mod tests {
         assert!(matches!(total_nanoseconds_to_timespec(min_total_nanoseconds), Ok((i64::MIN, 0))));
         assert!(matches!(total_nanoseconds_to_timespec(max_total_nanoseconds), Ok((i64::MAX, 999999999))));
 
-        assert!(matches!(total_nanoseconds_to_timespec(min_total_nanoseconds - 1), Err(OutOfRangeError(_))));
-        assert!(matches!(total_nanoseconds_to_timespec(max_total_nanoseconds + 1), Err(OutOfRangeError(_))));
+        assert!(matches!(total_nanoseconds_to_timespec(min_total_nanoseconds - 1), Err(TzError::OutOfRange)));
+        assert!(matches!(total_nanoseconds_to_timespec(max_total_nanoseconds + 1), Err(TzError::OutOfRange)));
 
         Ok(())
     }
 
     #[test]
-    fn test_const() -> Result<()> {
+    fn test_const() -> Result<(), TzError> {
         use crate::timezone::{AlternateTime, LeapSecond, MonthWeekDay, RuleDay, Transition, TransitionRule};
 
         macro_rules! unwrap {

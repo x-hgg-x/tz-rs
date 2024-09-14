@@ -2,7 +2,8 @@
 
 use crate::constants::*;
 use crate::datetime::{days_since_unix_epoch, is_leap_year, UtcDateTime};
-use crate::error::{OutOfRangeError, TransitionRuleError};
+use crate::error::timezone::TransitionRuleError;
+use crate::error::TzError;
 use crate::timezone::LocalTimeType;
 use crate::utils::{binary_search_i64, cmp};
 
@@ -43,7 +44,7 @@ impl Julian1WithoutLeap {
     #[inline]
     pub const fn new(julian_day_1: u16) -> Result<Self, TransitionRuleError> {
         if !(1 <= julian_day_1 && julian_day_1 <= 365) {
-            return Err(TransitionRuleError("invalid rule day julian day"));
+            return Err(TransitionRuleError::InvalidRuleDayJulianDay);
         }
 
         Ok(Self(julian_day_1))
@@ -98,7 +99,7 @@ impl Julian0WithLeap {
     #[inline]
     pub const fn new(julian_day_0: u16) -> Result<Self, TransitionRuleError> {
         if julian_day_0 > 365 {
-            return Err(TransitionRuleError("invalid rule day julian day"));
+            return Err(TransitionRuleError::InvalidRuleDayJulianDay);
         }
 
         Ok(Self(julian_day_0))
@@ -163,15 +164,15 @@ impl MonthWeekDay {
     #[inline]
     pub const fn new(month: u8, week: u8, week_day: u8) -> Result<Self, TransitionRuleError> {
         if !(1 <= month && month <= 12) {
-            return Err(TransitionRuleError("invalid rule day month"));
+            return Err(TransitionRuleError::InvalidRuleDayMonth);
         }
 
         if !(1 <= week && week <= 5) {
-            return Err(TransitionRuleError("invalid rule day week"));
+            return Err(TransitionRuleError::InvalidRuleDayWeek);
         }
 
         if week_day > 6 {
-            return Err(TransitionRuleError("invalid rule day week day"));
+            return Err(TransitionRuleError::InvalidRuleDayWeekDay);
         }
 
         Ok(Self { month, week, week_day })
@@ -333,21 +334,21 @@ impl AlternateTime {
 
         // Limit UTC offset to POSIX-required range
         if !(-25 * SECONDS_PER_HOUR < std_ut_offset && std_ut_offset < 26 * SECONDS_PER_HOUR) {
-            return Err(TransitionRuleError("invalid standard time UTC offset"));
+            return Err(TransitionRuleError::InvalidStdUtcOffset);
         }
 
         if !(-25 * SECONDS_PER_HOUR < dst_ut_offset && dst_ut_offset < 26 * SECONDS_PER_HOUR) {
-            return Err(TransitionRuleError("invalid Daylight Saving Time UTC offset"));
+            return Err(TransitionRuleError::InvalidDstUtcOffset);
         }
 
         // Overflow is not possible
         if !((dst_start_time as i64).abs() < SECONDS_PER_WEEK && (dst_end_time as i64).abs() < SECONDS_PER_WEEK) {
-            return Err(TransitionRuleError("invalid DST start or end time"));
+            return Err(TransitionRuleError::InvalidDstStartEndTime);
         }
 
         // Check DST transition rules consistency
         if !check_dst_transition_rules_consistency(&std, &dst, dst_start, dst_start_time, dst_end, dst_end_time) {
-            return Err(TransitionRuleError("DST transition rules are not consistent from one year to another"));
+            return Err(TransitionRuleError::InconsistentRule);
         }
 
         Ok(Self { std, dst, dst_start, dst_start_time, dst_end, dst_end_time })
@@ -390,7 +391,7 @@ impl AlternateTime {
     }
 
     /// Find the local time type associated to the alternate transition rule at the specified Unix time in seconds
-    const fn find_local_time_type(&self, unix_time: i64) -> Result<&LocalTimeType, OutOfRangeError> {
+    const fn find_local_time_type(&self, unix_time: i64) -> Result<&LocalTimeType, TzError> {
         // Overflow is not possible
         let dst_start_time_in_utc = self.dst_start_time as i64 - self.std.ut_offset as i64;
         let dst_end_time_in_utc = self.dst_end_time as i64 - self.dst.ut_offset as i64;
@@ -402,7 +403,7 @@ impl AlternateTime {
 
         // Check if the current year is valid for the following computations
         if !(i32::MIN + 2 <= current_year && current_year <= i32::MAX - 2) {
-            return Err(OutOfRangeError("out of range date time"));
+            return Err(TzError::OutOfRange);
         }
 
         let current_year_dst_start_unix_time = self.dst_start.unix_time(current_year, dst_start_time_in_utc);
@@ -475,7 +476,7 @@ pub enum TransitionRule {
 
 impl TransitionRule {
     /// Find the local time type associated to the transition rule at the specified Unix time in seconds
-    pub(super) const fn find_local_time_type(&self, unix_time: i64) -> Result<&LocalTimeType, OutOfRangeError> {
+    pub(super) const fn find_local_time_type(&self, unix_time: i64) -> Result<&LocalTimeType, TzError> {
         match self {
             Self::Fixed(local_time_type) => Ok(local_time_type),
             Self::Alternate(alternate_time) => alternate_time.find_local_time_type(unix_time),
@@ -706,10 +707,10 @@ const fn check_two_month_week_days(month_week_day_1: MonthWeekDay, utc_day_time_
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Result;
+    use crate::TzError;
 
     #[test]
-    fn test_compute_check_infos() -> Result<()> {
+    fn test_compute_check_infos() -> Result<(), TzError> {
         let check_julian = |check_infos: JulianDayCheckInfos, start_normal, end_normal, start_leap, end_leap| {
             assert_eq!(check_infos.start_normal_year_offset, start_normal);
             assert_eq!(check_infos.end_normal_year_offset, end_normal);
@@ -742,12 +743,12 @@ mod tests {
     }
 
     #[test]
-    fn test_check_dst_transition_rules_consistency() -> Result<()> {
+    fn test_check_dst_transition_rules_consistency() -> Result<(), TzError> {
         let utc = LocalTimeType::utc();
 
-        let julian_1 = |year_day| Result::Ok(RuleDay::Julian1WithoutLeap(Julian1WithoutLeap::new(year_day)?));
-        let julian_0 = |year_day| Result::Ok(RuleDay::Julian0WithLeap(Julian0WithLeap::new(year_day)?));
-        let mwd = |month, week, week_day| Result::Ok(RuleDay::MonthWeekDay(MonthWeekDay::new(month, week, week_day)?));
+        let julian_1 = |year_day| -> Result<_, TzError> { Ok(RuleDay::Julian1WithoutLeap(Julian1WithoutLeap::new(year_day)?)) };
+        let julian_0 = |year_day| -> Result<_, TzError> { Ok(RuleDay::Julian0WithLeap(Julian0WithLeap::new(year_day)?)) };
+        let mwd = |month, week, week_day| -> Result<_, TzError> { Ok(RuleDay::MonthWeekDay(MonthWeekDay::new(month, week, week_day)?)) };
 
         let check = |dst_start, dst_start_time, dst_end, dst_end_time| {
             let check_1 = check_dst_transition_rules_consistency(&utc, &utc, dst_start, dst_start_time, dst_end, dst_end_time);
@@ -856,7 +857,7 @@ mod tests {
     }
 
     #[test]
-    fn test_rule_day() -> Result<()> {
+    fn test_rule_day() -> Result<(), TzError> {
         let rule_day_j1 = RuleDay::Julian1WithoutLeap(Julian1WithoutLeap::new(60)?);
         assert_eq!(rule_day_j1.transition_date(2000), (3, 1));
         assert_eq!(rule_day_j1.transition_date(2001), (3, 1));
@@ -891,7 +892,7 @@ mod tests {
     }
 
     #[test]
-    fn test_transition_rule() -> Result<()> {
+    fn test_transition_rule() -> Result<(), TzError> {
         let transition_rule_fixed = TransitionRule::Fixed(LocalTimeType::new(-36000, false, None)?);
         assert_eq!(transition_rule_fixed.find_local_time_type(0)?.ut_offset(), -36000);
 
@@ -967,7 +968,7 @@ mod tests {
     }
 
     #[test]
-    fn test_transition_rule_overflow() -> Result<()> {
+    fn test_transition_rule_overflow() -> Result<(), TzError> {
         let transition_rule_1 = TransitionRule::Alternate(AlternateTime::new(
             LocalTimeType::new(-1, false, None)?,
             LocalTimeType::new(-1, true, None)?,
@@ -986,8 +987,8 @@ mod tests {
             0,
         )?);
 
-        assert!(matches!(transition_rule_1.find_local_time_type(i64::MIN), Err(OutOfRangeError(_))));
-        assert!(matches!(transition_rule_2.find_local_time_type(i64::MAX), Err(OutOfRangeError(_))));
+        assert!(matches!(transition_rule_1.find_local_time_type(i64::MIN), Err(TzError::OutOfRange)));
+        assert!(matches!(transition_rule_2.find_local_time_type(i64::MAX), Err(TzError::OutOfRange)));
 
         Ok(())
     }

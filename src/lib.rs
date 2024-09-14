@@ -20,7 +20,7 @@
 //! ## Time zone
 //!
 //! ```rust
-//! # fn main() -> Result<(), tz::TzError> {
+//! # fn main() -> Result<(), tz::Error> {
 //! # #[cfg(feature = "std")] {
 //! use tz::TimeZone;
 //!
@@ -59,7 +59,7 @@
 //! ## Date time
 //!
 //! ```rust
-//! # fn main() -> Result<(), tz::TzError> {
+//! # fn main() -> Result<(), tz::Error> {
 //! # #[cfg(feature = "std")] {
 //! use tz::{DateTime, LocalTimeType, TimeZone, UtcDateTime};
 //!
@@ -213,7 +213,7 @@ pub mod timezone;
 pub use datetime::{DateTime, UtcDateTime};
 
 #[doc(inline)]
-pub use error::TzError;
+pub use error::{Error, TzError};
 
 #[doc(inline)]
 pub use timezone::{LocalTimeType, TimeZoneRef};
@@ -221,6 +221,3 @@ pub use timezone::{LocalTimeType, TimeZoneRef};
 #[doc(inline)]
 #[cfg(feature = "alloc")]
 pub use timezone::{TimeZone, TimeZoneSettings};
-
-/// Alias for [`core::result::Result`] with the crate unified error
-pub type Result<T> = core::result::Result<T, TzError>;

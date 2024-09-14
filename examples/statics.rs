@@ -1,7 +1,8 @@
 use tz::datetime::{DateTime, UtcDateTime};
+use tz::error::TzError;
 use tz::timezone::{AlternateTime, LeapSecond, LocalTimeType, MonthWeekDay, RuleDay, TimeZoneRef, Transition, TransitionRule};
 
-fn main() -> tz::Result<()> {
+fn main() -> Result<(), TzError> {
     macro_rules! unwrap {
         ($x:expr) => {
             match $x {

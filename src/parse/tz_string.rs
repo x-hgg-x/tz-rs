@@ -1,6 +1,7 @@
 //! Functions used for parsing a TZ string.
 
-use crate::error::{ParseDataError, TzError, TzStringError};
+use crate::error::parse::{ParseDataError, TzStringError};
+use crate::error::TzError;
 use crate::parse::utils::{read_exact, read_optional_tag, read_tag, read_until, read_while, Cursor};
 use crate::timezone::{AlternateTime, Julian0WithLeap, Julian1WithoutLeap, LocalTimeType, MonthWeekDay, RuleDay, TransitionRule};
 
@@ -68,13 +69,13 @@ fn parse_offset(cursor: &mut Cursor<'_>) -> Result<i32, TzStringError> {
     let (sign, hour, minute, second) = parse_signed_hhmmss(cursor)?;
 
     if !(0..=24).contains(&hour) {
-        return Err(TzStringError::InvalidTzString("invalid offset hour"));
+        return Err(TzStringError::InvalidOffsetHour);
     }
     if !(0..=59).contains(&minute) {
-        return Err(TzStringError::InvalidTzString("invalid offset minute"));
+        return Err(TzStringError::InvalidOffsetMinute);
     }
     if !(0..=59).contains(&second) {
-        return Err(TzStringError::InvalidTzString("invalid offset second"));
+        return Err(TzStringError::InvalidOffsetSecond);
     }
 
     Ok(sign * (hour * 3600 + minute * 60 + second))
@@ -111,13 +112,13 @@ fn parse_rule_time(cursor: &mut Cursor<'_>) -> Result<i32, TzStringError> {
     let (hour, minute, second) = parse_hhmmss(cursor)?;
 
     if !(0..=24).contains(&hour) {
-        return Err(TzStringError::InvalidTzString("invalid day time hour"));
+        return Err(TzStringError::InvalidDayTimeHour);
     }
     if !(0..=59).contains(&minute) {
-        return Err(TzStringError::InvalidTzString("invalid day time minute"));
+        return Err(TzStringError::InvalidDayTimeMinute);
     }
     if !(0..=59).contains(&second) {
-        return Err(TzStringError::InvalidTzString("invalid day time second"));
+        return Err(TzStringError::InvalidDayTimeSecond);
     }
 
     Ok(hour * 3600 + minute * 60 + second)
@@ -128,13 +129,13 @@ fn parse_rule_time_extended(cursor: &mut Cursor<'_>) -> Result<i32, TzStringErro
     let (sign, hour, minute, second) = parse_signed_hhmmss(cursor)?;
 
     if !(-167..=167).contains(&hour) {
-        return Err(TzStringError::InvalidTzString("invalid day time hour"));
+        return Err(TzStringError::InvalidDayTimeHour);
     }
     if !(0..=59).contains(&minute) {
-        return Err(TzStringError::InvalidTzString("invalid day time minute"));
+        return Err(TzStringError::InvalidDayTimeMinute);
     }
     if !(0..=59).contains(&second) {
-        return Err(TzStringError::InvalidTzString("invalid day time second"));
+        return Err(TzStringError::InvalidDayTimeSecond);
     }
 
     Ok(sign * (hour * 3600 + minute * 60 + second))
@@ -176,11 +177,11 @@ pub(crate) fn parse_posix_tz(tz_string: &[u8], use_string_extensions: bool) -> R
     let dst_offset = match cursor.first() {
         Some(&b',') => std_offset - 3600,
         Some(_) => parse_offset(&mut cursor)?,
-        None => return Err(TzStringError::UnsupportedTzString("DST start and end rules must be provided").into()),
+        None => return Err(TzError::TzString(TzStringError::MissingDstStartEndRules)),
     };
 
     if cursor.is_empty() {
-        return Err(TzStringError::UnsupportedTzString("DST start and end rules must be provided").into());
+        return Err(TzError::TzString(TzStringError::MissingDstStartEndRules));
     }
 
     map_err(read_tag(&mut cursor, b","))?;
@@ -190,7 +191,7 @@ pub(crate) fn parse_posix_tz(tz_string: &[u8], use_string_extensions: bool) -> R
     let (dst_end, dst_end_time) = parse_rule_block(&mut cursor, use_string_extensions)?;
 
     if !cursor.is_empty() {
-        return Err(TzStringError::InvalidTzString("remaining data after parsing TZ string").into());
+        return Err(TzError::TzString(TzStringError::RemainingData));
     }
 
     Ok(TransitionRule::Alternate(AlternateTime::new(
@@ -365,8 +366,8 @@ mod tests {
 
     #[test]
     fn test_error() -> Result<(), TzError> {
-        assert!(matches!(parse_posix_tz(b"IST-1GMT0", false), Err(TzError::TzString(TzStringError::UnsupportedTzString(_)))));
-        assert!(matches!(parse_posix_tz(b"EET-2EEST", false), Err(TzError::TzString(TzStringError::UnsupportedTzString(_)))));
+        assert!(matches!(parse_posix_tz(b"IST-1GMT0", false), Err(TzError::TzString(TzStringError::MissingDstStartEndRules))));
+        assert!(matches!(parse_posix_tz(b"EET-2EEST", false), Err(TzError::TzString(TzStringError::MissingDstStartEndRules))));
 
         Ok(())
     }

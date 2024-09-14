@@ -1,6 +1,7 @@
 //! Functions used for parsing a TZif file.
 
-use crate::error::{TzError, TzFileError};
+use crate::error::parse::TzFileError;
+use crate::error::TzError;
 use crate::parse::tz_string::parse_posix_tz;
 use crate::parse::utils::{read_chunk_exact, read_exact, Cursor};
 use crate::timezone::{LeapSecond, LocalTimeType, TimeZone, Transition, TransitionRule};
@@ -43,14 +44,14 @@ struct Header {
 fn parse_header(cursor: &mut Cursor<'_>) -> Result<Header, TzFileError> {
     let magic = read_exact(cursor, 4)?;
     if magic != *b"TZif" {
-        return Err(TzFileError::InvalidTzFile("invalid magic number"));
+        return Err(TzFileError::InvalidMagicNumber);
     }
 
     let version = match read_exact(cursor, 1)? {
         [0x00] => Version::V1,
         [0x32] => Version::V2,
         [0x33] => Version::V3,
-        _ => return Err(TzFileError::UnsupportedTzFile("unsupported TZif version")),
+        _ => return Err(TzFileError::UnsupportedTzFileVersion),
     };
 
     read_exact(cursor, 15)?;
@@ -63,7 +64,7 @@ fn parse_header(cursor: &mut Cursor<'_>) -> Result<Header, TzFileError> {
     let char_count = u32::from_be_bytes(*read_chunk_exact(cursor)?);
 
     if !(type_count != 0 && char_count != 0 && (ut_local_count == 0 || ut_local_count == type_count) && (std_wall_count == 0 || std_wall_count == type_count)) {
-        return Err(TzFileError::InvalidTzFile("invalid header"));
+        return Err(TzFileError::InvalidHeader);
     }
 
     Ok(Header {
@@ -81,12 +82,12 @@ fn parse_header(cursor: &mut Cursor<'_>) -> Result<Header, TzFileError> {
 fn parse_footer(footer: &[u8], use_string_extensions: bool) -> Result<Option<TransitionRule>, TzError> {
     let footer = str::from_utf8(footer).map_err(TzFileError::from)?;
     if !(footer.starts_with('\n') && footer.ends_with('\n')) {
-        return Err(TzFileError::InvalidTzFile("invalid footer").into());
+        return Err(TzError::TzFile(TzFileError::InvalidFooter));
     }
 
     let tz_string = footer.trim_matches(|c: char| c.is_ascii_whitespace());
     if tz_string.starts_with(':') || tz_string.contains('\0') {
-        return Err(TzFileError::InvalidTzFile("invalid footer").into());
+        return Err(TzError::TzFile(TzFileError::InvalidFooter));
     }
 
     if !tz_string.is_empty() {
@@ -173,16 +174,16 @@ where
             let is_dst = match d4 {
                 0 => false,
                 1 => true,
-                _ => return Err(TzFileError::InvalidTzFile("invalid DST indicator").into()),
+                _ => return Err(TzError::TzFile(TzFileError::InvalidDstIndicator)),
             };
 
             let char_index = d5 as usize;
             if char_index >= header.char_count {
-                return Err(TzFileError::InvalidTzFile("invalid time zone designation char index").into());
+                return Err(TzError::TzFile(TzFileError::InvalidTimeZoneDesignationCharIndex));
             }
 
             let time_zone_designation = match self.time_zone_designations[char_index..].iter().position(|&c| c == b'\0') {
-                None => return Err(TzFileError::InvalidTzFile("invalid time zone designation char index").into()),
+                None => return Err(TzError::TzFile(TzFileError::InvalidTimeZoneDesignationCharIndex)),
                 Some(position) => {
                     let time_zone_designation = &self.time_zone_designations[char_index..char_index + position];
 
@@ -211,13 +212,13 @@ where
         let ut_locals_iter = self.ut_locals.iter().copied().chain(iter::repeat(0));
         for (std_wall, ut_local) in std_walls_iter.zip(ut_locals_iter).take(header.type_count) {
             if !matches!((std_wall, ut_local), (0, 0) | (1, 0) | (1, 1)) {
-                return Err(TzFileError::InvalidTzFile("invalid couple of standard/wall and UT/local indicators").into());
+                return Err(TzError::TzFile(TzFileError::InvalidStdWallUtLocal));
             }
         }
 
         let extra_rule = footer.and_then(|footer| parse_footer(footer, header.version == Version::V3).transpose()).transpose()?;
 
-        Ok(TimeZone::new(transitions, local_time_types, leap_seconds, extra_rule)?)
+        TimeZone::new(transitions, local_time_types, leap_seconds, extra_rule)
     }
 }
 
@@ -232,7 +233,7 @@ pub(crate) fn parse_tz_file(bytes: &[u8]) -> Result<TimeZone, TzError> {
             let data_blocks = read_data_blocks::<4>(&mut cursor, &header)?;
 
             if !cursor.is_empty() {
-                return Err(TzFileError::InvalidTzFile("remaining data after end of TZif v1 data block").into());
+                return Err(TzError::TzFile(TzFileError::RemainingDataV1));
             }
 
             Ok(data_blocks.parse(&header, None)?)
