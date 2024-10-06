@@ -143,7 +143,7 @@ impl DateTimeList for FoundDateTimeList {
     }
 }
 
-impl<'a> DateTimeList for FoundDateTimeListRefMut<'a> {
+impl DateTimeList for FoundDateTimeListRefMut<'_> {
     fn push(&mut self, found_date_time: FoundDateTimeKind) {
         if let Some(x) = self.buf.get_mut(self.current_index) {
             *x = Some(found_date_time);

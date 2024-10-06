@@ -134,7 +134,7 @@ trait ParseTime {
     fn parse_time(&self, data: &Self::TimeData) -> i64;
 }
 
-impl<'a> ParseTime for DataBlocks<'a, 4> {
+impl ParseTime for DataBlocks<'_, 4> {
     type TimeData = [u8; 4];
 
     fn parse_time(&self, data: &Self::TimeData) -> i64 {
@@ -142,7 +142,7 @@ impl<'a> ParseTime for DataBlocks<'a, 4> {
     }
 }
 
-impl<'a> ParseTime for DataBlocks<'a, 8> {
+impl ParseTime for DataBlocks<'_, 8> {
     type TimeData = [u8; 8];
 
     fn parse_time(&self, data: &Self::TimeData) -> i64 {
