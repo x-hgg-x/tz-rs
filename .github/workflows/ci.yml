@@ -37,7 +37,7 @@ jobs:
       - name: Install Rust
         run: |
           rustup set profile minimal
-          rustup toolchain install 1.81 stable nightly --component clippy
+          rustup toolchain install 1.85 stable nightly --component clippy
           rustup override set stable
 
       - name: Test

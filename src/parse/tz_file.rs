@@ -1,9 +1,9 @@
 //! Functions used for parsing a TZif file.
 
-use crate::error::parse::TzFileError;
 use crate::error::TzError;
+use crate::error::parse::TzFileError;
 use crate::parse::tz_string::parse_posix_tz;
-use crate::parse::utils::{read_chunk_exact, read_exact, Cursor};
+use crate::parse::utils::{Cursor, read_chunk_exact, read_exact};
 use crate::timezone::{LeapSecond, LocalTimeType, TimeZone, Transition, TransitionRule};
 
 use alloc::vec::Vec;
@@ -90,11 +90,7 @@ fn parse_footer(footer: &[u8], use_string_extensions: bool) -> Result<Option<Tra
         return Err(TzError::TzFile(TzFileError::InvalidFooter));
     }
 
-    if !tz_string.is_empty() {
-        Ok(Some(parse_posix_tz(tz_string.as_bytes(), use_string_extensions)).transpose()?)
-    } else {
-        Ok(None)
-    }
+    if !tz_string.is_empty() { Ok(Some(parse_posix_tz(tz_string.as_bytes(), use_string_extensions)).transpose()?) } else { Ok(None) }
 }
 
 /// TZif data blocks
@@ -187,11 +183,7 @@ where
                 Some(position) => {
                     let time_zone_designation = &self.time_zone_designations[char_index..char_index + position];
 
-                    if !time_zone_designation.is_empty() {
-                        Some(time_zone_designation)
-                    } else {
-                        None
-                    }
+                    if !time_zone_designation.is_empty() { Some(time_zone_designation) } else { None }
                 }
             };
 

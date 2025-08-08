@@ -1,8 +1,8 @@
 //! Functions used for parsing a TZ string.
 
-use crate::error::parse::{ParseDataError, TzStringError};
 use crate::error::TzError;
-use crate::parse::utils::{read_exact, read_optional_tag, read_tag, read_until, read_while, Cursor};
+use crate::error::parse::{ParseDataError, TzStringError};
+use crate::parse::utils::{Cursor, read_exact, read_optional_tag, read_tag, read_until, read_while};
 use crate::timezone::{AlternateTime, Julian0WithLeap, Julian1WithoutLeap, LocalTimeType, MonthWeekDay, RuleDay, TransitionRule};
 
 use core::num::ParseIntError;
@@ -146,11 +146,7 @@ fn parse_rule_block(cursor: &mut Cursor<'_>, use_string_extensions: bool) -> Res
     let date = parse_rule_day(cursor)?;
 
     let time = if map_err(read_optional_tag(cursor, b"/"))? {
-        if use_string_extensions {
-            parse_rule_time_extended(cursor)?
-        } else {
-            parse_rule_time(cursor)?
-        }
+        if use_string_extensions { parse_rule_time_extended(cursor)? } else { parse_rule_time(cursor)? }
     } else {
         2 * 3600
     };

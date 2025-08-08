@@ -1,9 +1,9 @@
 //! Types related to a time zone extra transition rule.
 
 use crate::constants::*;
-use crate::datetime::{days_since_unix_epoch, is_leap_year, UtcDateTime};
-use crate::error::timezone::TransitionRuleError;
+use crate::datetime::{UtcDateTime, days_since_unix_epoch, is_leap_year};
 use crate::error::TzError;
+use crate::error::timezone::TransitionRuleError;
 use crate::timezone::LocalTimeType;
 use crate::utils::{binary_search_i64, cmp};
 
@@ -457,11 +457,7 @@ impl AlternateTime {
             }
         };
 
-        if is_dst {
-            Ok(&self.dst)
-        } else {
-            Ok(&self.std)
-        }
+        if is_dst { Ok(&self.dst) } else { Ok(&self.std) }
     }
 }
 

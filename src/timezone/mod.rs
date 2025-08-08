@@ -5,8 +5,8 @@ mod rule;
 #[doc(inline)]
 pub use rule::{AlternateTime, Julian0WithLeap, Julian1WithoutLeap, MonthWeekDay, RuleDay, TransitionRule};
 
-use crate::error::timezone::{LocalTimeTypeError, TimeZoneError};
 use crate::error::TzError;
+use crate::error::timezone::{LocalTimeTypeError, TimeZoneError};
 use crate::utils::{binary_search_leap_seconds, binary_search_transitions};
 
 #[cfg(feature = "alloc")]

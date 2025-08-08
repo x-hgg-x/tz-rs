@@ -29,11 +29,7 @@ pub(super) fn read_chunk_exact<'a, const N: usize>(cursor: &mut Cursor<'a>) -> R
 
 /// Read bytes and compare them to the provided tag
 pub(super) fn read_tag(cursor: &mut Cursor<'_>, tag: &[u8]) -> Result<(), ParseDataError> {
-    if read_exact(cursor, tag.len())? == tag {
-        Ok(())
-    } else {
-        Err(ParseDataError::InvalidData)
-    }
+    if read_exact(cursor, tag.len())? == tag { Ok(()) } else { Err(ParseDataError::InvalidData) }
 }
 
 /// Read bytes if the remaining data is prefixed by the provided tag

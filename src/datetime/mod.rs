@@ -10,8 +10,8 @@ pub use find::{FoundDateTimeKind, FoundDateTimeListRefMut};
 
 use crate::constants::*;
 use crate::datetime::find::find_date_time;
-use crate::error::datetime::DateTimeError;
 use crate::error::TzError;
+use crate::error::datetime::DateTimeError;
 use crate::timezone::{LocalTimeType, TimeZoneRef};
 use crate::utils::{min, try_into_i32, try_into_i64};
 
@@ -51,11 +51,7 @@ impl UtcDateTime {
 
     /// Check if the UTC date time associated to a Unix time in seconds is valid
     const fn check_unix_time(unix_time: i64) -> Result<(), TzError> {
-        if Self::MIN_UNIX_TIME <= unix_time && unix_time <= Self::MAX_UNIX_TIME {
-            Ok(())
-        } else {
-            Err(TzError::OutOfRange)
-        }
+        if Self::MIN_UNIX_TIME <= unix_time && unix_time <= Self::MAX_UNIX_TIME { Ok(()) } else { Err(TzError::OutOfRange) }
     }
 
     /// Construct a UTC date time

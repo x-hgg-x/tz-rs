@@ -30,11 +30,7 @@ macro_rules! impl_try_into_integer {
         let min = <$to_type>::MIN as $from_type;
         let max = <$to_type>::MAX as $from_type;
 
-        if min <= $value && $value <= max {
-            Ok($value as $to_type)
-        } else {
-            Err(TzError::OutOfRange)
-        }
+        if min <= $value && $value <= max { Ok($value as $to_type) } else { Err(TzError::OutOfRange) }
     }};
 }
 
