@@ -79,7 +79,10 @@ impl LeapSecond {
     }
 }
 
-/// ASCII-encoded fixed-capacity string, used for storing time zone designations
+/// ASCII-encoded fixed-capacity string, used for storing time zone designations.
+///
+/// POSIX only supports time zone designations with at least three characters,
+/// but this type is extended to also support military time zones like `"Z"`.
 #[derive(Copy, Clone, Eq, PartialEq)]
 struct TzAsciiStr {
     /// Length-prefixed string buffer
@@ -91,7 +94,7 @@ impl TzAsciiStr {
     const fn new(input: &[u8]) -> Result<Self, LocalTimeTypeError> {
         let len = input.len();
 
-        if len < 1 || len > 7 {
+        if !(1 <= len && len <= 7) {
             return Err(LocalTimeTypeError::InvalidTimeZoneDesignationLength);
         }
 
