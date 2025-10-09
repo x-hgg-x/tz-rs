@@ -91,7 +91,7 @@ impl TzAsciiStr {
     const fn new(input: &[u8]) -> Result<Self, LocalTimeTypeError> {
         let len = input.len();
 
-        if !(3 <= len && len <= 7) {
+        if len < 1 || len > 7 {
             return Err(LocalTimeTypeError::InvalidTimeZoneDesignationLength);
         }
 
@@ -118,6 +118,8 @@ impl TzAsciiStr {
     #[inline]
     const fn as_bytes(&self) -> &[u8] {
         match &self.bytes {
+            [1, head @ .., _, _, _, _, _, _] => head,
+            [2, head @ .., _, _, _, _, _] => head,
             [3, head @ .., _, _, _, _] => head,
             [4, head @ .., _, _, _] => head,
             [5, head @ .., _, _] => head,
@@ -628,8 +630,8 @@ mod tests {
     #[test]
     fn test_tz_ascii_str() -> Result<(), TzError> {
         assert!(matches!(TzAsciiStr::new(b""), Err(LocalTimeTypeError::InvalidTimeZoneDesignationLength)));
-        assert!(matches!(TzAsciiStr::new(b"1"), Err(LocalTimeTypeError::InvalidTimeZoneDesignationLength)));
-        assert!(matches!(TzAsciiStr::new(b"12"), Err(LocalTimeTypeError::InvalidTimeZoneDesignationLength)));
+        assert_eq!(TzAsciiStr::new(b"1")?.as_bytes(), b"1");
+        assert_eq!(TzAsciiStr::new(b"12")?.as_bytes(), b"12");
         assert_eq!(TzAsciiStr::new(b"123")?.as_bytes(), b"123");
         assert_eq!(TzAsciiStr::new(b"1234")?.as_bytes(), b"1234");
         assert_eq!(TzAsciiStr::new(b"12345")?.as_bytes(), b"12345");
