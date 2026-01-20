@@ -19,6 +19,8 @@ use core::cmp::Ordering;
 use core::fmt;
 use core::ops::{Add, AddAssign, Sub, SubAssign};
 use core::time::Duration;
+#[cfg(feature = "std")]
+use std::time::SystemTime;
 
 /// UTC date time expressed in the [proleptic gregorian calendar](https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar)
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
@@ -171,7 +173,7 @@ impl UtcDateTime {
     /// Returns the current UTC date time
     #[cfg(feature = "std")]
     pub fn now() -> Result<Self, TzError> {
-        Self::from_total_nanoseconds(crate::utils::current_total_nanoseconds())
+        SystemTime::now().try_into()
     }
 
     /// Add a given duration to the `UtcDateTime`, returing `Some(UtcDateTime)` if the result does
@@ -336,6 +338,51 @@ impl Sub<Duration> for UtcDateTime {
 impl SubAssign<Duration> for UtcDateTime {
     fn sub_assign(&mut self, rhs: Duration) {
         *self = *self - rhs
+    }
+}
+
+impl TryFrom<DateTime> for UtcDateTime {
+    type Error = TzError;
+
+    fn try_from(value: DateTime) -> Result<Self, Self::Error> {
+        UtcDateTime::from_timespec(value.unix_time, value.nanoseconds)
+    }
+}
+
+#[cfg(feature = "std")]
+impl TryFrom<SystemTime> for UtcDateTime {
+    type Error = TzError;
+
+    fn try_from(value: SystemTime) -> Result<Self, Self::Error> {
+        match value.duration_since(SystemTime::UNIX_EPOCH) {
+            Ok(d) => UtcDateTime::UNIX_EPOCH.checked_add(d),
+            Err(e) => UtcDateTime::UNIX_EPOCH.checked_sub(e.duration()),
+        }
+        .ok_or(TzError::OutOfRange)
+    }
+}
+
+#[cfg(feature = "std")]
+impl From<UtcDateTime> for SystemTime {
+    fn from(value: UtcDateTime) -> Self {
+        match value.duration_since(UtcDateTime::UNIX_EPOCH) {
+            Ok(d) => SystemTime::UNIX_EPOCH + d,
+            Err(d) => SystemTime::UNIX_EPOCH - d,
+        }
+    }
+}
+
+#[cfg(feature = "std")]
+impl From<DateTime> for SystemTime {
+    fn from(value: DateTime) -> Self {
+        let unix_time = value.unix_time();
+        if unix_time >= 0 {
+            SystemTime::UNIX_EPOCH + Duration::new(unix_time as u64, value.nanoseconds)
+        } else if value.nanoseconds == 0 {
+            SystemTime::UNIX_EPOCH - Duration::from_secs(unix_time.unsigned_abs())
+        } else {
+            SystemTime::UNIX_EPOCH - Duration::new(unix_time.unsigned_abs() - 1, NANOSECONDS_PER_SECOND - value.nanoseconds)
+        }
     }
 }
 
@@ -572,8 +619,7 @@ impl DateTime {
     /// Returns the current date time associated to the specified time zone
     #[cfg(feature = "std")]
     pub fn now(time_zone_ref: TimeZoneRef<'_>) -> Result<Self, TzError> {
-        let now = crate::utils::current_total_nanoseconds();
-        Self::from_total_nanoseconds(now, time_zone_ref)
+        UtcDateTime::try_from(SystemTime::now())?.project(time_zone_ref)
     }
 }
 
@@ -1534,6 +1580,68 @@ mod tests {
             let after = UtcDateTime::from_timespec(-1, 200_000_000).unwrap();
             let before = UtcDateTime::from_timespec(-3, 800_000_000).unwrap();
             assert_eq!(Ok(Duration::new(1, 400_000_000)), after.duration_since(before));
+        }
+    }
+
+    #[test]
+    fn test_try_from_date_time_for_utc_date_time() {
+        let date_time = DateTime::from_timespec(24 * 60 * 60, 123, TimeZoneRef::utc()).unwrap();
+        let utc_date_time = UtcDateTime::from_timespec(24 * 60 * 60, 123).unwrap();
+
+        assert_eq!(utc_date_time, UtcDateTime::try_from(date_time).unwrap());
+    }
+
+    #[test]
+    #[cfg(feature = "std")]
+    fn test_try_from_system_time_for_utc_date_time_success() {
+        {
+            // after epoch
+            let system_time = SystemTime::UNIX_EPOCH + Duration::new(24 * 60 * 60, 200_000_000);
+            let utc_date_time = UtcDateTime::from_timespec(24 * 60 * 60, 200_000_000).unwrap();
+            assert_eq!(utc_date_time, UtcDateTime::try_from(system_time).unwrap());
+            // and the reverse
+            assert_eq!(system_time, SystemTime::from(utc_date_time));
+        }
+
+        {
+            // before epoch
+            let system_time = SystemTime::UNIX_EPOCH - Duration::new(24 * 60 * 60, 200_000_000);
+            let utc_date_time = UtcDateTime::from_timespec(-24 * 60 * 60 - 1, 800_000_000).unwrap();
+            assert_eq!(utc_date_time, UtcDateTime::try_from(system_time).unwrap());
+            // and the reverse
+            assert_eq!(system_time, SystemTime::from(utc_date_time));
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "std")]
+    fn test_try_from_system_time_for_utc_date_time_overflow() {
+        let system_time = SystemTime::UNIX_EPOCH + Duration::from_secs(i64::MAX as u64);
+        assert!(matches!(UtcDateTime::try_from(system_time).unwrap_err(), TzError::OutOfRange));
+    }
+
+    #[test]
+    #[cfg(feature = "std")]
+    fn test_from_date_time_for_system_time() {
+        {
+            // after epoch
+            let system_time = SystemTime::UNIX_EPOCH + Duration::new(24 * 60 * 60, 200_000_000);
+            let date_time = DateTime::from_timespec(24 * 60 * 60, 200_000_000, TimeZoneRef::utc()).unwrap();
+            assert_eq!(system_time, SystemTime::from(date_time));
+        }
+
+        {
+            // second resolution before epoch, it matters
+            let system_time = SystemTime::UNIX_EPOCH - Duration::from_secs(1);
+            let date_time = DateTime::from_timespec(-1, 0, TimeZoneRef::utc()).unwrap();
+            assert_eq!(system_time, SystemTime::from(date_time));
+        }
+
+        {
+            // before epoch
+            let system_time = SystemTime::UNIX_EPOCH - Duration::new(24 * 60 * 60, 200_000_000);
+            let date_time = DateTime::from_timespec(-24 * 60 * 60 - 1, 800_000_000, TimeZoneRef::utc()).unwrap();
+            assert_eq!(system_time, SystemTime::from(date_time));
         }
     }
 }

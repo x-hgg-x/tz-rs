@@ -522,7 +522,12 @@ impl TimeZone {
     /// Find the current local time type associated to the time zone
     #[cfg(feature = "std")]
     pub fn find_current_local_time_type(&self) -> Result<&LocalTimeType, TzError> {
-        self.find_local_time_type(crate::utils::current_unix_time())
+        use std::time::SystemTime;
+
+        match SystemTime::now().duration_since(SystemTime::UNIX_EPOCH) {
+            Ok(d) => self.find_local_time_type(0i64.saturating_add_unsigned(d.as_secs())),
+            Err(e) => self.find_local_time_type(0i64.saturating_sub_unsigned(e.duration().as_secs())),
+        }
     }
 }
 
