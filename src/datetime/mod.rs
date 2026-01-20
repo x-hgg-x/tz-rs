@@ -17,6 +17,8 @@ use crate::utils::{min, try_into_i32, try_into_i64};
 
 use core::cmp::Ordering;
 use core::fmt;
+use core::ops::{Add, AddAssign, Sub, SubAssign};
+use core::time::Duration;
 
 /// UTC date time expressed in the [proleptic gregorian calendar](https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar)
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
@@ -48,6 +50,9 @@ impl UtcDateTime {
     const MIN_UNIX_TIME: i64 = -67768100567971200;
     /// Maximum allowed Unix time in seconds
     const MAX_UNIX_TIME: i64 = 67767976233532799;
+
+    /// UNIX year 0: January 1, 1970 at midnight UTC.
+    pub const UNIX_EPOCH: UtcDateTime = UtcDateTime { year: 1970, month: 1, month_day: 1, hour: 0, minute: 0, second: 0, nanoseconds: 0 };
 
     /// Check if the UTC date time associated to a Unix time in seconds is valid
     const fn check_unix_time(unix_time: i64) -> Result<(), TzError> {
@@ -167,6 +172,170 @@ impl UtcDateTime {
     #[cfg(feature = "std")]
     pub fn now() -> Result<Self, TzError> {
         Self::from_total_nanoseconds(crate::utils::current_total_nanoseconds())
+    }
+
+    /// Add a given duration to the `UtcDateTime`, returing `Some(UtcDateTime)` if the result does
+    /// not result in an overflow of the internal representation, `None` otherwise.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # fn test() -> Option<()> {
+    /// use core::time::Duration;
+    /// use tz::UtcDateTime;
+    ///
+    /// let unix_epoch = UtcDateTime::UNIX_EPOCH;
+    /// assert_eq!("1970-01-01T00:00:00.000000000Z", unix_epoch.to_string());
+    ///
+    /// let tomorrow = unix_epoch.checked_add(Duration::from_secs(24 * 60 * 60))?;
+    /// assert_eq!("1970-01-02T00:00:00.000000000Z", tomorrow.to_string());
+    ///
+    /// assert_eq!(None, unix_epoch.checked_add(Duration::from_secs(u64::MAX)));
+    /// # Some(()) } test().expect("doctest exited prematurely");
+    /// ```
+    pub const fn checked_add(&self, rhs: Duration) -> Option<Self> {
+        let Some(mut unix_time) = self.unix_time().checked_add_unsigned(rhs.as_secs()) else {
+            return None;
+        };
+        let mut nanoseconds = self.nanoseconds() + rhs.subsec_nanos();
+
+        if nanoseconds >= NANOSECONDS_PER_SECOND {
+            if let Some(t) = unix_time.checked_add_unsigned((nanoseconds / NANOSECONDS_PER_SECOND) as u64) {
+                unix_time = t;
+            } else {
+                return None;
+            }
+            nanoseconds %= NANOSECONDS_PER_SECOND;
+        }
+
+        match UtcDateTime::from_timespec(unix_time, nanoseconds) {
+            Ok(t) => Some(t),
+            Err(_) => None,
+        }
+    }
+
+    /// Subtract a given duration from the `UtcDateTime`, returing `Some(UtcDateTime)` if the
+    /// result does not result in an integer overflow of the internal representation, `None`
+    /// otherwise.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # fn test() -> Option<()> {
+    /// use core::time::Duration;
+    /// use tz::UtcDateTime;
+    ///
+    /// let unix_epoch = UtcDateTime::UNIX_EPOCH;
+    /// assert_eq!("1970-01-01T00:00:00.000000000Z", unix_epoch.to_string());
+    ///
+    /// let yesterday = unix_epoch.checked_sub(Duration::from_secs(24 * 60 * 60))?;
+    /// assert_eq!("1969-12-31T00:00:00.000000000Z", yesterday.to_string());
+    ///
+    /// assert_eq!(None, unix_epoch.checked_sub(Duration::from_secs(u64::MAX)));
+    /// # Some(()) } test().expect("doctest exited prematurely");
+    /// ```
+    pub const fn checked_sub(&self, rhs: Duration) -> Option<Self> {
+        let Some(mut unix_time) = self.unix_time().checked_sub_unsigned(rhs.as_secs()) else {
+            return None;
+        };
+
+        let mut nanoseconds = self.nanoseconds();
+        let rhs_nanos = rhs.subsec_nanos();
+
+        while nanoseconds < rhs_nanos {
+            if let Some(t) = unix_time.checked_sub_unsigned(1) {
+                unix_time = t;
+            } else {
+                return None;
+            }
+            nanoseconds += NANOSECONDS_PER_SECOND;
+        }
+        nanoseconds -= rhs_nanos;
+
+        match UtcDateTime::from_timespec(unix_time, nanoseconds) {
+            Ok(t) => Some(t),
+            Err(_) => None,
+        }
+    }
+
+    /// Get the [`Duration`] elapsed since `earlier`. Returns <code>[Ok]\([Duration])</code> if
+    /// `earlier` is before `self`, or <code>[Err]\([Duration])</code> with the `Duration` in the
+    /// opposite direction if it occurs after.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # fn test() -> Result<(), tz::TzError> {
+    /// use core::time::Duration;
+    /// use tz::UtcDateTime;
+    ///
+    /// let one_day = Duration::from_secs(24 * 60 * 60);
+    /// let today = UtcDateTime::UNIX_EPOCH;
+    /// let tomorrow = today + one_day;
+    ///
+    /// assert_eq!(Ok(one_day), tomorrow.duration_since(today));
+    /// assert_eq!(Err(one_day), today.duration_since(tomorrow));
+    /// assert_eq!(Ok(Duration::from_secs(0)), today.duration_since(today));
+    ///
+    /// # Ok(()) } test().expect("doctest exited prematurely");
+    /// ```
+    pub const fn duration_since(&self, earlier: Self) -> Result<Duration, Duration> {
+        let (my_s, my_ns) = (self.unix_time(), self.nanoseconds());
+        let (earlier_s, earlier_ns) = (earlier.unix_time(), earlier.nanoseconds());
+
+        if my_s > earlier_s || my_s == earlier_s && my_ns >= earlier_ns {
+            let mut s = my_s - earlier_s;
+            let mut ns = my_ns;
+
+            while ns < earlier_ns {
+                ns += NANOSECONDS_PER_SECOND;
+                s -= 1;
+            }
+            ns -= earlier_ns;
+
+            Ok(Duration::new(s as u64, ns))
+        } else if let Ok(duration) = earlier.duration_since(*self) {
+            Err(duration)
+        } else {
+            // unwrap() is not yet const
+            unreachable!();
+        }
+    }
+}
+
+impl Add<Duration> for UtcDateTime {
+    type Output = UtcDateTime;
+
+    /// # Panics
+    ///
+    /// This function may panic if the result overflows the internal representation. See
+    /// [`UtcDateTime::checked_add`] if this is not desired.
+    fn add(self, rhs: Duration) -> Self::Output {
+        self.checked_add(rhs).expect("attempt to add with overflow")
+    }
+}
+
+impl AddAssign<Duration> for UtcDateTime {
+    fn add_assign(&mut self, rhs: Duration) {
+        *self = *self + rhs
+    }
+}
+
+impl Sub<Duration> for UtcDateTime {
+    type Output = UtcDateTime;
+
+    /// # Panics
+    ///
+    /// This function may panic if the result overflows the internal representation. See
+    /// [`UtcDateTime::checked_sub`] if this is not desired.
+    fn sub(self, rhs: Duration) -> Self::Output {
+        self.checked_sub(rhs).expect("attempt to subtract with overflow")
+    }
+}
+
+impl SubAssign<Duration> for UtcDateTime {
+    fn sub_assign(&mut self, rhs: Duration) {
+        *self = *self - rhs
     }
 }
 
@@ -1280,5 +1449,91 @@ mod tests {
         assert_eq!(local_time_type_2.time_zone_designation(), LOCAL_TIME_TYPE_2.time_zone_designation());
 
         Ok(())
+    }
+
+    #[test]
+    fn test_add_for_utc_date_time() {
+        let mut date_time = UtcDateTime::UNIX_EPOCH;
+        let one_day = Duration::from_secs(24 * 60 * 60);
+        let tomorrow = UtcDateTime::from_timespec(24 * 60 * 60, 0).unwrap();
+
+        assert_eq!(tomorrow, date_time + one_day);
+        date_time += one_day;
+        assert_eq!(tomorrow, date_time);
+    }
+
+    #[test]
+    #[should_panic(expected = "attempt to add with overflow")]
+    fn test_add_for_utc_date_time_overflow() {
+        let _ = UtcDateTime::UNIX_EPOCH + Duration::from_secs(u64::MAX);
+    }
+
+    #[test]
+    fn test_add_for_utc_date_time_carries_nanoseconds() {
+        let date_time = UtcDateTime::from_timespec(0, 600_000_000).unwrap();
+        let duration = Duration::from_nanos(600_000_000);
+        let out = UtcDateTime::from_timespec(1, 200_000_000).unwrap();
+
+        assert_eq!(out, date_time + duration);
+    }
+
+    #[test]
+    fn test_sub_for_utc_date_time() {
+        let mut date_time = UtcDateTime::UNIX_EPOCH;
+        let one_day = Duration::from_secs(24 * 60 * 60);
+        let yesterday = UtcDateTime::from_timespec(-24 * 60 * 60, 0).unwrap();
+
+        assert_eq!(yesterday, date_time - one_day);
+
+        date_time -= one_day;
+        assert_eq!(yesterday, date_time);
+    }
+
+    #[test]
+    #[should_panic(expected = "attempt to subtract with overflow")]
+    fn test_sub_for_utc_date_time_overflow() {
+        let _ = UtcDateTime::UNIX_EPOCH - Duration::from_secs(u64::MAX);
+    }
+
+    #[test]
+    fn test_sub_for_utc_date_time_borrows_nanoseconds() {
+        let utc_date_time = UtcDateTime::from_timespec(0, 200_000_000).unwrap();
+        let duration = Duration::from_nanos(800_000_000);
+        let out = UtcDateTime::from_timespec(-1, 400_000_000).unwrap();
+
+        assert_eq!(out, utc_date_time - duration);
+    }
+
+    #[test]
+    fn test_duration_since_for_utc_date_time_nanoseconds_only() {
+        let after = UtcDateTime::from_timespec(10, 300_000_000).unwrap();
+        let before = UtcDateTime::from_timespec(10, 200_000_000).unwrap();
+
+        assert_eq!(Ok(Duration::from_nanos(100_000_000)), after.duration_since(before));
+        assert_eq!(Err(Duration::from_nanos(100_000_000)), before.duration_since(after));
+    }
+
+    #[test]
+    fn test_duration_since_for_utc_date_time_borrows_nanoseconds() {
+        {
+            // after epoch
+            let after = UtcDateTime::from_timespec(3, 200_000_000).unwrap();
+            let before = UtcDateTime::from_timespec(1, 800_000_000).unwrap();
+            assert_eq!(Ok(Duration::new(1, 400_000_000)), after.duration_since(before));
+        }
+
+        {
+            // spanning epoch
+            let after = UtcDateTime::from_timespec(1, 200_000_000).unwrap();
+            let before = UtcDateTime::from_timespec(-1, 800_000_000).unwrap();
+            assert_eq!(Ok(Duration::new(1, 400_000_000)), after.duration_since(before));
+        }
+
+        {
+            // before epoch
+            let after = UtcDateTime::from_timespec(-1, 200_000_000).unwrap();
+            let before = UtcDateTime::from_timespec(-3, 800_000_000).unwrap();
+            assert_eq!(Ok(Duration::new(1, 400_000_000)), after.duration_since(before));
+        }
     }
 }
