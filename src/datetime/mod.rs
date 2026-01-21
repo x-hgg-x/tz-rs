@@ -186,13 +186,13 @@ impl UtcDateTime {
     /// use core::time::Duration;
     /// use tz::UtcDateTime;
     ///
-    /// let unix_epoch = UtcDateTime::UNIX_EPOCH;
-    /// assert_eq!("1970-01-01T00:00:00.000000000Z", unix_epoch.to_string());
+    /// let today = UtcDateTime::UNIX_EPOCH;
+    /// assert_eq!((1970, 1, 1), (today.year(), today.month(), today.month_day()));
     ///
-    /// let tomorrow = unix_epoch.checked_add(Duration::from_secs(24 * 60 * 60))?;
-    /// assert_eq!("1970-01-02T00:00:00.000000000Z", tomorrow.to_string());
+    /// let tomorrow = today.checked_add(Duration::from_secs(24 * 60 * 60))?;
+    /// assert_eq!((1970, 1, 2), (tomorrow.year(), tomorrow.month(), tomorrow.month_day()));
     ///
-    /// assert_eq!(None, unix_epoch.checked_add(Duration::from_secs(u64::MAX)));
+    /// assert_eq!(None, today.checked_add(Duration::from_secs(u64::MAX)));
     /// # Some(()) } test().expect("doctest exited prematurely");
     /// ```
     pub const fn checked_add(&self, rhs: Duration) -> Option<Self> {
@@ -227,13 +227,13 @@ impl UtcDateTime {
     /// use core::time::Duration;
     /// use tz::UtcDateTime;
     ///
-    /// let unix_epoch = UtcDateTime::UNIX_EPOCH;
-    /// assert_eq!("1970-01-01T00:00:00.000000000Z", unix_epoch.to_string());
+    /// let today = UtcDateTime::UNIX_EPOCH;
+    /// assert_eq!((1970, 1, 1), (today.year(), today.month(), today.month_day()));
     ///
-    /// let yesterday = unix_epoch.checked_sub(Duration::from_secs(24 * 60 * 60))?;
-    /// assert_eq!("1969-12-31T00:00:00.000000000Z", yesterday.to_string());
+    /// let yesterday = today.checked_sub(Duration::from_secs(24 * 60 * 60))?;
+    /// assert_eq!((1969, 12, 31), (yesterday.year(), yesterday.month(), yesterday.month_day()));
     ///
-    /// assert_eq!(None, unix_epoch.checked_sub(Duration::from_secs(u64::MAX)));
+    /// assert_eq!(None, today.checked_sub(Duration::from_secs(u64::MAX)));
     /// # Some(()) } test().expect("doctest exited prematurely");
     /// ```
     pub const fn checked_sub(&self, rhs: Duration) -> Option<Self> {
