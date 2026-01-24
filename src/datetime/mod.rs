@@ -17,6 +17,10 @@ use crate::utils::{min, try_into_i32, try_into_i64};
 
 use core::cmp::Ordering;
 use core::fmt;
+use core::ops::{Add, AddAssign, Sub, SubAssign};
+use core::time::Duration;
+#[cfg(feature = "std")]
+use std::time::SystemTime;
 
 /// UTC date time expressed in the [proleptic gregorian calendar](https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar)
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
@@ -44,10 +48,20 @@ impl fmt::Display for UtcDateTime {
 }
 
 impl UtcDateTime {
+    /// Unix epoch (`1970-01-01T00:00:00Z`)
+    pub const UNIX_EPOCH: Self = Self { year: 1970, month: 1, month_day: 1, hour: 0, minute: 0, second: 0, nanoseconds: 0 };
+
+    /// Minimum allowed UTC date time
+    pub const MIN: Self = Self { year: i32::MIN, month: 1, month_day: 1, hour: 0, minute: 0, second: 0, nanoseconds: 0 };
+
+    /// Maximum allowed UTC date time
+    pub const MAX: Self = Self { year: i32::MAX, month: 12, month_day: 31, hour: 23, minute: 59, second: 59, nanoseconds: 999_999_999 };
+
     /// Minimum allowed Unix time in seconds
-    const MIN_UNIX_TIME: i64 = -67768100567971200;
+    const MIN_UNIX_TIME: i64 = UtcDateTime::MIN.unix_time();
+
     /// Maximum allowed Unix time in seconds
-    const MAX_UNIX_TIME: i64 = 67767976233532799;
+    const MAX_UNIX_TIME: i64 = UtcDateTime::MAX.unix_time();
 
     /// Check if the UTC date time associated to a Unix time in seconds is valid
     const fn check_unix_time(unix_time: i64) -> Result<(), TzError> {
@@ -163,10 +177,100 @@ impl UtcDateTime {
         DateTime::from_timespec(self.unix_time(), self.nanoseconds, time_zone_ref)
     }
 
+    /// Add a given duration to the UTC date time, returning `None` if the result cannot be represented.
+    pub const fn checked_add(&self, duration: Duration) -> Option<Self> {
+        // Overflow is not possible
+        let total_nanoseconds = self.total_nanoseconds() + duration.as_nanos() as i128;
+
+        match Self::from_total_nanoseconds(total_nanoseconds) {
+            Ok(x) => Some(x),
+            Err(_) => None,
+        }
+    }
+
+    /// Subtract a given duration from the UTC date time, returning `None` if the result cannot be represented.
+    pub const fn checked_sub(&self, duration: Duration) -> Option<Self> {
+        // Overflow is not possible
+        let total_nanoseconds = self.total_nanoseconds() - duration.as_nanos() as i128;
+
+        match Self::from_total_nanoseconds(total_nanoseconds) {
+            Ok(x) => Some(x),
+            Err(_) => None,
+        }
+    }
+
+    /// Get the duration elapsed since an earlier point in time.
+    ///
+    /// Returns `Ok(Duration)` if `earlier` is before `self`, or `Err(Duration)` otherwise with the duration in the opposite direction.
+    ///
+    pub const fn duration_since(&self, earlier: Self) -> Result<Duration, Duration> {
+        let current_total_nanoseconds = self.total_nanoseconds();
+        let earlier_total_nanoseconds = earlier.total_nanoseconds();
+
+        duration_between(earlier_total_nanoseconds, current_total_nanoseconds)
+    }
+
     /// Returns the current UTC date time
     #[cfg(feature = "std")]
     pub fn now() -> Result<Self, TzError> {
-        Self::from_total_nanoseconds(crate::utils::current_total_nanoseconds())
+        SystemTime::now().try_into()
+    }
+}
+
+#[cfg(feature = "std")]
+impl TryFrom<SystemTime> for UtcDateTime {
+    type Error = TzError;
+
+    fn try_from(time: SystemTime) -> Result<Self, Self::Error> {
+        Self::from_total_nanoseconds(crate::utils::system_time::total_nanoseconds(time))
+    }
+}
+
+#[cfg(feature = "std")]
+impl From<UtcDateTime> for SystemTime {
+    fn from(utc_date_time: UtcDateTime) -> Self {
+        match duration_between(0, utc_date_time.total_nanoseconds()) {
+            Ok(duration) => SystemTime::UNIX_EPOCH + duration,
+            Err(duration) => SystemTime::UNIX_EPOCH - duration,
+        }
+    }
+}
+
+impl Add<Duration> for UtcDateTime {
+    type Output = UtcDateTime;
+
+    /// # Panics
+    ///
+    /// This function may panic if the result cannot be represented.
+    /// See [`UtcDateTime::checked_add`] if this is not desired.
+    ///
+    fn add(self, rhs: Duration) -> Self::Output {
+        self.checked_add(rhs).expect("attempt to add with overflow")
+    }
+}
+
+impl AddAssign<Duration> for UtcDateTime {
+    fn add_assign(&mut self, rhs: Duration) {
+        *self = *self + rhs
+    }
+}
+
+impl Sub<Duration> for UtcDateTime {
+    type Output = UtcDateTime;
+
+    /// # Panics
+    ///
+    /// This function may panic if the result cannot be represented.
+    /// See [`UtcDateTime::checked_sub`] if this is not desired.
+    ///
+    fn sub(self, rhs: Duration) -> Self::Output {
+        self.checked_sub(rhs).expect("attempt to subtract with overflow")
+    }
+}
+
+impl SubAssign<Duration> for UtcDateTime {
+    fn sub_assign(&mut self, rhs: Duration) {
+        *self = *self - rhs
     }
 }
 
@@ -400,11 +504,40 @@ impl DateTime {
         Self::from_timespec(self.unix_time, self.nanoseconds, time_zone_ref)
     }
 
+    /// Get the duration elapsed since an earlier point in time.
+    ///
+    /// Returns `Ok(Duration)` if `earlier` is before `self`, or `Err(Duration)` otherwise with the duration in the opposite direction.
+    ///
+    pub const fn duration_since(&self, earlier: Self) -> Result<Duration, Duration> {
+        let current_total_nanoseconds = self.total_nanoseconds();
+        let earlier_total_nanoseconds = earlier.total_nanoseconds();
+
+        duration_between(earlier_total_nanoseconds, current_total_nanoseconds)
+    }
+
     /// Returns the current date time associated to the specified time zone
     #[cfg(feature = "std")]
     pub fn now(time_zone_ref: TimeZoneRef<'_>) -> Result<Self, TzError> {
-        let now = crate::utils::current_total_nanoseconds();
+        let now = crate::utils::system_time::total_nanoseconds(SystemTime::now());
         Self::from_total_nanoseconds(now, time_zone_ref)
+    }
+}
+
+impl TryFrom<DateTime> for UtcDateTime {
+    type Error = TzError;
+
+    fn try_from(date_time: DateTime) -> Result<Self, Self::Error> {
+        Self::from_timespec(date_time.unix_time, date_time.nanoseconds)
+    }
+}
+
+#[cfg(feature = "std")]
+impl From<DateTime> for SystemTime {
+    fn from(date_time: DateTime) -> Self {
+        match duration_between(0, date_time.total_nanoseconds()) {
+            Ok(duration) => SystemTime::UNIX_EPOCH + duration,
+            Err(duration) => SystemTime::UNIX_EPOCH - duration,
+        }
     }
 }
 
@@ -616,6 +749,24 @@ const fn total_nanoseconds_to_timespec(total_nanoseconds: i128) -> Result<(i64, 
     let nanoseconds = total_nanoseconds.rem_euclid(NANOSECONDS_PER_SECOND as i128) as u32;
 
     Ok((unix_time, nanoseconds))
+}
+
+/// Get the duration elapsed between two points in time represented as total nanoseconds since Unix epoch (`1970-01-01T00:00:00Z`).
+///
+/// Returns `Ok(Duration)` if `before` is before `after`, or `Err(Duration)` otherwise with the duration in the opposite direction.
+///
+#[inline]
+const fn duration_between(before: i128, after: i128) -> Result<Duration, Duration> {
+    // Overflow is not possible
+    let total_nanoseconds_diff = after.abs_diff(before);
+
+    let secs = total_nanoseconds_diff / NANOSECONDS_PER_SECOND as u128;
+    let nanos = total_nanoseconds_diff % NANOSECONDS_PER_SECOND as u128;
+
+    // Overflow is not possible
+    let duration = Duration::new(secs as u64, nanos as u32);
+
+    if after >= before { Ok(duration) } else { Err(duration) }
 }
 
 /// Check date time inputs
@@ -1065,6 +1216,26 @@ mod tests {
 
     #[cfg(feature = "alloc")]
     #[test]
+    fn test_date_time_duration() -> Result<(), TzError> {
+        let utc_date_time = UtcDateTime::new(1, 2, 3, 4, 5, 6, 789_012_345)?;
+        let date_time = utc_date_time.project(TimeZoneRef::utc())?;
+
+        let duration = Duration::new(24 * 3600 * 365, 999_999_999);
+
+        let added_utc_date_time = UtcDateTime::new(2, 2, 3, 4, 5, 7, 789_012_344)?;
+        let substracted_utc_date_time = UtcDateTime::new(0, 2, 4, 4, 5, 5, 789_012_346)?;
+
+        assert_eq!(utc_date_time.checked_add(duration), Some(added_utc_date_time));
+        assert_eq!(utc_date_time.checked_sub(duration), Some(substracted_utc_date_time));
+
+        assert_eq!(utc_date_time.duration_since(substracted_utc_date_time), Ok(duration));
+        assert_eq!(date_time.duration_since(substracted_utc_date_time.project(TimeZoneRef::utc())?), Ok(duration));
+
+        Ok(())
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
     fn test_date_time_overflow() -> Result<(), TzError> {
         assert!(UtcDateTime::new(i32::MIN, 1, 1, 0, 0, 0, 0).is_ok());
         assert!(UtcDateTime::new(i32::MAX, 12, 31, 23, 59, 59, 0).is_ok());
@@ -1096,6 +1267,15 @@ mod tests {
 
         assert!(matches!(DateTime::from_timespec(i64::MIN, 0, TimeZone::fixed(-1)?.as_ref()), Err(TzError::OutOfRange)));
         assert!(matches!(DateTime::from_timespec(i64::MAX, 0, TimeZone::fixed(1)?.as_ref()), Err(TzError::OutOfRange)));
+
+        assert_eq!(UtcDateTime::MIN.checked_sub(Duration::from_nanos(1)), None);
+        assert_eq!(UtcDateTime::MAX.checked_add(Duration::from_nanos(1)), None);
+
+        assert_eq!(UtcDateTime::MIN.checked_sub(Duration::MAX), None);
+        assert_eq!(UtcDateTime::MAX.checked_add(Duration::MAX), None);
+
+        assert_eq!(UtcDateTime::MAX.duration_since(UtcDateTime::MIN), Ok(Duration::new(135536076801503999, 999999999)));
+        assert_eq!(UtcDateTime::MIN.duration_since(UtcDateTime::MAX), Err(Duration::new(135536076801503999, 999999999)));
 
         Ok(())
     }
@@ -1183,6 +1363,20 @@ mod tests {
 
         assert!(matches!(total_nanoseconds_to_timespec(min_total_nanoseconds - 1), Err(TzError::OutOfRange)));
         assert!(matches!(total_nanoseconds_to_timespec(max_total_nanoseconds + 1), Err(TzError::OutOfRange)));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_duration_between() -> Result<(), TzError> {
+        assert_eq!(duration_between(1_234_567_890, 1_234_567_890), Ok(Duration::ZERO));
+        assert_eq!(duration_between(-1_000_001_000, 1_000_001_000), Ok(Duration::new(2, 2000)));
+        assert_eq!(duration_between(1_000_001_000, -1_000_001_000), Err(Duration::new(2, 2000)));
+
+        assert_eq!(
+            duration_between(UtcDateTime::MIN.total_nanoseconds(), UtcDateTime::MAX.total_nanoseconds()),
+            Ok(Duration::new(135536076801503999, 999999999))
+        );
 
         Ok(())
     }

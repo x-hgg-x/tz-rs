@@ -21,6 +21,9 @@ use core::str;
 #[cfg(feature = "alloc")]
 use alloc::{boxed::Box, format, vec, vec::Vec};
 
+#[cfg(feature = "std")]
+use std::time::SystemTime;
+
 /// Transition of a TZif file
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Transition {
@@ -522,7 +525,7 @@ impl TimeZone {
     /// Find the current local time type associated to the time zone
     #[cfg(feature = "std")]
     pub fn find_current_local_time_type(&self) -> Result<&LocalTimeType, TzError> {
-        self.find_local_time_type(crate::utils::current_unix_time())
+        self.find_local_time_type(crate::utils::system_time::unix_time(SystemTime::now()))
     }
 }
 
