@@ -303,9 +303,17 @@ impl PartialEq for DateTime {
     }
 }
 
+impl Eq for DateTime {}
+
 impl PartialOrd for DateTime {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        (self.unix_time, self.nanoseconds).partial_cmp(&(other.unix_time, other.nanoseconds))
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for DateTime {
+    fn cmp(&self, other: &Self) -> Ordering {
+        (self.unix_time, self.nanoseconds).cmp(&(other.unix_time, other.nanoseconds))
     }
 }
 
@@ -1114,8 +1122,9 @@ mod tests {
         impl _AssertSyncSendStatic for DateTime {}
     }
 
+    #[cfg(feature = "alloc")]
     #[test]
-    fn test_utc_date_time_ord() -> Result<(), TzError> {
+    fn test_date_time_ord() -> Result<(), TzError> {
         let utc_date_time_1 = UtcDateTime::new(1972, 6, 30, 23, 59, 59, 1000)?;
         let utc_date_time_2 = UtcDateTime::new(1972, 6, 30, 23, 59, 60, 1000)?;
         let utc_date_time_3 = UtcDateTime::new(1972, 7, 1, 0, 0, 0, 1000)?;
@@ -1154,6 +1163,31 @@ mod tests {
 
         assert_eq!(utc_date_time_4.cmp(&utc_date_time_1), utc_date_time_4.unix_time().cmp(&utc_date_time_1.unix_time()));
         assert_eq!(utc_date_time_4.cmp(&utc_date_time_4), utc_date_time_4.unix_time().cmp(&utc_date_time_4.unix_time()));
+
+        let date_time_1 = utc_date_time_1.project(TimeZone::fixed(0)?.as_ref())?;
+        let date_time_2 = utc_date_time_2.project(TimeZone::fixed(3600)?.as_ref())?;
+        let date_time_3 = utc_date_time_3.project(TimeZone::fixed(7200)?.as_ref())?;
+        let date_time_4 = utc_date_time_4.project(TimeZone::fixed(10800)?.as_ref())?;
+
+        assert_eq!(date_time_1.cmp(&date_time_1), Ordering::Equal);
+        assert_eq!(date_time_1.cmp(&date_time_2), Ordering::Less);
+        assert_eq!(date_time_1.cmp(&date_time_3), Ordering::Less);
+        assert_eq!(date_time_1.cmp(&date_time_4), Ordering::Less);
+
+        assert_eq!(date_time_2.cmp(&date_time_1), Ordering::Greater);
+        assert_eq!(date_time_2.cmp(&date_time_2), Ordering::Equal);
+        assert_eq!(date_time_2.cmp(&date_time_3), Ordering::Equal);
+        assert_eq!(date_time_2.cmp(&date_time_4), Ordering::Less);
+
+        assert_eq!(date_time_3.cmp(&date_time_1), Ordering::Greater);
+        assert_eq!(date_time_3.cmp(&date_time_2), Ordering::Equal);
+        assert_eq!(date_time_3.cmp(&date_time_3), Ordering::Equal);
+        assert_eq!(date_time_3.cmp(&date_time_4), Ordering::Less);
+
+        assert_eq!(date_time_4.cmp(&date_time_1), Ordering::Greater);
+        assert_eq!(date_time_4.cmp(&date_time_2), Ordering::Greater);
+        assert_eq!(date_time_4.cmp(&date_time_3), Ordering::Greater);
+        assert_eq!(date_time_4.cmp(&date_time_4), Ordering::Equal);
 
         Ok(())
     }
